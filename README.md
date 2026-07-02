@@ -22,6 +22,7 @@ uv run philly snapshot-all      # capture all core tables (or: philly snapshot c
 uv run philly stage             # typed/deduped/classified staged tables (polars)
 uv run philly validate-sales    # marts/sale_validity.parquet with reason codes
 uv run philly build-features    # marts/sale_features.parquet (registry: docs/features.md)
+uv run philly train-baseline    # LightGBM + Ridge baselines, benchmarked against OPA
 uv run philly freshness         # heartbeat: exit 1 if snapshots are missing/stale
 
 # See what's on disk, then query it (views: raw_<dataset>, stg_<table>, mart_<table>)
@@ -51,6 +52,7 @@ src/philly_assessments/
   staging/             # raw -> typed/deduped/classified tables (polars)
   validation/sales.py  # CCAO-style sale-validity classification
   features/            # model-ready feature marts (see docs/features.md)
+  models/              # baseline models + IAAO ratio metrics (runs under data/models/)
   catalog.py           # DuckDB views over raw snapshots + staged/mart tables
   cli.py               # `philly` command-line entry point
 docs/

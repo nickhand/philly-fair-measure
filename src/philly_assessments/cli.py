@@ -69,6 +69,28 @@ def _cmd_build_features(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_train_baseline(args: argparse.Namespace) -> int:
+    from philly_assessments.models import train_baseline
+
+    result = train_baseline(args.data_dir, test_fraction=args.test_fraction)
+    print(f"run {result.run_id} -> {result.run_dir}\n")
+    columns = ("n", "rmse_log", "mape", "r2_log", "median_ratio", "cod", "prd", "prb")
+    print(f"{'model':<16}" + "".join(f"{c:>13}" for c in columns))
+    for model in ("lightgbm", "ridge", "opa_assessment"):
+        row = result.overall[model]
+        cells = []
+        for column in columns:
+            value = row.get(column)
+            if value is None:
+                cells.append(f"{'-':>13}")
+            elif column == "n":
+                cells.append(f"{value:>13,}")
+            else:
+                cells.append(f"{value:>13.4f}")
+        print(f"{model:<16}" + "".join(cells))
+    return 0
+
+
 def _cmd_snapshot_all(args: argparse.Namespace) -> int:
     from philly_assessments import config
 
@@ -163,6 +185,13 @@ def main(argv: list[str] | None = None) -> int:
     build_features.add_argument("--min-sale-year", type=int, default=2016)
     build_features.add_argument("--data-dir", type=Path)
     build_features.set_defaults(func=_cmd_build_features)
+
+    train = subparsers.add_parser(
+        "train-baseline", help="train LightGBM + Ridge baselines and benchmark against OPA"
+    )
+    train.add_argument("--test-fraction", type=float, default=0.1)
+    train.add_argument("--data-dir", type=Path)
+    train.set_defaults(func=_cmd_train_baseline)
 
     snapshot_all = subparsers.add_parser(
         "snapshot-all", help="snapshot every core table (the recurring snapshot job)"
