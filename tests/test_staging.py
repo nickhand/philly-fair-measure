@@ -130,11 +130,18 @@ def test_stg_opa_properties_adds_parsed_columns():
             "recording_date": ["2023-01-01T00:00:00Z"],
             "date_exterior_condition": [None],
             "year_built": ["1750"],
+            "house_number": ["108"],
+            # real point sampled from opa_properties_public (lon ~ -75.03, lat ~ 40.04)
+            "the_geom": ["0101000020E6100000AAFF97D2E0C152C045882B37A2054440"],
         }
     )
     out = stg_opa_properties(raw).collect()
     assert out["assessment_date_status"].to_list() == ["ok"]
     assert out["sale_date_status"].to_list() == ["implausible"]
     assert out["year_built_parsed"].to_list() == [1750]
+    assert out["house_number_parsed"].to_list() == [108]
+    assert out["lonlat_status"].to_list() == ["ok"]
+    assert abs(out["lon"][0] - -75.0293) < 0.001
+    assert abs(out["lat"][0] - 40.0440) < 0.001
     # raw passthrough intact
     assert out["parcel_number"].to_list() == ["1"]

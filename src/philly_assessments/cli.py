@@ -61,6 +61,14 @@ def _cmd_validate_sales(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_build_features(args: argparse.Namespace) -> int:
+    from philly_assessments.features import build_sale_features
+
+    result = build_sale_features(args.data_dir, min_sale_year=args.min_sale_year)
+    print(f"{result.manifest.row_count:,} rows -> {result.path}")
+    return 0
+
+
 def _cmd_snapshot_all(args: argparse.Namespace) -> int:
     from philly_assessments import config
 
@@ -148,6 +156,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     validate.add_argument("--data-dir", type=Path)
     validate.set_defaults(func=_cmd_validate_sales)
+
+    build_features = subparsers.add_parser(
+        "build-features", help="build marts/sale_features.parquet for arms-length sales"
+    )
+    build_features.add_argument("--min-sale-year", type=int, default=2016)
+    build_features.add_argument("--data-dir", type=Path)
+    build_features.set_defaults(func=_cmd_build_features)
 
     snapshot_all = subparsers.add_parser(
         "snapshot-all", help="snapshot every core table (the recurring snapshot job)"

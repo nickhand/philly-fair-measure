@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import polars as pl
 
+from philly_assessments.staging.geometry import with_point_lonlat
 from philly_assessments.staging.temporal import with_parsed_timestamp, with_parsed_year
 
 # Verified against the live rtt_summary table 2026-07-02 (docs/source_inventory.md).
@@ -67,7 +68,8 @@ def stg_assessments(raw: pl.LazyFrame) -> pl.LazyFrame:
 
 
 def stg_opa_properties(raw: pl.LazyFrame) -> pl.LazyFrame:
-    """Current OPA roll: all raw columns plus parsed temporal columns and year_built.
+    """Current OPA roll: all raw columns plus parsed temporal columns, year_built,
+    lon/lat decoded from the point geometry, and a numeric house number.
 
     Every value here is current-state only (temporal quality: current_only);
     never treat these characteristics as historically accurate for old sales.
@@ -75,7 +77,74 @@ def stg_opa_properties(raw: pl.LazyFrame) -> pl.LazyFrame:
     lf = raw
     for column in OPA_TIMESTAMP_COLUMNS:
         lf = with_parsed_timestamp(lf, column)
-    return with_parsed_year(lf, "year_built")
+    lf = with_parsed_year(lf, "year_built")
+    lf = with_point_lonlat(lf)
+    return lf.with_columns(
+        pl.col("house_number").cast(pl.String).str.strip_chars().cast(pl.Int32, strict=False)
+        .alias("house_number_parsed")
+    )
+
+
+def stg_permits(raw: pl.LazyFrame) -> pl.LazyFrame:
+    """L&I permits with parsed event dates, keyed to OPA accounts where linked."""
+    lf = raw
+    for column in ("permitissuedate", "permitcompleteddate", "certificateofoccupancydate"):
+        lf = with_parsed_timestamp(lf, column)
+    return lf.select(
+        "permitnumber",
+        "opa_account_num",
+        "parcel_id_num",
+        "permittype",
+        "permitdescription",
+        "typeofwork",
+        "commercialorresidential",
+        "approvedscopeofwork",
+        "status",
+        "systemofrecord",
+        "permitissuedate",
+        "permitissuedate_parsed",
+        "permitissuedate_status",
+        "permitcompleteddate",
+        "permitcompleteddate_parsed",
+        "permitcompleteddate_status",
+        "certificateofoccupancydate",
+        "certificateofoccupancydate_parsed",
+        "certificateofoccupancydate_status",
+        "address",
+        "zip",
+        "censustract",
+        "geocode_x",
+        "geocode_y",
+    )
+
+
+def stg_violations(raw: pl.LazyFrame) -> pl.LazyFrame:
+    """L&I violations with parsed event dates, keyed to OPA accounts where linked."""
+    lf = raw
+    for column in ("violationdate", "violationresolutiondate", "casecreateddate"):
+        lf = with_parsed_timestamp(lf, column)
+    return lf.select(
+        "violationnumber",
+        "casenumber",
+        "opa_account_num",
+        "parcel_id_num",
+        "violationcode",
+        "violationcodetitle",
+        "violationstatus",
+        "caseprioritydesc",
+        "violationdate",
+        "violationdate_parsed",
+        "violationdate_status",
+        "violationresolutiondate",
+        "violationresolutiondate_parsed",
+        "violationresolutiondate_status",
+        "casecreateddate",
+        "casecreateddate_parsed",
+        "casecreateddate_status",
+        "address",
+        "zip",
+        "censustract",
+    )
 
 
 def stg_deeds(raw: pl.LazyFrame) -> pl.LazyFrame:
