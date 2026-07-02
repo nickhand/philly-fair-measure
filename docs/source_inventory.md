@@ -1,0 +1,197 @@
+# Source Inventory
+
+Verified inventory of public datasets for the Philadelphia property assessment
+project. **Every "verified" entry below was checked live against the source API
+on 2026-07-02** (schema via `SELECT * ... LIMIT 0`, row counts via `count(*)`,
+ArcGIS layers via service metadata + `returnCountOnly` queries). Nothing here is
+assumed from memory or documentation alone. Row counts drift as sources update;
+treat them as of the verification date. Update cadence is mostly *unobserved* so
+far — establishing it empirically is what the snapshot program is for.
+
+Two API families serve this project:
+
+| Family | Endpoint | Serves |
+|---|---|---|
+| CARTO SQL API | `https://phl.carto.com/api/v2/sql?q=<sql>` | Tabular city datasets (OPA, L&I, Revenue) |
+| ArcGIS REST (City of Philadelphia org) | `https://services.arcgis.com/fLeGjb7u4uXqeF9q/ArcGIS/rest/services/<name>/FeatureServer/0` | Parcel/boundary/footprint geometries |
+
+CARTO notes (verified by probing): every table carries an indexed `cartodb_id`
+(int8) suitable for keyset pagination; geometry columns (`the_geom`) return as
+hex-encoded EWKB strings in SRID 4326; `the_geom_webmercator` is a redundant
+CARTO-internal reprojection. ArcGIS layers cap responses at `maxRecordCount=2000`,
+so bulk geometry pulls need `resultOffset` paging or envelope tiling.
+
+---
+
+## Core datasets (verified, snapshot-priority)
+
+### 1. OPA property assessments — current roll (`opa_properties_public`)
+
+- **Source page:** <https://opendataphilly.org/datasets/property-assessments/>
+- **API:** CARTO, table `opa_properties_public`
+- **Rows:** 583,711 (2026-07-02) — one row per OPA account (`parcel_number`)
+- **Schema:** 82 columns: identifiers (`parcel_number`, `pin`, address parts,
+  `registry_number`), current assessment (`market_value`, `taxable_land`,
+  `taxable_building`, `exempt_land`, `exempt_building`, `assessment_date`,
+  `market_value_date`, `homestead_exemption`), characteristics (`total_livable_area`,
+  `total_area`, `frontage`, `depth`, `number_of_bedrooms`, `number_of_bathrooms`,
+  `number_stories`, `year_built`, `year_built_estimate`, `quality_grade`,
+  `exterior_condition`, `interior_condition`, `basements`, `central_air`,
+  `garage_spaces`, `type_heater`, `fireplaces`, `view_type`, `topography`,
+  `parcel_shape`, `zoning`, `building_code(_new)`, `category_code`), last sale
+  (`sale_date`, `sale_price`, `recording_date`, `book_and_page`), owner/mailing
+  fields, `census_tract`, point geometry.
+- **Keys:** `parcel_number` (9-digit OPA/BRT account, string — preserve leading
+  zeros); `pin` also present.
+- **Relevance:** The central table: current characteristics + current assessment.
+- **Limitations:** **Current-state only** — characteristics reflect the latest
+  known values, not values as of past sale dates (the project's core temporal
+  caveat; every feature derived from here is `current_only`). Interior/exterior
+  condition and quality-grade fields exist but their fill rates/variance are
+  unprofiled. `year_built_estimate` flags estimated ages. Condition of unpermitted
+  renovations not reflected. Timestamp fields contain unparseable garbage
+  (observed live: an `assessment_date`-family value with year "206"), which is
+  why the raw layer stores temporal columns as verbatim strings and parsing
+  happens at staging with per-value status.
+
+### 2. OPA assessment history (`assessments`)
+
+- **Source page:** <https://opendataphilly.org/datasets/property-assessments/>
+- **API:** CARTO, table `assessments`
+- **Rows:** 7,485,082 (2026-07-02) ≈ 583k accounts × ~13 years
+- **Schema:** 11 columns: `parcel_number`, `year`, `market_value`,
+  `taxable_land`, `taxable_building`, `exempt_land`, `exempt_building`. No geometry.
+- **Keys:** (`parcel_number`, `year`) — **not perfectly unique**: the
+  2026-07-02 snapshot has 7,485,082 rows but 7,484,963 distinct key pairs
+  (119 duplicates). Staging must resolve or flag these.
+- **Relevance:** True assessment history — enables year-over-year assessment
+  trajectories, reassessment-cycle detection, and staleness analysis without
+  waiting for our own snapshots to accrue. Coverage observed: 2013–2027,
+  including the future-year roll (2027 values are published in advance).
+- **Limitations:** Values only; no historical *characteristics*. `year` is
+  varchar. Whether past years are ever restated is unknown — snapshots will
+  answer this.
+
+### 3. Real estate transfers (`rtt_summary`)
+
+- **Source page:** <https://opendataphilly.org/datasets/real-estate-transfers/>
+- **API:** CARTO, table `rtt_summary`
+- **Rows:** 5,110,364 (2026-07-02)
+- **Schema:** 51 columns: `document_id`, `document_type` (deeds, mortgages,
+  sheriff's deeds, etc.), `document_date`, `recording_date`, `display_date`,
+  `grantors`, `grantees` (free text), `cash_consideration`, `other_consideration`,
+  `total_consideration`, `assessed_value`, `common_level_ratio`,
+  `fair_market_value`, adjusted variants, `opa_account_num`, `property_count`,
+  address parts, `condo_name`/`unit_num`, `reg_map_id`, `legal_remarks`,
+  `discrepancy`.
+- **Keys:** `document_id` (one row per document–property; verify grain during
+  staging — `property_count` > 1 indicates multi-parcel documents).
+- **Relevance:** The sales backbone for Milestone 4. Maps remarkably well onto
+  the CCAO sales-validation template: `document_type` ≈ deed-type exclusions,
+  `grantors`/`grantees` → family-sale and legal-entity heuristics,
+  `property_count` → multi-parcel exclusion, `total_consideration` vs
+  `fair_market_value`/`common_level_ratio` → nominal-sale detection.
+- **Limitations:** Includes *all* recorded transfer-tax documents, not just
+  sales — deed filtering is mandatory. Names are messy free text.
+  `opa_account_num` linkage quality unprofiled (see `matched_regmap`,
+  `discrepancy`). Consideration can be nominal ($1 family transfers).
+
+### 4. L&I building & trade permits (`permits`)
+
+- **Source page:** <https://opendataphilly.org/datasets/licenses-and-inspections-building-permits/>
+- **API:** CARTO, table `permits`
+- **Rows:** 925,297 (2026-07-02)
+- **Schema:** 48 columns: `permitnumber`, `permittype`, `permitdescription`,
+  `typeofwork`, `approvedscopeofwork` (free text), `commercialorresidential`,
+  `permitissuedate`, `permitcompleteddate`, `certificateofoccupancydate`,
+  `status`, `opa_account_num`, `parcel_id_num`, `address`, `censustract`,
+  contractor fields, `geocode_x/y`.
+- **Keys:** `permitnumber`; joins to OPA via `opa_account_num`.
+- **Relevance:** Renovation/change proxy (CCAO's `char_recent_renovation`
+  analog); issue/completion dates give true event timing for temporal features.
+- **Limitations:** Only permitted work is visible — unpermitted renovations
+  (including the motivating property's) are invisible by construction. System
+  migration artifacts likely (`systemofrecord` column); date coverage to be
+  profiled.
+
+### 5. L&I code violations (`violations`)
+
+- **Source page:** <https://opendataphilly.org/datasets/licenses-and-inspections-violations/>
+- **API:** CARTO, table `violations`
+- **Rows:** 1,990,761 (2026-07-02)
+- **Schema:** 36 columns: `violationnumber`, `violationdate`, `violationcode`,
+  `violationcodetitle`, `violationstatus`, `violationresolutiondate`,
+  `casenumber`, case dates/status/priority, `opa_account_num`, `address`,
+  `censustract`, `geocode_x/y`, `underappeal`.
+- **Keys:** `violationnumber` (verify grain); joins via `opa_account_num`.
+- **Relevance:** Property-condition and distress proxy with real event dates;
+  neighborhood-level distress aggregates.
+- **Limitations:** Enforcement intensity varies by area and era — signal
+  confounds condition with inspection attention.
+
+---
+
+## Secondary datasets (existence + row count verified; schemas not yet pulled)
+
+| Table (CARTO) | Rows (2026-07-02) | Relevance | Notes |
+|---|---|---|---|
+| `real_estate_tax_delinquencies` | 54,401 | Distress signal; sale-validity context | |
+| `demolitions` | 14,206 | Structure-change events | |
+| `case_investigations` | 2,080,263 | L&I case detail behind violations | Large; snapshot later |
+| `business_licenses` | 431,911 | Rental-license signal (owner-occupancy proxy) | |
+| `appeals` | 43,140 | **L&I** appeals (permits/violations), *not* assessment appeals | |
+| `unsafe` | 3,076 | Unsafe-structure designations | |
+| `imm_dang` | 131 | Imminently dangerous structures | |
+| `li_court_appeals` | 460 | L&I court appeals | |
+| `opa_properties_public_pde` | 583,711 | Variant of the OPA table (PDE = Property Data Explorer?) | Diff against `opa_properties_public` before using |
+
+Probed and **not present** on CARTO (do not reference): `vacant_indicators_points`,
+`real_estate_transfers` (the transfers table is `rtt_summary`).
+
+---
+
+## Geospatial layers (ArcGIS REST, verified)
+
+Base: `https://services.arcgis.com/fLeGjb7u4uXqeF9q/ArcGIS/rest/services/<name>/FeatureServer/0`
+
+| Service | Geometry | Features | Key fields | Relevance / notes |
+|---|---|---|---|---|
+| `DOR_Parcel` | polygon | 607,816 | `mapreg`, `basereg`, `parcel`, address parts | Legal (Dept. of Records) parcel fabric. Registry keys ≠ OPA accounts; DOR↔OPA linkage is nontrivial and must go through PWD parcels or AIS. |
+| `PWD_PARCELS` | polygon | 547,321 | `brt_id`, `num_brt`, `num_accounts`, `gross_area`, `pin`, owner, `bldg_code` | **Best parcel↔OPA bridge**: carries OPA/BRT account ids directly; `num_brt`/`num_accounts` expose multi-account parcels (the house + side-yard case). Also the geometry source for parcel-shape features. |
+| `LI_BUILDING_FOOTPRINTS` | polygon | 546,070 | `bin`, `parcel_id_num`, `approx_hgt`, `max_hgt`, `square_ft` | Building footprints with heights; footprint-change detection across snapshots. |
+| `Census_Tracts_2020` | polygon | 408 | `GEOID` | Join key for ACS features. `Census_Tracts_2010` also available for older vintages. |
+| `Zoning_BaseDistricts` | polygon | 29,205 | `code`, `long_code`, `zoninggroup`, `pending` | Zoning base districts *are* available as geometry. Dated historical variants exist (`zoning_basedistricts_122019` … `122025`) — a ready-made zoning time series. A `zoning_descriptions` service also exists (unverified). |
+| `Philadelphia_Neighborhoods` | polygon | 57 | `id` only — **no name field** | ⚠️ Weak: 57 unnamed polygons; likely *not* the canonical neighborhood layer (the widely used Azavea-derived layer has ~158 named neighborhoods). Needs vetting before any use; treat as unverified-for-purpose. |
+
+---
+
+## Verified-but-external (fetch via other APIs when needed)
+
+- **ACS 5-year tract estimates** — Census Bureau API; CCAO's feature list shows
+  which tract aggregates earn their keep. Not yet probed; well-documented public API.
+- **PhilaDox deed documents** — document images/metadata behind `rtt_summary`;
+  access constraints unverified. Investigation milestone, not a dataset yet.
+
+## Deliberately not yet inventoried
+
+Flood risk, transit/GTFS, crime, 311, school catchments, imagery. Each needs the
+same live verification before entering this document. CCAO's experience suggests
+crime and FEMA flood add little once location and income context are in the
+model; prioritize accordingly.
+
+---
+
+## Cross-dataset key map (working hypothesis — validate during staging)
+
+```
+opa_properties_public.parcel_number  ==  assessments.parcel_number
+                                     ==  permits.opa_account_num
+                                     ==  violations.opa_account_num
+                                     ==  rtt_summary.opa_account_num
+                                     ==  PWD_PARCELS.brt_id
+DOR_Parcel.mapreg   ~  rtt_summary.reg_map_id   (registry map ids)
+LI_BUILDING_FOOTPRINTS.parcel_id_num  ~  DOR parcel linkage (source-dependent)
+census_tract fields  ->  Census_Tracts_2020.GEOID (format normalization needed)
+```
+
+All identifiers are strings with meaningful leading zeros — never cast to int.

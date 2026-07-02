@@ -1,0 +1,10 @@
+# Data is never committed; raw snapshots and derived tables live locally (see AGENTS.md)
+data/
+
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+.DS_Store
