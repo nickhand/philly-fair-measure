@@ -20,6 +20,15 @@ uv run philly snapshot carto opa_properties_public --limit 1000
 # Capture full raw snapshots
 uv run philly snapshot carto opa_properties_public
 uv run philly snapshot carto assessments
+
+# See what's on disk, then query it (views are named raw_<dataset>)
+uv run philly catalog
+uv run philly sql "
+  SELECT a.year, a.market_value, o.total_livable_area
+  FROM raw_assessments a
+  JOIN raw_opa_properties_public o USING (parcel_number)
+  WHERE o.location = '108 ELFRETHS ALY'
+  ORDER BY a.year"
 ```
 
 Snapshots land under `data/raw/source=carto/dataset=<table>/fetched_at=<utc>/`
@@ -34,6 +43,7 @@ src/philly_assessments/
   sources/carto.py     # CARTO SQL API client (schema, counts, keyset pagination)
   ingest/manifests.py  # snapshot manifest schema (pydantic)
   ingest/snapshots.py  # snapshot writer (pages -> Parquet + manifest)
+  catalog.py           # DuckDB views over the latest snapshot per dataset
   cli.py               # `philly` command-line entry point
 docs/
   source_inventory.md  # verified dataset inventory (Milestone 1)
