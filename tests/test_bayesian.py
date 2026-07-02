@@ -69,3 +69,17 @@ def test_train_bayesian_end_to_end(tmp_path):
     predictions = pl.read_parquet(result.run_dir / "predictions.parquet")
     assert predictions.height == 60
     assert (predictions["pi_high_90"] > predictions["pi_low_90"]).all()
+
+    # scoring artifacts roundtrip: load the run and price a few rows
+    from philly_assessments.models.bayesian import load_run, predict_price_draws
+
+    draws, encoder, geo = load_run(result.run_dir)
+    subset = frame.head(5).with_columns(
+        (pl.col("sale_date") - pl.datetime(1997, 1, 1)).dt.total_days()
+        .alias("time_sale_epoch_days")
+    )
+    x = encoder.transform(subset)
+    tract, ward = geo.tract_indices(subset)
+    price_draws = predict_price_draws(draws, x, tract, ward, seed=1)
+    assert price_draws.shape[1] == 5
+    assert np.isfinite(price_draws).all() and (price_draws > 0).all()

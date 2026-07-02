@@ -121,6 +121,16 @@ def _cmd_train_bayesian(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_screen_assessments(args: argparse.Namespace) -> int:
+    from philly_assessments.validation.opa import build_assessment_screen
+
+    result = build_assessment_screen(args.data_dir, chunk_size=args.chunk_size)
+    print(f"{result.manifest.row_count:,} rows -> {result.path}")
+    for flag in sorted(result.flag_counts):
+        print(f"  {flag:<26} {result.flag_counts[flag]:>9,}")
+    return 0
+
+
 def _cmd_snapshot_all(args: argparse.Namespace) -> int:
     from philly_assessments import config
 
@@ -233,6 +243,15 @@ def main(argv: list[str] | None = None) -> int:
     bayes.add_argument("--cores", type=int, default=1)
     bayes.add_argument("--data-dir", type=Path)
     bayes.set_defaults(func=_cmd_train_bayesian)
+
+    screen = subparsers.add_parser(
+        "screen-assessments",
+        help="score every residential property and flag OPA values outside the "
+        "Bayesian predictive interval",
+    )
+    screen.add_argument("--chunk-size", type=int, default=50_000)
+    screen.add_argument("--data-dir", type=Path)
+    screen.set_defaults(func=_cmd_screen_assessments)
 
     snapshot_all = subparsers.add_parser(
         "snapshot-all", help="snapshot every core table (the recurring snapshot job)"

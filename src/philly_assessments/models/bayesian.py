@@ -189,54 +189,68 @@ def _fit_posterior(
     return idata
 
 
-def _stack_draws(idata, name: str, max_draws: int, rng: np.random.Generator) -> np.ndarray:
-    values = idata.posterior[name].values  # (chains, draws, ...)
-    flat = values.reshape(-1, *values.shape[2:])
-    if len(flat) > max_draws:
-        flat = flat[rng.choice(len(flat), size=max_draws, replace=False)]
-    return flat
+_DRAW_VARIABLES = ("alpha_tract", "alpha_ward", "mu_city", "tau_tract", "beta", "sigma")
 
 
-def _predict_price_draws(
-    idata,
+def _thin_draws(idata, max_draws: int, seed: int) -> dict[str, np.ndarray]:
+    """Flatten chains and keep one common random subset of joint posterior draws."""
+    out: dict[str, np.ndarray] = {}
+    subset = None
+    for name in _DRAW_VARIABLES:
+        values = idata.posterior[name].values  # (chains, draws, ...)
+        flat = values.reshape(-1, *values.shape[2:])
+        if subset is None:
+            rng = np.random.default_rng(seed)
+            subset = (
+                np.arange(len(flat))
+                if len(flat) <= max_draws
+                else rng.choice(len(flat), size=max_draws, replace=False)
+            )
+        out[name] = flat[subset]
+    return out
+
+
+def predict_price_draws(
+    draws: dict[str, np.ndarray],
     x: np.ndarray,
     tract: np.ndarray,
     ward: np.ndarray,
     *,
-    max_draws: int,
     seed: int,
 ) -> np.ndarray:
     """(n_draws, n_rows) posterior-predictive draws of price (levels, not logs)."""
     rng = np.random.default_rng(seed)
-    keep = np.random.default_rng(seed)  # same subset across parameters
-    alpha_tract = _stack_draws(idata, "alpha_tract", max_draws, keep)
-    keep = np.random.default_rng(seed)
-    alpha_ward = _stack_draws(idata, "alpha_ward", max_draws, keep)
-    keep = np.random.default_rng(seed)
-    mu_city = _stack_draws(idata, "mu_city", max_draws, keep)
-    keep = np.random.default_rng(seed)
-    tau_tract = _stack_draws(idata, "tau_tract", max_draws, keep)
-    keep = np.random.default_rng(seed)
-    beta = _stack_draws(idata, "beta", max_draws, keep)
-    keep = np.random.default_rng(seed)
-    sigma = _stack_draws(idata, "sigma", max_draws, keep)
-
-    n_draws = len(beta)
+    n_draws = len(draws["beta"])
     alpha = np.empty((n_draws, len(tract)))
     seen = tract >= 0
-    alpha[:, seen] = alpha_tract[:, tract[seen]]
+    alpha[:, seen] = draws["alpha_tract"][:, tract[seen]]
     unseen_tract = (~seen) & (ward >= 0)
     if unseen_tract.any():
-        alpha[:, unseen_tract] = alpha_ward[:, ward[unseen_tract]] + tau_tract[
+        alpha[:, unseen_tract] = draws["alpha_ward"][:, ward[unseen_tract]] + draws["tau_tract"][
             :, None
         ] * rng.standard_normal((n_draws, int(unseen_tract.sum())))
     unseen_all = (~seen) & (ward < 0)
     if unseen_all.any():
-        alpha[:, unseen_all] = mu_city[:, None]
+        alpha[:, unseen_all] = draws["mu_city"][:, None]
 
-    mu = alpha + beta @ x.T
-    log_pred = mu + sigma[:, None] * rng.standard_normal(mu.shape)
+    mu = alpha + draws["beta"] @ x.T
+    log_pred = mu + draws["sigma"][:, None] * rng.standard_normal(mu.shape)
     return np.exp(log_pred)
+
+
+def load_run(run_dir: Path) -> tuple[dict[str, np.ndarray], CovariateEncoder, GeoIndex]:
+    """Load a trained run's posterior draws, covariate encoder, and geography index."""
+    with np.load(run_dir / "posterior_draws.npz") as data:
+        draws = {name: data[name] for name in data.files}
+    cov = json.loads((run_dir / "covariates.json").read_text())
+    encoder = CovariateEncoder(
+        names=cov["names"], medians=cov["medians"], means=cov["means"], stds=cov["stds"]
+    )
+    g = json.loads((run_dir / "geography.json").read_text())
+    geo = GeoIndex(
+        wards=g["wards"], tracts=g["tracts"], tract_to_ward_ix=np.array(g["tract_to_ward_ix"])
+    )
+    return draws, encoder, geo
 
 
 @dataclass(frozen=True)
@@ -295,9 +309,8 @@ def train_bayesian(
 
     x_test = encoder.transform(test_df)
     tract_test, ward_test = geo.tract_indices(test_df)
-    price_draws = _predict_price_draws(
-        idata, x_test, tract_test, ward_test, max_draws=max_prediction_draws, seed=seed
-    )
+    posterior_draws = _thin_draws(idata, max_prediction_draws, seed)
+    price_draws = predict_price_draws(posterior_draws, x_test, tract_test, ward_test, seed=seed)
     point = np.median(price_draws, axis=0)
     pi_low = np.quantile(price_draws, PI_LOW, axis=0)
     pi_high = np.quantile(price_draws, PI_HIGH, axis=0)
@@ -372,6 +385,31 @@ def train_bayesian(
     )
     pl.DataFrame(hyper_summary).write_parquet(run_dir / "posterior_summary.parquet")
     evaluation.write_parquet(run_dir / "evaluation.parquet")
+    # scoring artifacts: enough state to price any property from this run
+    np.savez_compressed(run_dir / "posterior_draws.npz", **posterior_draws)
+    (run_dir / "covariates.json").write_text(
+        json.dumps(
+            {
+                "names": encoder.names,
+                "medians": encoder.medians,
+                "means": encoder.means,
+                "stds": encoder.stds,
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    (run_dir / "geography.json").write_text(
+        json.dumps(
+            {
+                "wards": geo.wards,
+                "tracts": geo.tracts,
+                "tract_to_ward_ix": geo.tract_to_ward_ix.tolist(),
+            },
+            indent=2,
+        )
+        + "\n"
+    )
     test_df.select("sale_id", "parcel_id", "sale_date", "sale_price").with_columns(
         pl.Series("pred_median", point),
         pl.Series("pi_low_90", pi_low),
