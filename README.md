@@ -23,6 +23,7 @@ uv run philly stage             # typed/deduped/classified staged tables (polars
 uv run philly validate-sales    # marts/sale_validity.parquet with reason codes
 uv run philly build-features    # marts/sale_features.parquet (registry: docs/features.md)
 uv run philly train-baseline    # LightGBM + Ridge baselines, benchmarked against OPA
+uv run philly train-bayesian    # hierarchical Bayesian model with predictive intervals
 uv run philly freshness         # heartbeat: exit 1 if snapshots are missing/stale
 
 # See what's on disk, then query it (views: raw_<dataset>, stg_<table>, mart_<table>)

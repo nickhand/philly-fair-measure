@@ -12,6 +12,7 @@ dependencies = [
     "polars>=1.42.1",
     "pyarrow>=17",
     "pydantic>=2.7",
+    "pymc>=6.0.1",
     "scikit-learn>=1.9.0",
     "tenacity>=8.3",
 ]
@@ -38,8 +39,9 @@ src = ["src", "tests"]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.pytest.ini_options]
-addopts = "-ra -m 'not live'"
+addopts = "-ra -m 'not live and not slow'"
 markers = [
     "live: tests that hit real external APIs (deselected by default; run with -m live)",
+    "slow: tests that take more than ~10s, e.g. MCMC smoke tests (run with -m slow)",
 ]
 testpaths = ["tests"]

@@ -91,6 +91,36 @@ def _cmd_train_baseline(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_train_bayesian(args: argparse.Namespace) -> int:
+    from philly_assessments.models.bayesian import train_bayesian
+
+    result = train_bayesian(
+        args.data_dir,
+        test_fraction=args.test_fraction,
+        draws=args.draws,
+        tune=args.tune,
+        chains=args.chains,
+        cores=args.cores,
+    )
+    print(f"run {result.run_id} -> {result.run_dir}\n")
+    row = result.overall
+    for key in (
+        "n",
+        "rmse_log",
+        "mape",
+        "r2_log",
+        "median_ratio",
+        "cod",
+        "prd",
+        "prb",
+        "coverage_90",
+        "mean_pi_width_rel",
+    ):
+        value = row.get(key)
+        print(f"{key:>20}: " + ("-" if value is None else f"{value:,.4f}"))
+    return 0
+
+
 def _cmd_snapshot_all(args: argparse.Namespace) -> int:
     from philly_assessments import config
 
@@ -192,6 +222,17 @@ def main(argv: list[str] | None = None) -> int:
     train.add_argument("--test-fraction", type=float, default=0.1)
     train.add_argument("--data-dir", type=Path)
     train.set_defaults(func=_cmd_train_baseline)
+
+    bayes = subparsers.add_parser(
+        "train-bayesian", help="train the hierarchical Bayesian model with predictive intervals"
+    )
+    bayes.add_argument("--test-fraction", type=float, default=0.1)
+    bayes.add_argument("--draws", type=int, default=800)
+    bayes.add_argument("--tune", type=int, default=800)
+    bayes.add_argument("--chains", type=int, default=2)
+    bayes.add_argument("--cores", type=int, default=1)
+    bayes.add_argument("--data-dir", type=Path)
+    bayes.set_defaults(func=_cmd_train_bayesian)
 
     snapshot_all = subparsers.add_parser(
         "snapshot-all", help="snapshot every core table (the recurring snapshot job)"
