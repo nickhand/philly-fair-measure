@@ -47,8 +47,12 @@ so bulk geometry pulls need `resultOffset` paging or envelope tiling.
 - **Limitations:** **Current-state only** — characteristics reflect the latest
   known values, not values as of past sale dates (the project's core temporal
   caveat; every feature derived from here is `current_only`). Interior/exterior
-  condition and quality-grade fields exist but their fill rates/variance are
-  unprofiled. `year_built_estimate` flags estimated ages. Condition of unpermitted
+  condition fields have real variance (profiled 2026-07-02, single-family:
+  ~79% code "4", ~21% spread across codes 1–7, <0.1% null) — usable as features,
+  unlike Cook County's near-constant condition field, and a renovated property
+  still coded at the modal value is itself staleness evidence. `quality_grade`
+  mixes letter grades (C+, D-) with numeric and S/X codes — a normalization
+  case. `year_built_estimate` flags estimated ages. Condition of unpermitted
   renovations not reflected. Timestamp fields contain unparseable garbage
   (observed live: an `assessment_date`-family value with year "206"), which is
   why the raw layer stores temporal columns as verbatim strings and parsing
@@ -84,17 +88,24 @@ so bulk geometry pulls need `resultOffset` paging or envelope tiling.
   `fair_market_value`, adjusted variants, `opa_account_num`, `property_count`,
   address parts, `condo_name`/`unit_num`, `reg_map_id`, `legal_remarks`,
   `discrepancy`.
-- **Keys:** `document_id` (one row per document–property; verify grain during
-  staging — `property_count` > 1 indicates multi-parcel documents).
+- **Keys:** `record_id` is the true unique key (verified: 5,110,364 distinct on
+  5,110,364 rows). `document_id` is NOT unique (4,417,176 distinct — multi-parcel
+  documents expand to one row per property), and even
+  (`document_id`, `opa_account_num`) has ~346k duplicate pairs. Grain profiled
+  2026-07-02: among DEED documents, 169,025 (15.4%) have `property_count` > 1
+  and 182,167 (16.6%) lack an `opa_account_num` link — both first-class concerns
+  for sales validation.
 - **Relevance:** The sales backbone for Milestone 4. Maps remarkably well onto
   the CCAO sales-validation template: `document_type` ≈ deed-type exclusions,
   `grantors`/`grantees` → family-sale and legal-entity heuristics,
   `property_count` → multi-parcel exclusion, `total_consideration` vs
   `fair_market_value`/`common_level_ratio` → nominal-sale detection.
 - **Limitations:** Includes *all* recorded transfer-tax documents, not just
-  sales — deed filtering is mandatory. Names are messy free text.
-  `opa_account_num` linkage quality unprofiled (see `matched_regmap`,
-  `discrepancy`). Consideration can be nominal ($1 family transfers).
+  sales — deed filtering is mandatory (top types observed: MORTGAGE 1.51M,
+  DEED 1.09M, SATISFACTION 858k, ASSIGNMENT OF MORTGAGE 422k; DEED variants
+  like "DEED MISCELLANEOUS" and sheriff's deeds need classification during
+  staging). Names are messy free text. Consideration can be nominal
+  ($1 family transfers).
 
 ### 4. L&I building & trade permits (`permits`)
 
@@ -106,7 +117,9 @@ so bulk geometry pulls need `resultOffset` paging or envelope tiling.
   `permitissuedate`, `permitcompleteddate`, `certificateofoccupancydate`,
   `status`, `opa_account_num`, `parcel_id_num`, `address`, `censustract`,
   contractor fields, `geocode_x/y`.
-- **Keys:** `permitnumber`; joins to OPA via `opa_account_num`.
+- **Keys:** `permitnumber` — near-unique (224 duplicates on 925,297 rows,
+  2026-07-02); dedupe or disambiguate at staging. Joins to OPA via
+  `opa_account_num`.
 - **Relevance:** Renovation/change proxy (CCAO's `char_recent_renovation`
   analog); issue/completion dates give true event timing for temporal features.
 - **Limitations:** Only permitted work is visible — unpermitted renovations
@@ -123,7 +136,8 @@ so bulk geometry pulls need `resultOffset` paging or envelope tiling.
   `violationcodetitle`, `violationstatus`, `violationresolutiondate`,
   `casenumber`, case dates/status/priority, `opa_account_num`, `address`,
   `censustract`, `geocode_x/y`, `underappeal`.
-- **Keys:** `violationnumber` (verify grain); joins via `opa_account_num`.
+- **Keys:** `violationnumber` — near-unique (13 duplicates on 1,990,761 rows,
+  2026-07-02); joins via `opa_account_num`.
 - **Relevance:** Property-condition and distress proxy with real event dates;
   neighborhood-level distress aggregates.
 - **Limitations:** Enforcement intensity varies by area and era — signal
