@@ -17,11 +17,13 @@ uv sync
 # Smoke-test the snapshot pipeline with a small fetch
 uv run philly snapshot carto opa_properties_public --limit 1000
 
-# Capture full raw snapshots
-uv run philly snapshot carto opa_properties_public
-uv run philly snapshot carto assessments
+# The full pipeline: raw snapshots -> staged tables -> sale-validity mart
+uv run philly snapshot-all      # capture all core tables (or: philly snapshot carto <table>)
+uv run philly stage             # typed/deduped/classified staged tables (polars)
+uv run philly validate-sales    # marts/sale_validity.parquet with reason codes
+uv run philly freshness         # heartbeat: exit 1 if snapshots are missing/stale
 
-# See what's on disk, then query it (views are named raw_<dataset>)
+# See what's on disk, then query it (views: raw_<dataset>, stg_<table>, mart_<table>)
 uv run philly catalog
 uv run philly sql "
   SELECT a.year, a.market_value, o.total_livable_area
@@ -31,6 +33,8 @@ uv run philly sql "
   ORDER BY a.year"
 ```
 
+See [docs/operations.md](docs/operations.md) for the weekly launchd schedule.
+
 Snapshots land under `data/raw/source=carto/dataset=<table>/fetched_at=<utc>/`
 as zstd-compressed Parquet plus a `manifest.json` recording the query, schema,
 row counts, timing, and file checksums. Raw data is never modified after write.
@@ -39,15 +43,18 @@ row counts, timing, and file checksums. Raw data is never modified after write.
 
 ```
 src/philly_assessments/
-  config.py            # data directory resolution
+  config.py            # data dir resolution + core snapshot table registry
   sources/carto.py     # CARTO SQL API client (schema, counts, keyset pagination)
-  ingest/manifests.py  # snapshot manifest schema (pydantic)
+  ingest/manifests.py  # snapshot + derived-table manifest schemas (pydantic)
   ingest/snapshots.py  # snapshot writer (pages -> Parquet + manifest)
-  catalog.py           # DuckDB views over the latest snapshot per dataset
+  staging/             # raw -> typed/deduped/classified tables (polars)
+  validation/sales.py  # CCAO-style sale-validity classification
+  catalog.py           # DuckDB views over raw snapshots + staged/mart tables
   cli.py               # `philly` command-line entry point
 docs/
   source_inventory.md  # verified dataset inventory (Milestone 1)
   ccao-lessons.md      # patterns adopted from ccao-data
+  operations.md        # recurring snapshot schedule + freshness heartbeat
 data/                  # local data lake (gitignored): raw/ staged/ marts/
 ```
 

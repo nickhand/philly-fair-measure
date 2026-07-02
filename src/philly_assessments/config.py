@@ -7,6 +7,16 @@ from pathlib import Path
 
 DEFAULT_DATA_DIR = Path("data")
 
+# The recurring snapshot set: every table here is captured by `philly snapshot-all`.
+# Page sizes reflect row width (verified in docs/source_inventory.md).
+CORE_CARTO_TABLES: dict[str, int] = {
+    "opa_properties_public": 20_000,
+    "assessments": 50_000,
+    "rtt_summary": 30_000,
+    "permits": 20_000,
+    "violations": 20_000,
+}
+
 
 def data_dir() -> Path:
     """Root of the local data lake (raw/, staged/, marts/).

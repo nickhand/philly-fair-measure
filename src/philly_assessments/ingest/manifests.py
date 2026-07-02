@@ -55,3 +55,37 @@ def write_manifest(manifest: SnapshotManifest, directory: Path) -> Path:
 def read_manifest(directory: Path) -> SnapshotManifest:
     path = directory / MANIFEST_FILENAME
     return SnapshotManifest.model_validate_json(path.read_text())
+
+
+class InputRef(BaseModel):
+    """A pointer to the exact upstream data a derived table was built from."""
+
+    dataset: str
+    fetched_at: str
+
+
+class DerivedManifest(BaseModel):
+    """Provenance sidecar for staged/mart tables (stored as <table>.manifest.json)."""
+
+    manifest_version: int = 1
+    layer: str
+    table: str
+    built_at: datetime
+    row_count: int
+    inputs: list[InputRef]
+    package_version: str
+    notes: str | None = None
+
+
+def derived_manifest_path(table_path: Path) -> Path:
+    return table_path.with_suffix(".manifest.json")
+
+
+def write_derived_manifest(manifest: DerivedManifest, table_path: Path) -> Path:
+    path = derived_manifest_path(table_path)
+    path.write_text(manifest.model_dump_json(indent=2) + "\n")
+    return path
+
+
+def read_derived_manifest(table_path: Path) -> DerivedManifest:
+    return DerivedManifest.model_validate_json(derived_manifest_path(table_path).read_text())

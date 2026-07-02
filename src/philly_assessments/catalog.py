@@ -18,10 +18,17 @@ from pathlib import Path
 import duckdb
 
 from philly_assessments import config
-from philly_assessments.ingest.manifests import MANIFEST_FILENAME, SnapshotManifest, read_manifest
+from philly_assessments.ingest.manifests import (
+    MANIFEST_FILENAME,
+    DerivedManifest,
+    SnapshotManifest,
+    read_derived_manifest,
+    read_manifest,
+)
 from philly_assessments.ingest.snapshots import DATA_FILENAME
 
 RAW_VIEW_PREFIX = "raw_"
+DERIVED_LAYERS = {"staged": "stg_", "marts": "mart_"}
 _INCOMPLETE_SUFFIX = ".incomplete"
 
 
@@ -83,6 +90,30 @@ def latest_snapshots(data_dir: Path | None = None) -> dict[str, SnapshotRef]:
     return latest
 
 
+@dataclass(frozen=True)
+class DerivedRef:
+    layer: str
+    table: str
+    path: Path
+
+    @property
+    def view_name(self) -> str:
+        return DERIVED_LAYERS[self.layer] + self.table
+
+    def manifest(self) -> DerivedManifest:
+        return read_derived_manifest(self.path)
+
+
+def list_derived(data_dir: Path | None = None) -> list[DerivedRef]:
+    """Staged and mart tables on disk, sorted by (layer, table)."""
+    root = data_dir if data_dir is not None else config.data_dir()
+    refs = []
+    for layer in DERIVED_LAYERS:
+        for path in sorted((root / layer).glob("*.parquet")):
+            refs.append(DerivedRef(layer=layer, table=path.stem, path=path))
+    return refs
+
+
 def _quote_identifier(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
@@ -90,11 +121,17 @@ def _quote_identifier(name: str) -> str:
 def connect(
     data_dir: Path | None = None, database: str = ":memory:"
 ) -> duckdb.DuckDBPyConnection:
-    """Open DuckDB with a raw_<dataset> view over each dataset's latest snapshot."""
+    """Open DuckDB with views over the data lake.
+
+    raw_<dataset> reads each dataset's latest snapshot; stg_<table> and
+    mart_<table> read staged and mart tables.
+    """
     con = duckdb.connect(database)
-    for ref in latest_snapshots(data_dir).values():
+    views = [(ref.view_name, ref.data_path) for ref in latest_snapshots(data_dir).values()]
+    views += [(ref.view_name, ref.path) for ref in list_derived(data_dir)]
+    for view_name, path in views:
         con.execute(
-            f"CREATE OR REPLACE VIEW {_quote_identifier(ref.view_name)} AS "
-            f"SELECT * FROM read_parquet({str(ref.data_path)!r})"
+            f"CREATE OR REPLACE VIEW {_quote_identifier(view_name)} AS "
+            f"SELECT * FROM read_parquet({str(path)!r})"
         )
     return con
