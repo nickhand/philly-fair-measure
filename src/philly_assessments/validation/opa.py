@@ -122,6 +122,17 @@ def build_assessment_screen(
         pl.read_parquet(paths["price_index"]),
     )
     logger.info("scoring %s residential properties", f"{features.height:,}")
+    # persist the full feature frame: the comps CLI prices arbitrary parcels
+    # from it without re-running feature assembly (models/comps.py)
+    features_path, _ = write_derived_table(
+        features,
+        root,
+        "marts",
+        "assessment_features",
+        [],
+        notes=f"valuation_date={valuation_date:%Y-%m-%d}",
+    )
+    logger.info("assessment features persisted -> %s", features_path)
 
     baseline_run = latest_run_dir("baseline", data_dir)
     bayesian_run = latest_run_dir("bayesian", data_dir)

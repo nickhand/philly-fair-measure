@@ -25,6 +25,7 @@ uv run philly build-features    # marts/sale_features.parquet (registry: docs/fe
 uv run philly train-baseline    # LightGBM + Ridge baselines, benchmarked against OPA
 uv run philly train-bayesian    # hierarchical Bayesian model with predictive intervals
 uv run philly screen-assessments  # flag OPA values outside each property's predictive interval
+uv run philly comps "108 ELFRETHS ALY"  # comparable sales for a property (parcel id or address)
 uv run philly freshness         # heartbeat: exit 1 if snapshots are missing/stale
 
 # See what's on disk, then query it (views: raw_<dataset>, stg_<table>, mart_<table>)

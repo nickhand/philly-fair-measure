@@ -149,6 +149,66 @@ def _cmd_screen_assessments(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_comps(args: argparse.Namespace) -> int:
+    import polars as pl
+
+    from philly_assessments.models.comps import find_comps, resolve_parcel
+
+    candidates = resolve_parcel(args.query, args.data_dir)
+    if not candidates:
+        print(f"no property matches {args.query!r}")
+        return 1
+    if len(candidates) > 1:
+        print("multiple matches; use a parcel id:")
+        for c in candidates:
+            print(f"  {c['parcel_id']}  {c['address']}")
+        return 1
+    parcel_id = candidates[0]["parcel_id"]
+    result = find_comps(parcel_id, args.data_dir, k=args.k, window_years=args.window_years)
+
+    t = result.target
+    print(f"{t['address']}  (parcel {t['parcel_id']})")
+    print(
+        f"  {t.get('char_livable_area') or '?'} sqft {t.get('char_style')} "
+        f"{t.get('char_era')}, interior condition {t.get('char_interior_condition')}"
+    )
+    print(f"  OPA market value: ${t.get('opa_market_value') or 0:,.0f}")
+    from philly_assessments import config
+
+    data_root = args.data_dir if args.data_dir is not None else config.data_dir()
+    screen_path = data_root / "marts" / "assessment_screen.parquet"
+    if screen_path.exists():
+        row = (
+            pl.scan_parquet(screen_path)
+            .filter(pl.col("parcel_id") == parcel_id)
+            .collect()
+        )
+        if row.height:
+            r = row.to_dicts()[0]
+            print(
+                f"  model: ${r['bayes_median']:,.0f} "
+                f"(90% PI ${r['bayes_pi_low_90']:,.0f} - ${r['bayes_pi_high_90']:,.0f}) "
+                f"-> {r['assessment_flag']}"
+            )
+
+    print(f"\ntop {result.comps.height} comparable arms-length sales:")
+    header = (
+        f"  {'address':<26} {'sold':<11} {'price':>11} {'adj. today':>11} "
+        f"{'sqft':>6} {'style':<9} {'dist':>6} {'sim':>5}"
+    )
+    print(header)
+    print("  " + "-" * (len(header) - 2))
+    for c in result.comps.to_dicts():
+        print(
+            f"  {str(c['address'] or '?')[:26]:<26} "
+            f"{c['sale_date']:%Y-%m-%d}  "
+            f"${c['sale_price']:>10,.0f} ${c['price_adj_today']:>10,.0f} "
+            f"{c['char_livable_area'] or 0:>6.0f} {str(c['char_style']):<9} "
+            f"{c['distance_m'] or 0:>5.0f}m {c['similarity']:>5.2f}"
+        )
+    return 0
+
+
 def _cmd_snapshot_all(args: argparse.Namespace) -> int:
     from philly_assessments import config
 
@@ -293,6 +353,15 @@ def main(argv: list[str] | None = None) -> int:
     screen.add_argument("--chunk-size", type=int, default=50_000)
     screen.add_argument("--data-dir", type=Path)
     screen.set_defaults(func=_cmd_screen_assessments)
+
+    comps = subparsers.add_parser(
+        "comps", help="comparable sales for a property (parcel id or address fragment)"
+    )
+    comps.add_argument("query")
+    comps.add_argument("--k", type=int, default=10)
+    comps.add_argument("--window-years", type=float, default=5.0)
+    comps.add_argument("--data-dir", type=Path)
+    comps.set_defaults(func=_cmd_comps)
 
     snapshot_all = subparsers.add_parser(
         "snapshot-all", help="snapshot every core table (the recurring snapshot job)"

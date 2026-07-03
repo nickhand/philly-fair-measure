@@ -209,11 +209,30 @@ def _xy(df: pl.DataFrame) -> np.ndarray:
     return np.nan_to_num(xy, nan=0.0)
 
 
+SIGMA_TERM_NAMES = [
+    "block_roll_missing",
+    "knn_dist",
+    "style_twin",
+    "style_detached",
+    "style_other",
+]
+
+
 def _sigma_design(df: pl.DataFrame) -> np.ndarray:
-    """Evidence-density design for log sigma: [block_roll_missing, scaled knn distance]."""
+    """Design for log sigma: evidence density plus style, per the conditional
+    calibration finding (coverage 80-99.6% by district/style before v2.1)."""
     missing = df["mkt_block_roll_mean_price"].is_null().to_numpy().astype(np.float64)
     dist = df["mkt_knn_mean_dist_m"].cast(pl.Float64).fill_null(500.0).to_numpy()
-    return np.column_stack([missing, np.log1p(dist) / 10.0])
+    style = df["char_style"].cast(pl.String).fill_null("unknown").to_numpy()
+    return np.column_stack(
+        [
+            missing,
+            np.log1p(dist) / 10.0,
+            (style == "twin").astype(np.float64),
+            (style == "detached").astype(np.float64),
+            ((style == "other") | (style == "unknown")).astype(np.float64),
+        ]
+    )
 
 
 def _fit_posterior(
@@ -222,6 +241,7 @@ def _fit_posterior(
     z_sigma: np.ndarray,
     y: np.ndarray,
     area_idx: np.ndarray,
+    district_idx: np.ndarray,
     geo: GeoIndex,
     *,
     draws: int,
@@ -266,7 +286,15 @@ def _fit_posterior(
 
         g0 = pm.Normal("g0", -1.0, 1.0)
         g = pm.Normal("g", 0.0, 0.5, dims="sigma_term")
-        sigma = pm.Deterministic("sigma_obs", pm.math.exp(g0 + z_sigma @ g))
+        tau_sigma_district = pm.HalfNormal("tau_sigma_district", 0.3)
+        z_sigma_district = pm.Normal("z_sigma_district", 0.0, 1.0, dims="district")
+        u_sigma_district = pm.Deterministic(
+            "u_sigma_district", tau_sigma_district * z_sigma_district, dims="district"
+        )
+        sigma = pm.Deterministic(
+            "sigma_obs",
+            pm.math.exp(g0 + z_sigma @ g + u_sigma_district[district_idx]),
+        )
 
         # learned nu couples every observation through one global parameter and
         # sampled brutally slowly at this scale (hours); a fixed moderate-tail
@@ -298,7 +326,8 @@ def _fit_posterior(
 
 _DRAW_VARIABLES = (
     "alpha_area", "alpha_district", "mu_city", "tau_area",
-    "beta", "tau_gp", "w_spatial", "g0", "g", "nu",
+    "beta", "tau_gp", "w_spatial", "g0", "g", "u_sigma_district",
+    "tau_sigma_district", "nu",
 )
 
 
@@ -359,6 +388,16 @@ def predict_price_draws(
     if basis is not None and "w_spatial" in draws:
         mu = mu + (draws["tau_gp"][:, None] * draws["w_spatial"]) @ basis.T
     log_sigma = draws["g0"][:, None] + draws["g"] @ z_sigma.T
+    if "u_sigma_district" in draws:
+        u = np.zeros((n_draws, n_rows))
+        known = district >= 0
+        u[:, known] = draws["u_sigma_district"][:, district[known]]
+        unknown = ~known
+        if unknown.any():
+            u[:, unknown] = draws["tau_sigma_district"][:, None] * rng.standard_normal(
+                (n_draws, int(unknown.sum()))
+            )
+        log_sigma = log_sigma + u
     t_noise = rng.standard_t(np.maximum(draws["nu"], 2.1)[:, None], size=mu.shape)
     log_pred = mu + np.exp(log_sigma) * t_noise
     if time_adj_log is not None:
@@ -438,13 +477,14 @@ def train_bayesian(
         return y
 
     x_train = encoder.transform(train_df)
-    area_train, _ = geo.indices(train_df)
+    area_train, district_train = geo.indices(train_df)
     idata = _fit_posterior(
         x_train,
         rbf.transform(_xy(train_df)) if rbf is not None else None,
         _sigma_design(train_df),
         target(train_df),
         area_train,
+        np.maximum(district_train, 0),
         geo,
         draws=draws,
         tune=tune,
@@ -504,7 +544,8 @@ def train_bayesian(
     overall = evaluation.filter(pl.col("segment_type") == "overall").to_dicts()[0]
 
     hyper_summary = []
-    for name in ("mu_city", "tau_district", "tau_area", "tau_gp", "g0", "nu"):
+    for name in ("mu_city", "tau_district", "tau_area", "tau_gp", "g0",
+                 "tau_sigma_district", "nu"):
         if name not in idata.posterior:
             continue
         flat = idata.posterior[name].values.reshape(-1)
@@ -528,8 +569,8 @@ def train_bayesian(
                 "q95": float(np.quantile(beta_flat[:, i], 0.95)),
             }
         )
-    g_flat = idata.posterior["g"].values.reshape(-1, 2)
-    for i, name in enumerate(("sigma_block_roll_missing", "sigma_knn_dist")):
+    g_flat = idata.posterior["g"].values.reshape(-1, len(SIGMA_TERM_NAMES))
+    for i, name in enumerate(f"sigma_{term}" for term in SIGMA_TERM_NAMES):
         hyper_summary.append(
             {
                 "parameter": name,
@@ -554,6 +595,7 @@ def train_bayesian(
                 "time_adjusted": time_adjusted,
                 "nu_fixed": nu_fixed,
                 "spatial_basis": spatial_basis,
+                "sigma_terms": SIGMA_TERM_NAMES,
                 "max_prediction_draws": max_prediction_draws,
                 "seed": seed,
                 "covariates": encoder.feature_names,
