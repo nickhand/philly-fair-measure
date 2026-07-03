@@ -103,20 +103,34 @@ class ArcGISClient:
         )
         return int(payload["count"])
 
+    def oid_field(self, service: str, layer: int = 0) -> str:
+        """The layer's ObjectID field name (case varies by layer: objectid,
+        OBJECTID, ...)."""
+        for f in self.get_fields(service, layer):
+            if f["esri_type"] == "esriFieldTypeOID":
+                return f["name"]
+        return KEYSET_FIELD
+
     def iter_pages(
-        self, service: str, layer: int = 0, *, page_size: int = DEFAULT_PAGE_SIZE
+        self,
+        service: str,
+        layer: int = 0,
+        *,
+        page_size: int = DEFAULT_PAGE_SIZE,
+        keyset_field: str | None = None,
     ) -> Iterator[list[dict[str, Any]]]:
         """Yield pages of flattened rows: properties + geometry as GeoJSON string."""
         url = self.layer_url(service, layer) + "/query"
+        key = keyset_field or self.oid_field(service, layer)
         last_id = 0
         while True:
             payload = self._get(
                 url,
                 {
-                    "where": f"{KEYSET_FIELD} > {last_id}",
+                    "where": f"{key} > {last_id}",
                     "outFields": "*",
                     "outSR": 4326,
-                    "orderByFields": KEYSET_FIELD,
+                    "orderByFields": key,
                     "resultRecordCount": page_size,
                     "f": "geojson",
                 },
@@ -131,7 +145,7 @@ class ArcGISClient:
                 row[GEOMETRY_COLUMN] = None if geometry is None else json.dumps(geometry)
                 rows.append(row)
             yield rows
-            last_id = features[-1]["properties"][KEYSET_FIELD]
+            last_id = features[-1]["properties"][key]
             # no short-page early exit: servers may silently cap
             # resultRecordCount below the request (maxRecordCount varies by
             # layer), so only an empty page proves exhaustion
