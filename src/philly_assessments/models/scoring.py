@@ -38,11 +38,17 @@ def score_lightgbm(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
     """
     import lightgbm as lgb
 
+    from philly_assessments.models.baseline import apply_vertical_calibration
+
     booster = lgb.Booster(model_file=str(run_dir / "model_lightgbm.txt"))
     mappings = json.loads((run_dir / "categorical_mappings.json").read_text())
     params = run_params(run_dir)
     x = _encode(df, mappings, params["numeric_features"], params["categorical_features"])
-    return np.exp(booster.predict(x))
+    pred_log = booster.predict(x)
+    calibration_path = run_dir / "vertical_calibration.json"
+    if calibration_path.exists():
+        pred_log = apply_vertical_calibration(pred_log, json.loads(calibration_path.read_text()))
+    return np.exp(pred_log)
 
 
 def lightgbm_median_ratio(run_dir: Path) -> float:

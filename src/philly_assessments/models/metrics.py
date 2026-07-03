@@ -43,10 +43,15 @@ def fit_metrics(estimate, sale_price) -> dict[str, float | int | None]:
 def ratio_metrics(estimate, sale_price) -> dict[str, float | None]:
     est, sale = _clean(estimate, sale_price)
     if len(est) < 3:
-        return {"median_ratio": None, "cod": None, "prd": None, "prb": None}
+        return {"median_ratio": None, "cod": None, "prd": None, "prb": None, "mki": None}
     ratio = est / sale
     out: dict[str, float | None] = {"median_ratio": float(np.median(ratio))}
-    for name, fn in (("cod", assesspy.cod), ("prd", assesspy.prd), ("prb", assesspy.prb)):
+    for name, fn in (
+        ("cod", assesspy.cod),
+        ("prd", assesspy.prd),
+        ("prb", assesspy.prb),
+        ("mki", assesspy.mki),
+    ):
         try:
             value = float(fn(est, sale))
             out[name] = value if math.isfinite(value) else None

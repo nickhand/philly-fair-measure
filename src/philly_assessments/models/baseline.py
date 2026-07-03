@@ -233,6 +233,31 @@ def _train_ridge(train_df: pl.DataFrame, y_train: np.ndarray, ridge_numeric: lis
     return pipeline, matrix
 
 
+def fit_vertical_calibration(pred_log: np.ndarray, actual_log: np.ndarray) -> dict:
+    """Monotone correction of E[log price | predicted log price], fitted on the
+    validation slice — the ML analog of assessors' vertical-equity adjustments.
+
+    The gradient it removes: with under-informative features at the tails,
+    predictions compress toward segment means, over-valuing cheap homes and
+    under-valuing expensive ones (PRD > 1). Isotonic regression of the residual
+    on the prediction is increasing by construction, so the calibrated
+    prediction remains monotone in the raw one.
+    """
+    from sklearn.isotonic import IsotonicRegression
+
+    iso = IsotonicRegression(increasing=True, out_of_bounds="clip")
+    iso.fit(pred_log, actual_log - pred_log)
+    return {
+        "x": [float(v) for v in iso.X_thresholds_],
+        "y": [float(v) for v in iso.y_thresholds_],
+    }
+
+
+def apply_vertical_calibration(pred_log: np.ndarray, calibration: dict) -> np.ndarray:
+    correction = np.interp(pred_log, calibration["x"], calibration["y"])
+    return pred_log + correction
+
+
 def _segments(test_df: pl.DataFrame) -> list[tuple[str, str, pl.Series]]:
     """(segment_type, segment, row mask) triples for evaluation breakouts."""
     out = [("overall", "overall", pl.Series([True] * test_df.height))]
@@ -262,6 +287,7 @@ def train_baseline(
     test_fraction: float = 0.1,
     validation_fraction: float = 0.1,
     time_adjusted: bool = True,
+    vertical_calibration: bool = True,
     lgb_params: dict | None = None,
     num_boost_round: int = 5000,
     early_stopping_rounds: int = 100,
@@ -316,6 +342,11 @@ def train_baseline(
 
     test_adj = test_df["time_adj_log"].to_numpy() if time_adjusted else np.zeros(test_df.height)
     pred_lgb_ref = booster.predict(x["test"], num_iteration=booster.best_iteration)
+    calibration = None
+    if vertical_calibration:
+        val_pred_ref = booster.predict(x["val"], num_iteration=booster.best_iteration)
+        calibration = fit_vertical_calibration(val_pred_ref, y["val"])
+        pred_lgb_ref = apply_vertical_calibration(pred_lgb_ref, calibration)
     pred_lgb = np.exp(pred_lgb_ref - test_adj)
 
     ridge_numeric = RIDGE_NUMERIC_BASE + ([] if time_adjusted else ["time_sale_epoch_days"])
@@ -378,6 +409,7 @@ def train_baseline(
                 "test_fraction": test_fraction,
                 "validation_fraction": validation_fraction,
                 "time_adjusted": time_adjusted,
+                "vertical_calibration": vertical_calibration,
                 "features": features,
                 "numeric_features": numeric,
                 "categorical_features": categorical,
@@ -389,6 +421,10 @@ def train_baseline(
         + "\n"
     )
     (run_dir / "categorical_mappings.json").write_text(json.dumps(mappings, indent=2) + "\n")
+    if calibration is not None:
+        (run_dir / "vertical_calibration.json").write_text(
+            json.dumps(calibration, indent=2) + "\n"
+        )
     evaluation.write_parquet(run_dir / "evaluation.parquet")
     pl.DataFrame(
         {

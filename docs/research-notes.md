@@ -128,6 +128,18 @@ comes from features.**
   weighted conformal wrapper around LightGBM is a cheap, strong frequentist
   complement to the Bayesian intervals.
 
+**Spatial-field verdict for this project (measured 2026-07-03).** After the
+kNN sale surface and learned market areas, out-of-time test residuals show
+Moran's I = 0.051 (k=10 neighbors) and a noise-level distance correlogram —
+essentially no latent field left to model. A GP field is therefore *not*
+currently warranted; the earlier RBF-basis slowdown measurement indicted that
+parameterization (overlapping collinear columns), not the HSGP idea, whose
+orthonormal basis is well-conditioned. If richer models ever leave a residual
+field, the 2026 toolchain: `pm.gp.HSGP` (PyMC, mature), GPBoost
+(boosting + Vecchia GP, Python/R), and the newly released
+[PyINLA](https://arxiv.org/abs/2603.27276) bringing R-INLA's SPDE machinery
+to Python.
+
 **Modern Bayesian practice applicable here**
 - **HSGP** (Hilbert-space GP approximation; Solin & Särkkä, and the practical
   probabilistic-programming variant) gives near-exact low-dimensional GPs at

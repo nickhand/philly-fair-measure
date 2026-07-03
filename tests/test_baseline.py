@@ -11,6 +11,27 @@ from philly_assessments.models.baseline import feature_lists, train_baseline
 from philly_assessments.models.metrics import fit_metrics, ratio_metrics
 
 
+def test_vertical_calibration_flattens_compression_gradient():
+    from philly_assessments.models.baseline import (
+        apply_vertical_calibration,
+        fit_vertical_calibration,
+    )
+
+    rng = np.random.default_rng(0)
+    actual = rng.uniform(10.0, 14.0, 4000)  # log prices
+    # a model that compresses toward the mean (the PRD mechanism)
+    pred = 12.0 + 0.7 * (actual - 12.0) + rng.normal(0, 0.05, 4000)
+    calibration = fit_vertical_calibration(pred, actual)
+    adjusted = apply_vertical_calibration(pred, calibration)
+
+    low, high = actual < 11.0, actual > 13.0
+    assert abs((adjusted - actual)[low].mean()) < 0.3 * abs((pred - actual)[low].mean())
+    assert abs((adjusted - actual)[high].mean()) < 0.3 * abs((pred - actual)[high].mean())
+    # monotone in the raw prediction
+    order = np.argsort(pred)
+    assert (np.diff(adjusted[order]) >= -1e-9).all()
+
+
 def test_fit_metrics_known_values():
     out = fit_metrics([110_000.0, 90_000.0], [100_000.0, 100_000.0])
     assert out["n"] == 2

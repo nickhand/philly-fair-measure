@@ -10,6 +10,20 @@
 > TASP convention on identical sales: ours COD 26.0 vs OPA 33.0 (Keene's 10.1
 > is on OPA's curated in-window sample — mostly a sample-selection gap).
 > Style gradient matches Keene's ordering (detached 18.8 < twin 21.9 < row 27.0).
+>
+> **Follow-ups executed 2026-07-03:** Tier 2.1 parcel shapes — null result in
+> Philly (uniform rectangular rowhome lots; kept, 1.9% of gain). Spatial GP
+> field — *measured unnecessary*: after the kNN surface + market areas,
+> test-residual Moran's I is 0.051 with a noise-level correlogram at every
+> range; HSGP/PyINLA remain documented options if the residual field ever
+> reappears. PRD work — objective swaps don't help (L1 worsens to 1.135;
+> Huber ≈ L2); isotonic vertical calibration (validation-fitted, persisted,
+> applied in scoring) took PRD 1.112 → **1.073** and PRB → −0.072 at zero
+> accuracy cost; MKI added to the suite (ours 0.938 vs OPA 0.804). The
+> remaining q1 median gradient (≈1.21) is conditional-on-prediction
+> information deficit — fixable only by tail-informative features
+> (condition granularity, violation severity, distress signals), not by any
+> recalibration of the prediction.
 
 Goal: improve the measured metrics from the v1 baselines. Grounded in OPA's
 TY2027 methodology and the 2026 literature (see
