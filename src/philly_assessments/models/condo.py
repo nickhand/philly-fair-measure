@@ -207,6 +207,7 @@ def train_condo(
                 "lgb_params": params,
                 "best_iteration": booster.best_iteration,
                 "test_fraction": test_fraction,
+                "validation_fraction": validation_fraction,
                 "time_adjusted": time_adjusted,
                 "vertical_calibration": vertical_calibration,
                 "features": features,

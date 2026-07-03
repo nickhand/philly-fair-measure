@@ -185,6 +185,65 @@ def _cmd_screen_assessments(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_conformal_check(args: argparse.Namespace) -> int:
+    import polars as pl
+
+    from philly_assessments.models.conformal import conformal_check
+
+    result = conformal_check(args.data_dir, alpha=args.alpha, k=args.k)
+    print(f"conformal cross-check on {result.run_dir.name} (nominal {1 - args.alpha:.0%})\n")
+
+    methods = ["conformal_global", "conformal_district", "conformal_knn", "bayesian"]
+    labels = [m.removeprefix("conformal_") for m in methods]
+    header = f"{'segment':<16}{'n':>9}" + "".join(f"{label:>16}" for label in labels)
+    print(header)
+    print("-" * len(header))
+    segments = result.table.select("segment_type", "segment", "n").unique(
+        maintain_order=True
+    )
+    for seg in segments.to_dicts():
+        cells = []
+        for method in methods:
+            row = result.table.filter(
+                (pl.col("method") == method)
+                & (pl.col("segment_type") == seg["segment_type"])
+                & (pl.col("segment") == seg["segment"])
+            )
+            if row.height:
+                cells.append(
+                    f"{row['coverage'][0]:>8.3f}/{row['median_width_log'][0]:<7.2f}"
+                )
+            else:
+                cells.append(f"{'-':>16}")
+        print(f"{seg['segment']:<16}{seg['n']:>9,}" + "".join(cells))
+
+    spread = (
+        result.district_coverage.group_by("method")
+        .agg(
+            pl.col("coverage").min().alias("min"),
+            pl.col("coverage").max().alias("max"),
+        )
+        .sort("method")
+    )
+    print("\ncoverage across districts (min - max):")
+    for row in spread.to_dicts():
+        print(f"  {row['method']:<20} {row['min']:.3f} - {row['max']:.3f}")
+
+    if result.flag_agreement is not None:
+        print("\nscreen flag agreement (bayesian rows x conformal-knn columns):")
+        pivot = result.flag_agreement.pivot(
+            on="conformal_flag", index="bayesian_flag", values="len"
+        ).fill_null(0)
+        cols = [c for c in pivot.columns if c != "bayesian_flag"]
+        print(f"  {'bayesian \\ conformal':<26}" + "".join(f"{c[:14]:>16}" for c in cols))
+        for row in pivot.sort("bayesian_flag").to_dicts():
+            print(
+                f"  {row['bayesian_flag']:<26}"
+                + "".join(f"{row[c]:>16,}" for c in cols)
+            )
+    return 0
+
+
 def _cmd_comps(args: argparse.Namespace) -> int:
     import polars as pl
 
@@ -403,6 +462,16 @@ def main(argv: list[str] | None = None) -> int:
     screen.add_argument("--chunk-size", type=int, default=50_000)
     screen.add_argument("--data-dir", type=Path)
     screen.set_defaults(func=_cmd_screen_assessments)
+
+    conformal = subparsers.add_parser(
+        "conformal-check",
+        help="frequentist conformal intervals around LightGBM as an independent "
+        "cross-check of the Bayesian screen",
+    )
+    conformal.add_argument("--alpha", type=float, default=0.10)
+    conformal.add_argument("--k", type=int, default=500, help="calibration neighbors (knn method)")
+    conformal.add_argument("--data-dir", type=Path)
+    conformal.set_defaults(func=_cmd_conformal_check)
 
     comps = subparsers.add_parser(
         "comps", help="comparable sales for a property (parcel id or address fragment)"

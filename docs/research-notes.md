@@ -140,6 +140,29 @@ field, the 2026 toolchain: `pm.gp.HSGP` (PyMC, mature), GPBoost
 [PyINLA](https://arxiv.org/abs/2603.27276) bringing R-INLA's SPDE machinery
 to Python.
 
+**Conformal cross-check verdict (measured 2026-07-03,
+`philly conformal-check`, artifacts in the baseline run dir).** The
+spatially weighted conformal wrapper proposed above is now built
+(models/conformal.py: split-conformal on the rebuilt validation slice,
+asymmetric residual quantiles, global / district-Mondrian / kNN-weighted
+variants) and the cross-check **passes**: on the same 19,516-sale out-of-time
+test, conformal-kNN covers 89.8% at median log-width 0.98 vs the Bayesian
+90.1% at 1.30 — same coverage, ~25% narrower, because it wraps the stronger
+LightGBM point model while the linear Bayesian pays in width. Exactly as
+arXiv:2312.06531 predicts, marginal (global) conformal hides local failure —
+district coverage spans 0.798–0.998 — while the spatially weighted variant
+tightens the spread to 0.875–0.916, the best of all methods including the
+Bayesian (0.858–0.926). Flag agreement on the full screen: the independent
+machine confirms 76% of Bayesian under-assessment flags (1,710/2,411) and 40%
+of over-flags (174/434); its narrower bands also flag ~19k borderliners the
+Bayesian screen calls within-range. Screen policy unchanged — Bayesian stays
+primary for residential (more conservative, posterior-draw semantics), the
+double-flagged intersection (~1.9k properties) is the highest-confidence
+actionable set, and the conformal engine prices the condo screen, which has
+no Bayesian arm. All methods still undercover q1 (0.78–0.85 vs 0.90) — the
+measured interior-condition information limit; kNN-conformal degrades most
+gracefully (0.852 at width 1.42).
+
 **Modern Bayesian practice applicable here**
 - **HSGP** (Hilbert-space GP approximation; Solin & Särkkä, and the practical
   probabilistic-programming variant) gives near-exact low-dimensional GPs at
