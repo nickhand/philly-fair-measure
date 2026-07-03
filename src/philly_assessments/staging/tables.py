@@ -147,6 +147,133 @@ def stg_delinquencies(raw: pl.LazyFrame) -> pl.LazyFrame:
     )
 
 
+def stg_complaints(raw: pl.LazyFrame) -> pl.LazyFrame:
+    """L&I complaints: resident-initiated reports with true event dates.
+
+    The upstream of violations — the closest public proxy for interior
+    condition (MAINTENANCE RESIDENTIAL is tenants reporting heat/plumbing/
+    electrical) and the city's only live vacancy feed (VACANT HOUSE)."""
+    lf = raw
+    for column in ("complaintdate", "complaintresolution_date"):
+        lf = with_parsed_timestamp(lf, column)
+    return lf.select(
+        "complaintnumber",
+        "casenumber",
+        "opa_account_num",
+        "parcel_id_num",
+        "complaintcode",
+        "complaintcodename",
+        "complaintstatus",
+        "casestatus",
+        "unitresponsible",
+        "complaintdate",
+        "complaintdate_parsed",
+        "complaintdate_status",
+        "complaintresolution_date",
+        "complaintresolution_date_parsed",
+        "complaintresolution_date_status",
+        "address",
+        "zip",
+        "censustract",
+    )
+
+
+def stg_case_investigations(raw: pl.LazyFrame) -> pl.LazyFrame:
+    """L&I case investigations (inspection events), keyed to OPA accounts.
+
+    Adds the escalation ladder beyond violations: PRECOURT investigations mark
+    cases headed to court (severe, prolonged distress); HCEU INSP are housing
+    code enforcement inspections (interior access happened)."""
+    lf = with_parsed_timestamp(raw, "investigationcompleted")
+    return lf.select(
+        "casenumber",
+        "opa_account_num",
+        "parcel_id_num",
+        "casetype",
+        "casepriority",
+        "investigationtype",
+        "investigationstatus",
+        "investigationcompleted",
+        "investigationcompleted_parsed",
+        "investigationcompleted_status",
+        "address",
+        "zip",
+        "censustract",
+    )
+
+
+def stg_rental_licenses(raw: pl.LazyFrame) -> pl.LazyFrame:
+    """Rental business licenses: per-parcel tenure spans.
+
+    A license active at a sale date marks the property investor-/landlord-held
+    as of that sale (initialissuedate <= date < inactivedate). owneroccupied
+    and numberofunits come straight from the license record."""
+    lf = raw.filter(pl.col("licensetype").cast(pl.String) == "Rental")
+    for column in ("initialissuedate", "mostrecentissuedate", "expirationdate", "inactivedate"):
+        lf = with_parsed_timestamp(lf, column)
+    return lf.select(
+        "licensenum",
+        "opa_account_num",
+        "parcel_id_num",
+        "rentalcategory",
+        "licensestatus",
+        "owneroccupied",
+        "numberofunits",
+        "initialissuedate",
+        "initialissuedate_parsed",
+        "initialissuedate_status",
+        "mostrecentissuedate",
+        "mostrecentissuedate_parsed",
+        "mostrecentissuedate_status",
+        "expirationdate",
+        "expirationdate_parsed",
+        "expirationdate_status",
+        "inactivedate",
+        "inactivedate_parsed",
+        "inactivedate_status",
+        "address",
+        "zip",
+        "censustract",
+    )
+
+
+def stg_appeals(raw: pl.LazyFrame) -> pl.LazyFrame:
+    """L&I / ZBA appeals with decisions.
+
+    A granted ZBA variance is a development entitlement the characteristics
+    table won't show for years — an uplift event with a true decision date."""
+    lf = raw
+    for column in ("createddate", "scheduleddate", "decisiondate", "completeddate"):
+        lf = with_parsed_timestamp(lf, column)
+    return lf.select(
+        "appealnumber",
+        "opa_account_num",
+        "parcel_id_num",
+        "appealtype",
+        "applicationtype",
+        "appealstatus",
+        "appealgrounds",
+        "decision",
+        "meetingresult",
+        "relatedpermit",
+        "createddate",
+        "createddate_parsed",
+        "createddate_status",
+        "scheduleddate",
+        "scheduleddate_parsed",
+        "scheduleddate_status",
+        "decisiondate",
+        "decisiondate_parsed",
+        "decisiondate_status",
+        "completeddate",
+        "completeddate_parsed",
+        "completeddate_status",
+        "address",
+        "zip",
+        "censustract",
+    )
+
+
 def stg_demolitions(raw: pl.LazyFrame) -> pl.LazyFrame:
     """L&I demolitions with parsed event dates (true as-of event signal)."""
     lf = raw

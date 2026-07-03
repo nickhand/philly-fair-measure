@@ -125,7 +125,15 @@ def build_assessment_screen(
             raise FileNotFoundError(f"{path} missing; run the pipeline first")
 
     optional = {}
-    for name in ("parcels", "demolitions", "delinquencies"):
+    for name in (
+        "parcels",
+        "demolitions",
+        "delinquencies",
+        "complaints",
+        "case_investigations",
+        "rental_licenses",
+        "appeals",
+    ):
         path = root / "staged" / f"{name}.parquet"
         optional[name] = pl.scan_parquet(path) if path.exists() else None
     proximity_path = root / "marts" / "proximity.parquet"
@@ -142,6 +150,10 @@ def build_assessment_screen(
         optional["demolitions"],
         optional["delinquencies"],
         optional["proximity"],
+        optional["complaints"],
+        optional["case_investigations"],
+        optional["rental_licenses"],
+        optional["appeals"],
     )
     logger.info("scoring %s residential properties", f"{features.height:,}")
     # persist the full feature frame: the comps CLI prices arbitrary parcels
@@ -193,6 +205,10 @@ def build_assessment_screen(
         "shp_n_linked_parcels",
         "shp_linked_lot_area_m2",
         "dist_tax_delinquent",
+        "evt_n_vacant_complaints_5y_before",
+        "evt_vacant_complaint_days_since",
+        "evt_n_unpermitted_work_complaints_5y_before",
+        "ten_rental_license_at_sale",
         "opa_market_value",
     ).with_columns(
         pl.Series("pred_lightgbm", pred_lgb),

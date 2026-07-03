@@ -88,6 +88,20 @@ NUMERIC_FEATURES = [
     "dist_tax_years_owed",
     "dist_tax_total_due",
     "dist_sheriff_sale",
+    # L&I complaint/inspection/tenure family (the q1 follow-up round two:
+    # resident-reported interior distress, vacancy, escalation, tenure)
+    "evt_n_complaints_5y_before",
+    "evt_n_int_maint_complaints_5y_before",
+    "evt_n_ext_maint_complaints_5y_before",
+    "evt_n_vacant_complaints_5y_before",
+    "evt_n_unpermitted_work_complaints_5y_before",
+    "evt_vacant_complaint_days_since",
+    "evt_n_investigations_5y_before",
+    "evt_n_precourt_5y_before",
+    "evt_n_appeal_granted_before",
+    "ten_rental_license_at_sale",
+    "ten_owner_occupied_rental",
+    "ten_rental_units",
     "loc_lon",
     "loc_lat",
     # parcel geometry (PWD polygons via the brt_id bridge; plan v2 Tier 2.1)

@@ -146,6 +146,203 @@ def join_proximity(frame: pl.DataFrame, proximity: pl.LazyFrame | None) -> pl.Da
     return frame.join(prox, on="parcel_id", how="left")
 
 
+# L&I complaint taxonomy slices (live-profiled 2026-07-03). The vocabulary
+# CHANGED with the ~2022 system migration, so every slice needs both eras
+# (the legacy-only lists silently zeroed out at recent valuation dates —
+# caught because total counts worked while slices didn't). Interior
+# maintenance complaints are tenant-reported heat/plumbing/sewage — the
+# closest public proxy for interior condition; vacant complaints are the
+# city's only live vacancy feed; unpermitted-work complaints are neighbors
+# reporting exactly the renovations that never got permits (the founding
+# use case's blind spot).
+INT_MAINT_COMPLAINTS = [
+    "MAINTENANCE RESIDENTIAL",  # legacy
+    "PROPERTY MAINTENANCE COMPLAINT INTERIOR",
+    "RESIDENCE WITHOUT HEAT (OCTOBER 1 - APRIL 15)",
+    "BROKEN MAIN DRAIN/RAW SEWAGE WITHIN THE PROPERTY",
+]
+EXT_MAINT_COMPLAINTS = [
+    "PROPERTY MAINTENANCE COMPLAINT EXTERIOR",
+    "PROPERTY MAINTENANCE HIGH WEEDS",
+    "PROPERTY MAINTENANCE EXTERIOR REVIEWED",
+]
+VACANT_COMPLAINTS = [
+    "VACANT HOUSE",  # legacy
+    "VACANT PROPERTY COMPLAINT",
+    "VACANT & OPEN TO TRESPASS",
+]
+UNPERMITTED_WORK_COMPLAINTS = [
+    "WORK UNDERWAY WITHOUT PERMITS",
+    "WORK UNDERWAY IN VIOLATION OF PERMIT REQUIREMENTS",
+]
+
+DISTRESS_TENURE_COUNTS = [
+    "evt_n_complaints_5y_before",
+    "evt_n_int_maint_complaints_5y_before",
+    "evt_n_ext_maint_complaints_5y_before",
+    "evt_n_vacant_complaints_5y_before",
+    "evt_n_unpermitted_work_complaints_5y_before",
+    "evt_n_investigations_5y_before",
+    "evt_n_precourt_5y_before",
+    "evt_n_appeal_granted_before",
+    "ten_rental_license_at_sale",
+    "ten_owner_occupied_rental",
+]
+DISTRESS_TENURE_COLUMNS = [
+    *DISTRESS_TENURE_COUNTS,
+    "evt_vacant_complaint_days_since",
+    "ten_rental_units",
+]
+
+
+def distress_tenure_features(
+    targets: pl.DataFrame,
+    complaints: pl.LazyFrame | None = None,
+    investigations: pl.LazyFrame | None = None,
+    rental_licenses: pl.LazyFrame | None = None,
+    appeals: pl.LazyFrame | None = None,
+) -> pl.DataFrame:
+    """as_of_sale distress (evt_) and tenure (ten_) block, shared by the sale
+    mart and the assessment screen.
+
+    `targets` columns: sale_id, parcel_id, sale_date (the anchor date). Every
+    event counts strictly before the anchor; rental tenure uses license spans
+    (initial issue <= anchor < inactive). Missing inputs yield null columns so
+    the model feature set is stable either way."""
+    out = targets.select("sale_id")
+
+    def _events(frame: pl.LazyFrame, date_col: str, *extra: pl.Expr) -> pl.DataFrame:
+        return (
+            frame.filter(
+                pl.col("opa_account_num").is_not_null()
+                & pl.col(f"{date_col}_parsed").is_not_null()
+            )
+            .select(
+                pl.col("opa_account_num").alias("parcel_id"),
+                pl.col(f"{date_col}_parsed").alias("event_date"),
+                *extra,
+            )
+            .collect()
+        )
+
+    def _joined(events: pl.DataFrame) -> pl.DataFrame:
+        return (
+            targets.join(events, on="parcel_id")
+            .with_columns(
+                (pl.col("sale_date") - pl.col("event_date")).dt.total_days().alias("days_before")
+            )
+            .filter(pl.col("days_before") > 0)
+            .with_columns((pl.col("days_before") <= EVENT_WINDOW_DAYS).alias("in_window"))
+        )
+
+    if complaints is not None:
+        name = pl.col("name")
+        feats = (
+            _joined(
+                _events(
+                    complaints,
+                    "complaintdate",
+                    pl.col("complaintcodename").cast(pl.String).alias("name"),
+                )
+            )
+            .group_by("sale_id")
+            .agg(
+                pl.col("in_window").sum().alias("evt_n_complaints_5y_before"),
+                (pl.col("in_window") & name.is_in(INT_MAINT_COMPLAINTS))
+                .sum()
+                .alias("evt_n_int_maint_complaints_5y_before"),
+                (pl.col("in_window") & name.is_in(EXT_MAINT_COMPLAINTS))
+                .sum()
+                .alias("evt_n_ext_maint_complaints_5y_before"),
+                (pl.col("in_window") & name.is_in(VACANT_COMPLAINTS))
+                .sum()
+                .alias("evt_n_vacant_complaints_5y_before"),
+                (pl.col("in_window") & name.is_in(UNPERMITTED_WORK_COMPLAINTS))
+                .sum()
+                .alias("evt_n_unpermitted_work_complaints_5y_before"),
+                pl.when(name.is_in(VACANT_COMPLAINTS))
+                .then(pl.col("days_before"))
+                .min()
+                .alias("evt_vacant_complaint_days_since"),
+            )
+        )
+        out = out.join(feats, on="sale_id", how="left")
+
+    if investigations is not None:
+        feats = (
+            _joined(
+                _events(
+                    investigations,
+                    "investigationcompleted",
+                    pl.col("investigationtype").cast(pl.String).alias("itype"),
+                )
+            )
+            .group_by("sale_id")
+            .agg(
+                pl.col("in_window").sum().alias("evt_n_investigations_5y_before"),
+                (pl.col("in_window") & (pl.col("itype") == "PRECOURT"))
+                .sum()
+                .alias("evt_n_precourt_5y_before"),
+            )
+        )
+        out = out.join(feats, on="sale_id", how="left")
+
+    if appeals is not None:
+        # decision vocabulary is split across system generations (legacy rows:
+        # uppercase GRANTED with a null appealtype; new ZBA rows: "Granted"),
+        # so match case-insensitively and count grants from any board — a
+        # granted variance/appeal is an entitlement event either way
+        granted = _events(
+            appeals,
+            "decisiondate",
+            pl.col("decision").cast(pl.String).alias("decision"),
+        ).filter(pl.col("decision").str.to_uppercase().str.contains("GRANT"))
+        feats = (
+            _joined(granted)
+            .group_by("sale_id")
+            .agg(pl.len().alias("evt_n_appeal_granted_before"))
+        )
+        out = out.join(feats, on="sale_id", how="left")
+
+    if rental_licenses is not None:
+        licenses = (
+            rental_licenses.filter(
+                pl.col("opa_account_num").is_not_null()
+                & pl.col("initialissuedate_parsed").is_not_null()
+            )
+            .select(
+                pl.col("opa_account_num").alias("parcel_id"),
+                pl.col("initialissuedate_parsed").alias("start"),
+                pl.col("inactivedate_parsed").alias("end"),
+                pl.col("owneroccupied").cast(pl.String).alias("owner_occupied"),
+                pl.col("numberofunits").cast(pl.Float64, strict=False).alias("units"),
+            )
+            .collect()
+        )
+        feats = (
+            targets.join(licenses, on="parcel_id")
+            .filter(
+                (pl.col("start") <= pl.col("sale_date"))
+                & (pl.col("end").is_null() | (pl.col("end") > pl.col("sale_date")))
+            )
+            .group_by("sale_id")
+            .agg(
+                pl.lit(1.0).first().alias("ten_rental_license_at_sale"),
+                (pl.col("owner_occupied") == "Yes")
+                .any()
+                .cast(pl.Float64)
+                .alias("ten_owner_occupied_rental"),
+                pl.col("units").max().alias("ten_rental_units"),
+            )
+        )
+        out = out.join(feats, on="sale_id", how="left")
+
+    for column in DISTRESS_TENURE_COLUMNS:
+        if column not in out.columns:
+            out = out.with_columns(pl.lit(None, dtype=pl.Float64).alias(column))
+    return out
+
+
 def join_parcel_shapes(frame: pl.DataFrame, parcels: pl.LazyFrame | None) -> pl.DataFrame:
     """Attach shp_* columns by OPA account; null columns when parcels are absent
     so the model feature set is stable either way."""
@@ -332,6 +529,10 @@ def assemble_sale_features(
     demolitions: pl.LazyFrame | None = None,
     delinquencies: pl.LazyFrame | None = None,
     proximity: pl.LazyFrame | None = None,
+    complaints: pl.LazyFrame | None = None,
+    investigations: pl.LazyFrame | None = None,
+    rental_licenses: pl.LazyFrame | None = None,
+    appeals: pl.LazyFrame | None = None,
     *,
     min_sale_year: int = DEFAULT_MIN_SALE_YEAR,
 ) -> pl.DataFrame:
@@ -547,6 +748,17 @@ def assemble_sale_features(
         .join(violation_feats, on="sale_id", how="left")
         .join(demo_feats, on="sale_id", how="left")
         .join(
+            distress_tenure_features(
+                base.select("sale_id", "parcel_id", "sale_date"),
+                complaints,
+                investigations,
+                rental_licenses,
+                appeals,
+            ),
+            on="sale_id",
+            how="left",
+        )
+        .join(
             current_asmt,
             left_on=["parcel_id", "sale_year"],
             right_on=["parcel_id", "asmt_year"],
@@ -576,6 +788,7 @@ def assemble_sale_features(
             pl.col("evt_n_severe_violations_5y_before").fill_null(0),
             pl.col("evt_n_open_severe_at_sale").fill_null(0),
             pl.col("evt_n_demolitions_before").fill_null(0),
+            *[pl.col(c).fill_null(0.0) for c in DISTRESS_TENURE_COUNTS],
             pl.when(pl.col("asmt_market_value_prev_year") > 0)
             .then(
                 pl.col("asmt_market_value_sale_year") / pl.col("asmt_market_value_prev_year")
@@ -617,7 +830,15 @@ def build_sale_features(
                 "`philly build-market-areas`, and `philly build-price-index` first"
             )
     optional = {}
-    for name in ("parcels", "demolitions", "delinquencies"):
+    for name in (
+        "parcels",
+        "demolitions",
+        "delinquencies",
+        "complaints",
+        "case_investigations",
+        "rental_licenses",
+        "appeals",
+    ):
         path = root / "staged" / f"{name}.parquet"
         if path.exists():
             paths[name] = path
@@ -645,6 +866,10 @@ def build_sale_features(
         optional["demolitions"],
         optional["delinquencies"],
         optional["proximity"],
+        optional["complaints"],
+        optional["case_investigations"],
+        optional["rental_licenses"],
+        optional["appeals"],
         min_sale_year=min_sale_year,
     )
     inputs = []

@@ -168,22 +168,32 @@ so bulk geometry pulls need `resultOffset` paging or envelope tiling.
 
 ---
 
-## Secondary datasets (existence + row count verified; schemas not yet pulled)
+## Secondary datasets — PROMOTED 2026-07-03 (snapshotted + staged + in models)
 
-| Table (CARTO) | Rows (2026-07-02) | Relevance | Notes |
-|---|---|---|---|
-| `real_estate_tax_delinquencies` | 54,401 | Distress signal; sale-validity context | |
-| `demolitions` | 14,206 | Structure-change events | |
-| `case_investigations` | 2,080,263 | L&I case detail behind violations | Large; snapshot later |
-| `business_licenses` | 431,911 | Rental-license signal (owner-occupancy proxy) | |
-| `appeals` | 43,140 | **L&I** appeals (permits/violations), *not* assessment appeals | |
-| `unsafe` | 3,076 | Unsafe-structure designations | |
-| `imm_dang` | 131 | Imminently dangerous structures | |
-| `li_court_appeals` | 460 | L&I court appeals | |
-| `opa_properties_public_pde` | 583,711 | Variant of the OPA table (PDE = Property Data Explorer?) | Diff against `opa_properties_public` before using |
+Live-profiled before ingestion (schemas, taxonomies, OPA linkage ~99%):
+
+| Table (CARTO) | Rows (2026-07-03) | What we use |
+|---|---|---|
+| `complaints` | 1,038,931 | L&I complaints 2000+ (`complaintcodename` taxonomy): MAINTENANCE RESIDENTIAL 169k (tenant-reported interior distress), VACANT HOUSE 64k (the only live vacancy feed), exterior maintenance/weeds. True event dates → `evt_` features. |
+| `case_investigations` | 2,080,982 | Inspection events (`investigationtype`): PRECOURT 142k = court-escalation severity ladder; HCEU INSP 678k. |
+| `business_licenses` | 431,952 | Rental licenses (288k): tenure spans via initial/inactive dates, `owneroccupied`, `numberofunits` → `ten_` features (17.2% of arms-length sales investor-held at sale). |
+| `appeals` | 43,149 | L&I + ZBA appeals with decisions. **Decision vocabulary splits by system generation**: legacy rows say GRANTED with a NULL appealtype; new ZBA rows say "Granted" (and often just "Complete") — match grants case-insensitively across boards. *Not* assessment appeals. |
+
+## Remaining secondary (existence + row count verified; not ingested)
+
+| Table (CARTO) | Rows | Notes |
+|---|---|---|
+| `unsafe` | 3,076 | Redundant with `caseprioritydesc` severity ladder (verified) |
+| `imm_dang` | 131 | Same |
+| `li_court_appeals` | 460 | Tiny |
+| `trade_licenses` | 49,961 | Contractor licensing; not parcel events |
+| `public_cases_fc` | 5,840,358 | 311 tickets; the L&I `complaints` table is the curated, OPA-linked property subset (carries `ticket_num_311`) |
+| `real_estate_tax_balances` | 683,926 | **DEAD: tax periods end 2016** (probed 2026-07-03); delinquencies is the live table |
+| `opa_properties_public_pde` | 583,711 | Variant of the OPA table | 
 
 Probed and **not present** on CARTO (do not reference): `vacant_indicators_points`,
-`real_estate_transfers` (the transfers table is `rtt_summary`).
+`real_estate_transfers` (the transfers table is `rtt_summary`),
+`li_building_certifications`, `sheriff_sales`, `zoning_appeals`.
 
 ---
 

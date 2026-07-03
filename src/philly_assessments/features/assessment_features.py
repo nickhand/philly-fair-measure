@@ -34,11 +34,13 @@ from philly_assessments.features.price_index import with_time_adjustment
 from philly_assessments.features.sale_features import (
     _CHAR_RENAMES,
     _LOC_RENAMES,
+    DISTRESS_TENURE_COUNTS,
     PPSF_AREA_BOUNDS,
     ROLL_WINDOW_DAYS,
     SEVERE_PRIORITIES,
     _block_id,
     _recency_weight,
+    distress_tenure_features,
     era_expr,
     join_delinquencies,
     join_parcel_shapes,
@@ -74,6 +76,10 @@ def assemble_assessment_features(
     demolitions: pl.LazyFrame | None = None,
     delinquencies: pl.LazyFrame | None = None,
     proximity: pl.LazyFrame | None = None,
+    complaints: pl.LazyFrame | None = None,
+    investigations: pl.LazyFrame | None = None,
+    rental_licenses: pl.LazyFrame | None = None,
+    appeals: pl.LazyFrame | None = None,
 ) -> pl.DataFrame:
     from philly_assessments.config import CONDO_ACCOUNT_PREFIX
 
@@ -339,6 +345,21 @@ def assemble_assessment_features(
         .join(permit_events, on="parcel_id", how="left")
         .join(violation_events, on="parcel_id", how="left")
         .join(demo_feats, on="parcel_id", how="left")
+        .join(
+            distress_tenure_features(
+                base.select(
+                    pl.col("parcel_id").alias("sale_id"),
+                    "parcel_id",
+                    pl.lit(valuation_date).alias("sale_date"),
+                ),
+                complaints,
+                investigations,
+                rental_licenses,
+                appeals,
+            ).rename({"sale_id": "parcel_id"}),
+            on="parcel_id",
+            how="left",
+        )
         .rename({**_CHAR_RENAMES, **_LOC_RENAMES})
         .rename(
             {
@@ -358,6 +379,7 @@ def assemble_assessment_features(
             pl.col("evt_n_severe_violations_5y_before").fill_null(0),
             pl.col("evt_n_open_severe_at_sale").fill_null(0),
             pl.col("evt_n_demolitions_before").fill_null(0),
+            *[pl.col(c).fill_null(0.0) for c in DISTRESS_TENURE_COUNTS],
             pl.lit(float(epoch_days)).alias("time_sale_epoch_days"),
             pl.lit((valuation_date.month - 1) // 3 + 1).alias("time_quarter"),
             pl.lit(valuation_date.month).alias("time_month"),

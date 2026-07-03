@@ -50,6 +50,32 @@ external (listings — access/terms-constrained; imagery — later-stage) or
 accepting the limit and letting the Bayesian intervals carry the tail
 uncertainty, which they do.
 
+**L&I distress round two + tenure (`evt_`/`ten_`, 2026-07-03):** four newly
+ingested tables (complaints 1.04M, case_investigations 2.08M, rental
+business_licenses 288k, appeals 43k — all ~99% OPA-linked, live-profiled
+before ingestion). **Vocabulary gotcha (caught by coverage checks):** both
+the complaint taxonomy and the appeal decision vocabulary changed with L&I's
+~2022 system migration, so every slice needs both eras — the legacy-only
+lists produced working totals with silently-zero slices at recent valuation
+dates. Features, all as_of_sale: interior-maintenance complaints
+(tenant-reported heat/plumbing/sewage — the closest public proxy for
+interior condition; 11.7% of sales within 5y), exterior maintenance,
+**vacancy complaints + recency** (the only live vacancy feed; 6.9% within
+5y), **unpermitted-work complaints** (2.2% — neighbors reporting exactly the
+renovations permits miss; the founding use case's signal, also a screen
+evidence column), inspections + **PRECOURT escalation** (6%), granted
+variances/appeals (any board), and rental-license tenure spans:
+**investor-held-at-sale** (17.2%), owner-occupied-landlord flag, licensed
+units. **Result: best model to date overall — RMSE(log) 0.3377, COD 26.00
+(from 26.18) — but the q1 median ratio stays 1.200 and q1 COD 39.0. The
+interior-condition wall does not move.** This closes the public-data attack
+on the q1 tail: resident-reported distress is now IN the model and the
+residual q1 bias persists, which makes the earlier diagnosis airtight —
+what's unobservable is *positive* interior condition (renovation), not
+distress. Remaining paths are listings/imagery (see research notes). The
+vacancy, unpermitted-work, and tenure columns also feed the screen as
+evidence and the equity diagnostics.
+
 **Owner-linked adjacency (`shp_n_linked_parcels`, `shp_linked_lot_area_m2`,
 2026-07-03):** same-small-owner parcels touching within 0.3m (institutional
 owners with >20 parcels excluded) — the house + side-yard assemblage signal.

@@ -22,6 +22,13 @@ CORE_CARTO_TABLES: dict[str, int] = {
     "rtt_summary": 30_000,
     "permits": 20_000,
     "violations": 20_000,
+    "real_estate_tax_delinquencies": 30_000,
+    "demolitions": 30_000,
+    # L&I distress/tenure family (live-verified 2026-07-03)
+    "complaints": 30_000,
+    "case_investigations": 30_000,
+    "business_licenses": 20_000,
+    "appeals": 20_000,
 }
 
 
