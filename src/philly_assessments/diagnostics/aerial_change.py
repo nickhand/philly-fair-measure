@@ -260,32 +260,23 @@ def build_pilot_sample(
     return sample
 
 
-def run_aerial_pilot(
-    data_dir: Path | None = None,
+def score_parcels(
+    sample: pl.DataFrame,
     *,
-    vintage_early: int = 2020,
-    vintage_late: int = 2023,
-    n_demolition: int = 200,
-    n_construction: int = 200,
-    n_control: int = 300,
+    vintage_early: int,
+    vintage_late: int,
+    data_dir: Path | None = None,
     workers: int = 6,
-    save_examples: int = 6,
+    save_examples: int = 0,
+    example_dir: Path | None = None,
 ) -> pl.DataFrame:
+    """Fetch tile pairs and score change for a (parcel_id, group) frame.
+
+    Parcels without PWD polygons, without coverage in either vintage, or with
+    tiny masks are dropped (counts logged)."""
     import httpx
     import shapely
     from shapely import from_geojson
-
-    from philly_assessments.ingest.derived import write_derived_table
-
-    root = data_dir if data_dir is not None else config.data_dir()
-    sample = build_pilot_sample(
-        root,
-        vintage_early=vintage_early,
-        vintage_late=vintage_late,
-        n_demolition=n_demolition,
-        n_construction=n_construction,
-        n_control=n_control,
-    )
 
     pwd_ref = catalog.latest_snapshots(data_dir).get("pwd_parcels")
     if pwd_ref is None:
@@ -298,9 +289,7 @@ def run_aerial_pilot(
         .unique(subset=["parcel_id"])
     )
     frame = sample.join(polys, on="parcel_id", how="inner")
-    logger.info(
-        "%d of %d sampled parcels have PWD polygons", frame.height, sample.height
-    )
+    logger.info("%d of %d parcels have PWD polygons", frame.height, sample.height)
 
     geoms = from_geojson(frame["geometry_geojson"].to_numpy(), on_invalid="ignore")
     rows = frame.select("parcel_id", "group").to_dicts()
@@ -333,7 +322,49 @@ def run_aerial_pilot(
                 results.append(out)
     logger.info("scored %d of %d parcels", len(results), len(rows))
 
-    table = pl.DataFrame(results)
+    if examples and example_dir is not None:
+        example_dir.mkdir(parents=True, exist_ok=True)
+        from PIL import Image
+
+        for parcel_id, group, early, late in examples:
+            side = np.concatenate([early, np.ones((TILE_PX, 4)), late], axis=1)
+            Image.fromarray((side * 255).astype(np.uint8)).save(
+                example_dir / f"{group}_{parcel_id}_{vintage_early}_vs_{vintage_late}.png"
+            )
+    return pl.DataFrame(results)
+
+
+def run_aerial_pilot(
+    data_dir: Path | None = None,
+    *,
+    vintage_early: int = 2020,
+    vintage_late: int = 2023,
+    n_demolition: int = 200,
+    n_construction: int = 200,
+    n_control: int = 300,
+    workers: int = 6,
+    save_examples: int = 6,
+) -> pl.DataFrame:
+    from philly_assessments.ingest.derived import write_derived_table
+
+    root = data_dir if data_dir is not None else config.data_dir()
+    sample = build_pilot_sample(
+        root,
+        vintage_early=vintage_early,
+        vintage_late=vintage_late,
+        n_demolition=n_demolition,
+        n_construction=n_construction,
+        n_control=n_control,
+    )
+    table = score_parcels(
+        sample,
+        vintage_early=vintage_early,
+        vintage_late=vintage_late,
+        data_dir=data_dir,
+        workers=workers,
+        save_examples=save_examples,
+        example_dir=root / "diagnostics" / "aerial_pilot_examples",
+    )
     write_derived_table(
         table,
         root,
@@ -343,16 +374,93 @@ def run_aerial_pilot(
         notes=f"vintages {vintage_early} vs {vintage_late}; PASDA MapServer tiles",
     )
 
-    example_dir = root / "diagnostics" / "aerial_pilot_examples"
-    example_dir.mkdir(parents=True, exist_ok=True)
-    from PIL import Image
-
-    for parcel_id, group, early, late in examples:
-        side = np.concatenate([early, np.ones((TILE_PX, 4)), late], axis=1)
-        Image.fromarray((side * 255).astype(np.uint8)).save(
-            example_dir / f"{group}_{parcel_id}_{vintage_early}_vs_{vintage_late}.png"
-        )
     return table
+
+
+def run_aerial_score(
+    data_dir: Path | None = None,
+    *,
+    vintage_early: int = 2023,
+    vintage_late: int = 2025,
+    flags: tuple[str, ...] = ("over_assessed_candidate", "under_assessed_candidate"),
+    n_control: int = 300,
+    workers: int = 6,
+    limit: int | None = None,
+) -> pl.DataFrame:
+    """Score the assessment screen's flagged residential parcels for aerial
+    change and persist screen-joinable evidence.
+
+    A fresh quiet-control sample is scored alongside the targets so the
+    change threshold is calibrated for THIS vintage pair (flight gap and
+    imaging conditions shift the whole score distribution): a parcel is
+    change-flagged when its score exceeds the controls' 90th percentile —
+    the pilot's 10% false-positive budget, at which ~42% of known structural
+    change was caught."""
+    from philly_assessments.ingest.derived import write_derived_table
+
+    root = data_dir if data_dir is not None else config.data_dir()
+    screen_path = root / "marts" / "assessment_screen.parquet"
+    if not screen_path.exists():
+        raise FileNotFoundError(f"{screen_path} missing; run `philly screen-assessments` first")
+    screen = pl.scan_parquet(screen_path)
+    if "model_family" in screen.collect_schema().names():
+        screen = screen.filter(pl.col("model_family") == "residential")
+    targets = (
+        screen.filter(pl.col("assessment_flag").is_in(list(flags)))
+        .select("parcel_id")
+        .unique()
+        .collect()
+        .with_columns(pl.lit("screen_flagged").alias("group"))
+    )
+    if limit is not None:
+        targets = targets.head(limit)
+    controls = build_pilot_sample(
+        root,
+        vintage_early=vintage_early,
+        vintage_late=vintage_late,
+        n_demolition=0,
+        n_construction=0,
+        n_control=n_control,
+    ).filter(pl.col("group") == "control")
+    logger.info("aerial-score: %d flagged parcels + %d controls", targets.height, controls.height)
+
+    table = score_parcels(
+        pl.concat([targets, controls]),
+        vintage_early=vintage_early,
+        vintage_late=vintage_late,
+        data_dir=data_dir,
+        workers=workers,
+    )
+    threshold = float(
+        table.filter(pl.col("group") == "control")["score_corr"].drop_nulls().quantile(0.9)
+    )
+    pair = f"{vintage_early}_vs_{vintage_late}"
+    scores = (
+        table.filter(pl.col("group") == "screen_flagged")
+        .select(
+            "parcel_id",
+            pl.col("score_corr").alias("aerial_change_score"),
+            (pl.col("score_corr") > threshold).alias("aerial_change_flag"),
+            pl.lit(pair).alias("aerial_pair"),
+        )
+        .drop_nulls("aerial_change_score")
+    )
+    write_derived_table(
+        scores,
+        root,
+        "diagnostics",
+        "aerial_change_scores",
+        [],
+        notes=f"pair {pair}; control-calibrated threshold {threshold:.4f} "
+        f"(90th pct of {n_control} quiet parcels)",
+    )
+    logger.info(
+        "aerial change scores: %d parcels, threshold %.3f, %d flagged",
+        scores.height,
+        threshold,
+        int(scores["aerial_change_flag"].sum()),
+    )
+    return scores
 
 
 def pilot_summary(table: pl.DataFrame) -> pl.DataFrame:

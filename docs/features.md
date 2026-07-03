@@ -76,6 +76,27 @@ distress. Remaining paths are listings/imagery (see research notes). The
 vacancy, unpermitted-work, and tenure columns also feed the screen as
 evidence and the equity diagnostics.
 
+**Identical-twin uniformity (`twin_n`, `opa_vs_twin_median` on the screen,
+2026-07-03):** Philadelphia's blocks are runs of identical rowhomes, and
+Pennsylvania's constitutional **uniformity clause** makes
+assessment-vs-comparable-assessments a first-class appeal argument. The
+strict twin key requires every recorded characteristic to match on the same
+block (area, lot, style, stories, year built, exterior/interior condition,
+quality grade, basement, garage, central air). Measured on the current roll:
+**40.3% of residential parcels sit in loose characteristic-twin sets of ≥5**
+(median within-set assessment spread 26.9% — but mostly explained by
+recorded condition differences); **22.6% sit in STRICT sets of ≥5**, where
+OPA is largely uniform (77% of sets all-equal, median spread 0.0%) — and the
+residue is the sharpest appeal evidence public data can produce: **624
+parcels assessed >10% (204 of them >25%) above homes their own records
+describe as identical in every respect** (top case: 10× its six twins).
+The screen carries `twin_n` and `opa_vs_twin_median` for every parcel in a
+strict set; the future report layer should render the twin table as a
+uniformity exhibit. OPA-process note: strict-twin uniformity being high is
+*to their credit* and worth saying in any public write-up; the loose-twin
+spread mostly measures recorded-condition differences, which an appellant
+can contest separately if their condition code is wrong.
+
 **Owner-linked adjacency (`shp_n_linked_parcels`, `shp_linked_lot_area_m2`,
 2026-07-03):** same-small-owner parcels touching within 0.3m (institutional
 owners with >20 parcels excluded) — the house + side-yard assemblage signal.
@@ -166,6 +187,21 @@ are ~21% non-modal vs Cook County's ~98%-constant field, so they carry signal;
 a renovated property still coded at the modal value is itself staleness
 evidence). `_raw` suffixes mark fields still needing normalization
 (quality_grade mixes letter/numeric/S/X codes).
+
+**Interior-condition reality check (measured 2026-07-03, user hypothesis:
+OPA has no interior inspectors):** confirmed with nuance. 81.8% of
+residential parcels carry interior == exterior (the modal cell, 4/4
+"average", holds 351,608 parcels), and among **67,015 parcels with major
+renovation permits since 2020 — the one paper trail that tells OPA an
+interior changed — 77.5% still have interior == exterior and only 17% show
+interior coded better.** The field is mostly an exterior echo with ~18%
+genuine off-diagonal information; true interior state is unobserved, which
+(a) makes the q1 interior-condition diagnosis airtight from the OPA side
+too, (b) means interior-condition-based assessment differences between
+otherwise-identical twins rest on a field OPA cannot verify (appeal-relevant
+in both directions), and (c) splits the imagery roadmap cleanly: Mapillary
+facades check the code OPA actually maintains (exterior); only listings
+photos can see interiors.
 
 ## Events (`evt_`) — true event dates, no future leakage (tested)
 

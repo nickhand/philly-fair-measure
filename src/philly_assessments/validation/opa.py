@@ -95,6 +95,53 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def twin_uniformity(features: pl.DataFrame, *, min_set: int = 5) -> pl.DataFrame:
+    """Strict identical-twin uniformity stats per parcel (PA uniformity clause).
+
+    ~40% of residential Philadelphia sits in same-block runs of physically
+    identical rowhomes. The STRICT key requires every recorded characteristic
+    to match — area, lot, style, stories, year built, exterior/interior
+    condition, quality grade, basement, garage, central air — so a parcel
+    assessed above its twins' median differs in NOTHING OPA's own records
+    capture. Measured 2026-07-03: 22.6% of residential parcels sit in strict
+    sets of >=5; OPA is uniform on 77% of sets (all-equal assessments,
+    median spread 0.0%), and the residue (624 parcels >10% above twin
+    median) is the sharpest appeal evidence public data can produce."""
+    strict_key = pl.concat_str(
+        [
+            pl.col("loc_block_id"),
+            pl.col("char_livable_area").cast(pl.String),
+            pl.col("char_lot_area").fill_null(-1).cast(pl.String),
+            pl.col("char_style").fill_null("?"),
+            pl.col("char_stories").fill_null(-1).cast(pl.String),
+            pl.col("char_year_built").fill_null(-1).cast(pl.String),
+            pl.col("char_exterior_condition").fill_null("?"),
+            pl.col("char_interior_condition").fill_null("?"),
+            pl.col("char_quality_grade_raw").fill_null("?"),
+            pl.col("char_basement").fill_null("?"),
+            pl.col("char_garage_spaces").fill_null(-1).cast(pl.String),
+            pl.col("char_central_air").fill_null("?"),
+        ],
+        separator="|",
+    )
+    eligible = features.filter(
+        (pl.col("opa_market_value").fill_null(0) > 0)
+        & pl.col("loc_block_id").is_not_null()
+        & (pl.col("char_livable_area").fill_null(0) > 0)
+    ).select("parcel_id", "opa_market_value", strict_key.alias("_twin_key"))
+    return (
+        eligible.with_columns(pl.len().over("_twin_key").alias("twin_n"))
+        .filter(pl.col("twin_n") >= min_set)
+        .with_columns(
+            (
+                pl.col("opa_market_value")
+                / pl.col("opa_market_value").median().over("_twin_key")
+            ).alias("opa_vs_twin_median")
+        )
+        .select("parcel_id", "twin_n", "opa_vs_twin_median")
+    )
+
+
 @dataclass(frozen=True)
 class ScreenResult:
     path: Path
@@ -220,6 +267,21 @@ def build_assessment_screen(
         pl.lit("bayesian_posterior").alias("interval_method"),
         pl.lit(valuation_date).alias("valuation_date"),
     )
+
+    residential = residential.join(twin_uniformity(features), on="parcel_id", how="left")
+
+    # aerial change evidence (diagnostics/aerial_change.py, `philly
+    # aerial-score`): joined when present; scores describe the parcel between
+    # two flights, so they stay valid across screen rebuilds
+    aerial_path = root / "diagnostics" / "aerial_change_scores.parquet"
+    if aerial_path.exists():
+        residential = residential.join(
+            pl.read_parquet(aerial_path).select(
+                "parcel_id", "aerial_change_score", "aerial_change_flag", "aerial_pair"
+            ),
+            on="parcel_id",
+            how="left",
+        )
 
     frames = [residential]
     condo_runs: list[Path] = []

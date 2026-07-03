@@ -75,3 +75,18 @@ uv run philly conformal-check      # frequentist cross-check of the screen inter
 `philly acs-sensitivity` is an on-demand diagnostic (never a production
 model); rerun it after major feature changes to keep the measured cost of the
 demographics ban current.
+
+## Aerial change evidence (on-demand)
+
+```bash
+uv run philly aerial-score          # score the screen's flagged parcels (2023 vs 2025 flights)
+uv run philly screen-assessments    # rerun to embed aerial_change_score/flag columns
+```
+
+Scores come from free PASDA orthophotos (only the 2020/2023/2024/2025
+services render — probe before assuming other vintages). The threshold is
+recalibrated per vintage pair from a fresh quiet-control sample (90th
+percentile ≈ 10% false-positive budget; catches ~42% of known structural
+change per the pilot). Keep runs to the flagged set — citywide would be ~1M
+requests against Penn State's free service. `philly aerial-pilot` re-runs
+the ground-truth validation.

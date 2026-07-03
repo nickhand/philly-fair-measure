@@ -341,6 +341,25 @@ def _cmd_aerial_pilot(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_aerial_score(args: argparse.Namespace) -> int:
+    from philly_assessments.diagnostics.aerial_change import run_aerial_score
+
+    scores = run_aerial_score(
+        args.data_dir,
+        vintage_early=args.early,
+        vintage_late=args.late,
+        n_control=args.n_control,
+        limit=args.limit,
+    )
+    flagged = scores.filter(scores["aerial_change_flag"])
+    print(
+        f"\n{scores.height:,} flagged screen parcels scored ({args.early} vs {args.late}); "
+        f"{flagged.height:,} show aerial change above the control-calibrated threshold"
+    )
+    print("rerun `philly screen-assessments` to embed the evidence columns")
+    return 0
+
+
 def _cmd_comps(args: argparse.Namespace) -> int:
     import polars as pl
 
@@ -611,6 +630,18 @@ def main(argv: list[str] | None = None) -> int:
     aerial.add_argument("--n-control", type=int, default=300)
     aerial.add_argument("--data-dir", type=Path)
     aerial.set_defaults(func=_cmd_aerial_pilot)
+
+    aerial_score = subparsers.add_parser(
+        "aerial-score",
+        help="score the screen's flagged parcels for aerial change "
+        "(control-calibrated; rerun screen-assessments to embed)",
+    )
+    aerial_score.add_argument("--early", type=int, default=2023)
+    aerial_score.add_argument("--late", type=int, default=2025)
+    aerial_score.add_argument("--n-control", type=int, default=300)
+    aerial_score.add_argument("--limit", type=int)
+    aerial_score.add_argument("--data-dir", type=Path)
+    aerial_score.set_defaults(func=_cmd_aerial_score)
 
     comps = subparsers.add_parser(
         "comps", help="comparable sales for a property (parcel id or address fragment)"

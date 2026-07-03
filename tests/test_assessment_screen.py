@@ -115,6 +115,32 @@ def test_event_windows_anchor_on_valuation_date():
     assert row["evt_n_open_violations_at_sale"] == 1
 
 
+def test_twin_uniformity_strict_key():
+    from philly_assessments.validation.opa import twin_uniformity
+
+    def _parcel(pid, value, area=1000.0, cond="4"):
+        return {
+            "parcel_id": pid, "opa_market_value": value, "loc_block_id": "b1",
+            "char_livable_area": area, "char_lot_area": 800.0, "char_style": "row",
+            "char_stories": 2.0, "char_year_built": 1925.0,
+            "char_exterior_condition": cond, "char_interior_condition": "4",
+            "char_quality_grade_raw": "C", "char_basement": "D",
+            "char_garage_spaces": 0.0, "char_central_air": "N",
+        }
+
+    rows = [_parcel(f"p{i}", 100_000.0) for i in range(5)]
+    rows.append(_parcel("high", 150_000.0))          # identical but assessed 1.5x
+    rows.append(_parcel("diff_cond", 150_000.0, cond="7"))  # condition differs -> own set
+    rows.append(_parcel("diff_area", 100_000.0, area=1400.0))
+    out = twin_uniformity(pl.DataFrame(rows))
+    by = {r["parcel_id"]: r for r in out.to_dicts()}
+    assert by["p0"]["twin_n"] == 6  # five equals + the outlier share the strict key
+    assert by["p0"]["opa_vs_twin_median"] == pytest.approx(1.0)
+    assert by["high"]["opa_vs_twin_median"] == pytest.approx(1.5)
+    # different condition / area parcels fall out of the set (n < 5 -> excluded)
+    assert "diff_cond" not in by and "diff_area" not in by
+
+
 def test_finalize_screen_flags_and_ranking():
     df = pl.DataFrame(
         {
