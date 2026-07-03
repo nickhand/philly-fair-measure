@@ -192,6 +192,29 @@ no Bayesian arm. All methods still undercover q1 (0.78–0.85 vs 0.90) — the
 measured interior-condition information limit; kNN-conformal degrades most
 gracefully (0.852 at width 1.42).
 
+**Aerial change-detection pilot verdict (measured 2026-07-03,
+`philly aerial-pilot`, diagnostics/aerial_change.py).** Free PASDA
+orthophotos CAN see structural change. Setup: per-parcel tile pairs from the
+2020 and 2023 flights (render matrix probed first — only the 2020/2023/2024/
+2025 MapServers serve pixels from /export; 2015-2019 and 2022 are tile-cache
+shells), quantile-matched grayscale, three change metrics, validated against
+ground truth: 158 demolitions + 182 new-construction permits completed
+between the flights vs 267 quiet controls (no permits/demos/unpermitted-work
+complaints since 2018). Result: the **parcel-masked Pearson change score
+separates real change at AUC 0.80-0.84 (demolition) / 0.78 (new
+construction)**; full-tile SSIM drowns in 15cm-scale noise (shadows, cars,
+~px misregistration) and 60cm downsampling doesn't beat masked correlation
+(Pearson is already registration-robust). At a 10% false-positive budget the
+score catches ~42% of known structural changes. Reading: **useful as screen
+evidence, not a standalone detector** — a high change score on a parcel
+whose assessment predates the later flight is appeal-grade context, and the
+2023→2025 pair brackets recent unpermitted work. Scaling note: citywide is
+~1M tile requests against a free Penn State service; score the screen's
+flagged/candidate set first, and be polite (the pilot ran 6-way concurrent,
+~1,200 tiles in minutes). Example pairs under
+data/diagnostics/aerial_pilot_examples/ — the first demolition example shows
+a structure present in 2020 and a parking lot in 2023.
+
 **Modern Bayesian practice applicable here**
 - **HSGP** (Hilbert-space GP approximation; Solin & Särkkä, and the practical
   probabilistic-programming variant) gives near-exact low-dimensional GPs at

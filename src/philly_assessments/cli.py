@@ -312,6 +312,35 @@ def _cmd_ratio_study(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_aerial_pilot(args: argparse.Namespace) -> int:
+    from philly_assessments.diagnostics.aerial_change import pilot_summary, run_aerial_pilot
+
+    table = run_aerial_pilot(
+        args.data_dir,
+        vintage_early=args.early,
+        vintage_late=args.late,
+        n_demolition=args.n_demolition,
+        n_construction=args.n_construction,
+        n_control=args.n_control,
+    )
+    summary = pilot_summary(table)
+    print(f"\naerial change pilot: {args.early} vs {args.late} flights, "
+          f"{table.height} parcels scored\n")
+    header = (f"{'group':<18}{'metric':<12}{'n_event':>8}{'n_ctrl':>8}"
+              f"{'AUC':>8}{'med_event':>11}{'med_ctrl':>10}")
+    print(header)
+    print("-" * len(header))
+    for row in summary.to_dicts():
+        print(
+            f"{row['group']:<18}{row['metric'].removeprefix('score_'):<12}"
+            f"{row['n_event']:>8,}{row['n_control']:>8,}"
+            f"{row['auc_vs_control']:>8.3f}{row['median_event']:>11.3f}"
+            f"{row['median_control']:>10.3f}"
+        )
+    print("\nexample tile pairs -> data/diagnostics/aerial_pilot_examples/")
+    return 0
+
+
 def _cmd_comps(args: argparse.Namespace) -> int:
     import polars as pl
 
@@ -569,6 +598,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     ratio_study.add_argument("--data-dir", type=Path)
     ratio_study.set_defaults(func=_cmd_ratio_study)
+
+    aerial = subparsers.add_parser(
+        "aerial-pilot",
+        help="aerial change-detection pilot: PASDA orthophoto change scores vs "
+        "known demolitions/new construction (diagnostic)",
+    )
+    aerial.add_argument("--early", type=int, default=2020)
+    aerial.add_argument("--late", type=int, default=2023)
+    aerial.add_argument("--n-demolition", type=int, default=200)
+    aerial.add_argument("--n-construction", type=int, default=200)
+    aerial.add_argument("--n-control", type=int, default=300)
+    aerial.add_argument("--data-dir", type=Path)
+    aerial.set_defaults(func=_cmd_aerial_pilot)
 
     comps = subparsers.add_parser(
         "comps", help="comparable sales for a property (parcel id or address fragment)"
