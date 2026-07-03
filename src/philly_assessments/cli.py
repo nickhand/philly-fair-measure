@@ -121,6 +121,22 @@ def _cmd_train_bayesian(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_build_market_areas(args: argparse.Namespace) -> int:
+    from philly_assessments.features.market_areas import build_market_areas
+
+    result = build_market_areas(args.data_dir, n_areas=args.n_areas, n_districts=args.n_districts)
+    print(f"{result.manifest.row_count:,} rows -> {result.path}")
+    return 0
+
+
+def _cmd_build_price_index(args: argparse.Namespace) -> int:
+    from philly_assessments.features.price_index import build_price_index
+
+    result = build_price_index(args.data_dir)
+    print(f"{result.manifest.row_count:,} rows -> {result.path}")
+    return 0
+
+
 def _cmd_screen_assessments(args: argparse.Namespace) -> int:
     from philly_assessments.validation.opa import build_assessment_screen
 
@@ -243,6 +259,20 @@ def main(argv: list[str] | None = None) -> int:
     bayes.add_argument("--cores", type=int, default=1)
     bayes.add_argument("--data-dir", type=Path)
     bayes.set_defaults(func=_cmd_train_bayesian)
+
+    market_areas = subparsers.add_parser(
+        "build-market-areas", help="learn GMA-analog market areas from arms-length sales"
+    )
+    market_areas.add_argument("--n-areas", type=int, default=350)
+    market_areas.add_argument("--n-districts", type=int, default=18)
+    market_areas.add_argument("--data-dir", type=Path)
+    market_areas.set_defaults(func=_cmd_build_market_areas)
+
+    price_index = subparsers.add_parser(
+        "build-price-index", help="build the district monthly price index"
+    )
+    price_index.add_argument("--data-dir", type=Path)
+    price_index.set_defaults(func=_cmd_build_price_index)
 
     screen = subparsers.add_parser(
         "screen-assessments",
