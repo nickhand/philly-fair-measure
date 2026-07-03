@@ -170,15 +170,27 @@ def _block_rolling_features(pool: pl.DataFrame) -> pl.DataFrame:
             .alias("ppsf_o")
         )
     )
-    return pairs.group_by("sale_id").agg(
-        ((pl.col("w") * pl.col("sale_price_o")).sum() / pl.col("w").sum()).alias(
-            "mkt_block_roll_mean_price"
-        ),
-        pl.len().alias("mkt_block_roll_n"),
-        (
-            (pl.col("w") * pl.col("ppsf_o")).sum()
-            / pl.when(pl.col("ppsf_o").is_not_null()).then(pl.col("w")).otherwise(0.0).sum()
-        ).alias("mkt_block_roll_ppsf"),
+    return (
+        pairs.group_by("sale_id")
+        .agg(
+            ((pl.col("w") * pl.col("sale_price_o")).sum() / pl.col("w").sum()).alias(
+                "mkt_block_roll_mean_price"
+            ),
+            pl.len().alias("mkt_block_roll_n"),
+            (pl.col("w") * pl.col("ppsf_o")).sum().alias("_wppsf"),
+            pl.when(pl.col("ppsf_o").is_not_null())
+            .then(pl.col("w"))
+            .otherwise(0.0)
+            .sum()
+            .alias("_w_ppsf"),
+        )
+        .with_columns(
+            # guard 0/0: peers may all lack a valid livable area
+            pl.when(pl.col("_w_ppsf") > 0)
+            .then(pl.col("_wppsf") / pl.col("_w_ppsf"))
+            .alias("mkt_block_roll_ppsf")
+        )
+        .drop("_wppsf", "_w_ppsf")
     )
 
 

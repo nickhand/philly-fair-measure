@@ -84,6 +84,23 @@ def _assemble(sales, opa, permits=None, violations=None, assessments=None, **kwa
     return {row["sale_id"]: row for row in out.to_dicts()}
 
 
+def test_block_roll_ppsf_null_when_no_peer_has_valid_area():
+    # peer sale exists but its parcel has an implausible livable area:
+    # the $/sqft roll must be null (not NaN from 0/0), price roll still works
+    sales = [
+        _sale("first", "p1", 200_000.0, datetime(2020, 1, 1)),
+        _sale("target", "p2", 300_000.0, datetime(2021, 1, 1)),
+    ]
+    opa = [
+        _opa("p1", house_number=101) | {"total_livable_area": 50.0},  # < plausible bound
+        _opa("p2", house_number=103),
+    ]
+    by_id = _assemble(sales, opa)
+    row = by_id["target"]
+    assert row["mkt_block_roll_mean_price"] == pytest.approx(200_000.0)
+    assert row["mkt_block_roll_ppsf"] is None
+
+
 def test_block_rolling_mean_and_parcel_priors():
     sales = [
         _sale("a", "p1", 100_000.0, datetime(2020, 1, 1)),

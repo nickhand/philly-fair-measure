@@ -64,15 +64,32 @@ def score_bayesian_intervals(
     chunk_size: int = 50_000,
     seed: int = 42,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """(median, pi_low, pi_high) price arrays; chunked to bound draw-matrix memory."""
-    draws, encoder, geo = load_run(run_dir)
+    """(median, pi_low, pi_high) price arrays at the frame's dates; chunked to
+    bound draw-matrix memory. Handles the run's time adjustment internally."""
+    from philly_assessments.models.bayesian import _sigma_design, _xy
+
+    draws, encoder, geo, basis = load_run(run_dir)
     x = encoder.transform(df)
-    tract, ward = geo.tract_indices(df)
+    area, district = geo.indices(df)
+    b = basis.transform(_xy(df)) if basis is not None else None
+    z = _sigma_design(df)
+    if run_params(run_dir).get("time_adjusted") and "time_adj_log" in df.columns:
+        adj = df["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy()
+    else:
+        adj = np.zeros(len(x))
+
     medians, lows, highs = [], [], []
     for start in range(0, len(x), chunk_size):
         stop = min(start + chunk_size, len(x))
         price_draws = predict_price_draws(
-            draws, x[start:stop], tract[start:stop], ward[start:stop], seed=seed + start
+            draws,
+            x[start:stop],
+            b[start:stop] if b is not None else None,
+            z[start:stop],
+            area[start:stop],
+            district[start:stop],
+            seed=seed + start,
+            time_adj_log=adj[start:stop],
         )
         medians.append(np.median(price_draws, axis=0))
         lows.append(np.quantile(price_draws, pi_low, axis=0))

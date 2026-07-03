@@ -1,25 +1,40 @@
-"""Bayesian hierarchical valuation model (Milestone 7).
+"""Bayesian hierarchical valuation model, v2 (Milestone 7 + plan v2 Tier 3).
 
-A hierarchical hedonic regression with partial pooling over geography:
+A robust heteroscedastic hedonic with partial pooling over *learned* geography
+and a finite-rank spatial surface, trained on time-adjusted prices:
 
-    log(price) ~ Normal(alpha_tract + X @ beta, sigma)
-    alpha_tract ~ Normal(alpha_ward, tau_tract)     [non-centered]
-    alpha_ward  ~ Normal(mu_city, tau_ward)         [non-centered]
+    y_i = log(price_i) + time_adj_i                      [reference-month dollars]
+    y_i ~ StudentT(nu, mu_i, sigma_i)                    [robust to fat tails]
+    mu_i = alpha_area[a_i] + X_i @ beta + B_i @ w        [B: fixed RBF basis]
+    alpha_area ~ Normal(alpha_district, tau_area)        [non-centered]
+    alpha_district ~ Normal(mu_city, tau_district)       [non-centered]
+    log sigma_i = g0 + g @ Z_i                           [evidence-density terms]
 
-What this adds over the LightGBM baseline is not point accuracy (a linear
-hedonic will usually lose to boosted trees) but **calibrated uncertainty**:
-every property gets a full predictive distribution, and we report the
-empirical coverage of the 90% predictive interval on the out-of-time test set.
-A property whose OPA assessment falls far outside its predictive interval is a
-principled staleness candidate — that is the payoff of this layer.
+Modern-practice choices and why (docs/research-notes.md):
 
-Covariates are a compact, interpretable subset (standardized on the training
-slice; medians imputed with the block-roll missingness kept as an indicator).
-Condition codes enter as ordinals — a deliberate v0 simplification.
+- **Student-t likelihood** (nu learned): sale-price tails inflated the v1
+  Normal sigma to 0.45, making honest intervals very wide; a robust likelihood
+  narrows intervals without sacrificing coverage.
+- **Time-adjusted target** (OPA practice, shared with the v2 LightGBM): kills
+  the linear-time-trend extrapolation bias (v1 median ratio 1.12).
+- **Learned geography** for pooling: district (18) → market area (350) from
+  features/market_areas.py replaces ward → tract; boundaries follow price
+  discontinuities rather than administrative lines.
+- **Fixed RBF spatial basis** (~64 k-means centers, shared bandwidth): a
+  finite-rank GP approximation in the HSGP spirit, with the basis chosen
+  a priori so that scoring from persisted draws is exact simple linear
+  algebra (an honest tradeoff: lengthscale fixed, not learned).
+- **Heteroscedastic sigma**: predictive uncertainty widens where evidence is
+  thin (missing block roll, distant kNN neighbors) — sharper where dense,
+  honest where sparse.
+- **Conditional calibration**: coverage is reported by district and style, not
+  just overall (the spatially-weighted-conformal lesson: marginal coverage can
+  hide local failure).
 
-Unseen geography at prediction time degrades gracefully: unseen tract draws a
-fresh tract effect around its ward; unseen ward falls back to the city level.
-Uses the same chronological test split as the baseline for comparability.
+Unseen geography degrades gracefully: unseen market area draws a fresh area
+effect around its district; unseen district falls back to the city level.
+Chains run sequentially by default (cores=1): parallel chains fork on macOS
+and segfault under multithreaded BLAS at this data size.
 """
 
 from __future__ import annotations
@@ -46,13 +61,23 @@ from philly_assessments.models.metrics import evaluate_estimates
 logger = logging.getLogger(__name__)
 
 PI_LOW, PI_HIGH = 0.05, 0.95
+N_RBF_CENTERS = 64
+MIN_DISTRICT_SEGMENT_N = 200
 
 _LOG1P_COVARIATES = {
     "char_livable_area": "log_livable_area",
     "char_lot_area": "log_lot_area",
     "mkt_block_roll_mean_price": "log_block_roll",
+    "mkt_block_roll_ppsf": "log_block_roll_ppsf",
 }
-_LINEAR_COVARIATES = ["char_beds", "char_baths", "char_year_built", "time_sale_epoch_days"]
+_LINEAR_COVARIATES = [
+    "char_beds",
+    "char_baths",
+    "char_year_built",
+    "mkt_knn_log_ppsf",
+    "mkt_area_level_log_ppsf",
+    "mkt_knn_mean_dist_m",
+]
 _ORDINAL_COVARIATES = ["char_exterior_condition", "char_interior_condition"]
 
 
@@ -94,11 +119,13 @@ class CovariateEncoder:
 
 
 def _raw_covariates(df: pl.DataFrame) -> pl.DataFrame:
+    # fill_nan: float NaN (e.g. from upstream 0/0) is not null in polars and
+    # would otherwise poison the encoder's mean/std for the whole column
     exprs = [
-        pl.col(src).cast(pl.Float64).log1p().alias(dst)
+        pl.col(src).cast(pl.Float64).fill_nan(None).log1p().alias(dst)
         for src, dst in _LOG1P_COVARIATES.items()
     ]
-    exprs += [pl.col(c).cast(pl.Float64) for c in _LINEAR_COVARIATES]
+    exprs += [pl.col(c).cast(pl.Float64).fill_nan(None) for c in _LINEAR_COVARIATES]
     exprs += [
         pl.col(c).cast(pl.String).cast(pl.Int32, strict=False).cast(pl.Float64)
         for c in _ORDINAL_COVARIATES
@@ -109,41 +136,92 @@ def _raw_covariates(df: pl.DataFrame) -> pl.DataFrame:
 
 @dataclass
 class GeoIndex:
-    wards: list[str]
-    tracts: list[str]
-    tract_to_ward_ix: np.ndarray  # ward index of each known tract
+    """Fine-within-coarse geography index (market areas within districts)."""
+
+    coarse: list[str]
+    fine: list[str]
+    fine_to_coarse_ix: np.ndarray
 
     @classmethod
-    def fit(cls, df: pl.DataFrame) -> GeoIndex:
+    def fit(
+        cls, df: pl.DataFrame, fine_col: str = "loc_market_area",
+        coarse_col: str = "loc_district",
+    ) -> GeoIndex:
         pairs = (
-            df.group_by("loc_census_tract_raw", "loc_ward")
+            df.group_by(fine_col, coarse_col)
             .agg(pl.len())
             .sort("len", descending=True)
-            .unique(subset=["loc_census_tract_raw"], keep="first")
+            .unique(subset=[fine_col], keep="first")
         )
-        wards = sorted(df["loc_ward"].cast(pl.String).fill_null("__none__").unique().to_list())
-        ward_ix = {w: i for i, w in enumerate(wards)}
-        tracts, tract_ward = [], []
-        for row in pairs.sort("loc_census_tract_raw").to_dicts():
-            tracts.append(str(row["loc_census_tract_raw"]))
-            tract_ward.append(ward_ix.get(str(row["loc_ward"]), 0))
-        return cls(wards=wards, tracts=tracts, tract_to_ward_ix=np.array(tract_ward))
+        coarse = sorted(df[coarse_col].cast(pl.String).fill_null("__none__").unique().to_list())
+        coarse_ix = {value: i for i, value in enumerate(coarse)}
+        fine, fine_coarse = [], []
+        for row in pairs.sort(fine_col).to_dicts():
+            fine.append(str(row[fine_col]))
+            fine_coarse.append(coarse_ix.get(str(row[coarse_col]), 0))
+        return cls(coarse=coarse, fine=fine, fine_to_coarse_ix=np.array(fine_coarse))
 
-    def tract_indices(self, df: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
-        """(tract index or -1 if unseen, ward index or -1 if unseen) per row."""
-        tract_ix = {t: i for i, t in enumerate(self.tracts)}
-        ward_ix = {w: i for i, w in enumerate(self.wards)}
-        tract = np.array(
-            [tract_ix.get(str(v), -1) for v in df["loc_census_tract_raw"].to_list()]
+    def indices(
+        self, df: pl.DataFrame, fine_col: str = "loc_market_area",
+        coarse_col: str = "loc_district",
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """(fine index or -1 if unseen, coarse index or -1 if unseen) per row."""
+        fine_ix = {value: i for i, value in enumerate(self.fine)}
+        coarse_ix = {value: i for i, value in enumerate(self.coarse)}
+        fine = np.array([fine_ix.get(str(v), -1) for v in df[fine_col].to_list()])
+        coarse = np.array([coarse_ix.get(str(v), -1) for v in df[coarse_col].to_list()])
+        return fine, coarse
+
+
+@dataclass
+class RBFBasis:
+    """Fixed Gaussian basis over projected coordinates: a finite-rank GP surface."""
+
+    centers: np.ndarray  # (m, 2) in meters
+    bandwidth_m: float
+
+    @classmethod
+    def fit(cls, xy: np.ndarray, n_centers: int = N_RBF_CENTERS, seed: int = 42) -> RBFBasis:
+        from sklearn.cluster import KMeans
+
+        centers = (
+            KMeans(n_clusters=n_centers, n_init=4, random_state=seed).fit(xy).cluster_centers_
         )
-        ward = np.array([ward_ix.get(str(v), -1) for v in df["loc_ward"].to_list()])
-        return tract, ward
+        # bandwidth ~ 1.5x median nearest-center spacing: overlapping, smooth
+        from scipy.spatial import cKDTree
+
+        dist, _ = cKDTree(centers).query(centers, k=2)
+        bandwidth = 1.5 * float(np.median(dist[:, 1]))
+        return cls(centers=centers, bandwidth_m=bandwidth)
+
+    def transform(self, xy: np.ndarray) -> np.ndarray:
+        d2 = ((xy[:, None, :] - self.centers[None, :, :]) ** 2).sum(axis=2)
+        return np.exp(-0.5 * d2 / self.bandwidth_m**2)
+
+
+def _xy(df: pl.DataFrame) -> np.ndarray:
+    from philly_assessments.features.market_areas import project_xy
+
+    out = df.select(
+        pl.col("loc_lon").alias("lon"), pl.col("loc_lat").alias("lat")
+    ).with_columns(*project_xy(pl.col("lon"), pl.col("lat")))
+    xy = out.select("x_m", "y_m").to_numpy()
+    return np.nan_to_num(xy, nan=0.0)
+
+
+def _sigma_design(df: pl.DataFrame) -> np.ndarray:
+    """Evidence-density design for log sigma: [block_roll_missing, scaled knn distance]."""
+    missing = df["mkt_block_roll_mean_price"].is_null().to_numpy().astype(np.float64)
+    dist = df["mkt_knn_mean_dist_m"].cast(pl.Float64).fill_null(500.0).to_numpy()
+    return np.column_stack([missing, np.log1p(dist) / 10.0])
 
 
 def _fit_posterior(
     x: np.ndarray,
+    basis: np.ndarray | None,
+    z_sigma: np.ndarray,
     y: np.ndarray,
-    tract_idx: np.ndarray,
+    area_idx: np.ndarray,
     geo: GeoIndex,
     *,
     draws: int,
@@ -151,52 +229,88 @@ def _fit_posterior(
     chains: int,
     cores: int,
     seed: int,
+    nu_fixed: float | None,
 ):
     import pymc as pm
 
     coords = {
-        "ward": geo.wards,
-        "tract": geo.tracts,
+        "district": geo.coarse,
+        "area": geo.fine,
         "covariate": [f"x{i}" for i in range(x.shape[1])],
+        "sigma_term": [f"z{i}" for i in range(z_sigma.shape[1])],
     }
+    if basis is not None:
+        coords["basis"] = [f"b{i}" for i in range(basis.shape[1])]
     with pm.Model(coords=coords):
         mu_city = pm.Normal("mu_city", 12.0, 2.0)
-        tau_ward = pm.HalfNormal("tau_ward", 0.5)
-        z_ward = pm.Normal("z_ward", 0.0, 1.0, dims="ward")
-        alpha_ward = pm.Deterministic("alpha_ward", mu_city + tau_ward * z_ward, dims="ward")
-
-        tau_tract = pm.HalfNormal("tau_tract", 0.5)
-        z_tract = pm.Normal("z_tract", 0.0, 1.0, dims="tract")
-        alpha_tract = pm.Deterministic(
-            "alpha_tract", alpha_ward[geo.tract_to_ward_ix] + tau_tract * z_tract, dims="tract"
+        tau_district = pm.HalfNormal("tau_district", 0.5)
+        z_district = pm.Normal("z_district", 0.0, 1.0, dims="district")
+        alpha_district = pm.Deterministic(
+            "alpha_district", mu_city + tau_district * z_district, dims="district"
+        )
+        tau_area = pm.HalfNormal("tau_area", 0.3)
+        z_area = pm.Normal("z_area", 0.0, 1.0, dims="area")
+        alpha_area = pm.Deterministic(
+            "alpha_area", alpha_district[geo.fine_to_coarse_ix] + tau_area * z_area, dims="area"
         )
 
         beta = pm.Normal("beta", 0.0, 1.0, dims="covariate")
-        sigma = pm.HalfNormal("sigma", 0.5)
-        pm.Normal("obs", alpha_tract[tract_idx] + x @ beta, sigma, observed=y)
+        mu = alpha_area[area_idx] + x @ beta
+        if basis is not None:
+            # measured 2026-07-03: the overlapping RBF columns are collinear and
+            # multiply a shared tau_gp — sampling slows >15x. Off by default;
+            # the kNN covariate already carries the fine-grained surface.
+            tau_gp = pm.HalfNormal("tau_gp", 0.3)
+            w = pm.Normal("w_spatial", 0.0, 1.0, dims="basis")
+            mu = mu + basis @ (tau_gp * w)
 
+        g0 = pm.Normal("g0", -1.0, 1.0)
+        g = pm.Normal("g", 0.0, 0.5, dims="sigma_term")
+        sigma = pm.Deterministic("sigma_obs", pm.math.exp(g0 + z_sigma @ g))
+
+        # learned nu couples every observation through one global parameter and
+        # sampled brutally slowly at this scale (hours); a fixed moderate-tail
+        # nu keeps the robustness at a fraction of the cost
+        nu = pm.Gamma("nu", alpha=2.0, beta=0.1) if nu_fixed is None else nu_fixed
+
+        pm.StudentT("obs", nu=nu, mu=mu, sigma=sigma, observed=y)
+
+        # nutpie: Rust NUTS, several-fold faster than the default sampler and
+        # runs parallel chains as in-process threads — which also sidesteps the
+        # macOS fork/segfault issue that forced sequential chains previously
+        try:
+            import nutpie  # noqa: F401
+
+            sampler_kwargs = {"nuts_sampler": "nutpie"}
+        except ImportError:
+            sampler_kwargs = {"cores": cores}
         idata = pm.sample(
             draws=draws,
             tune=tune,
             chains=chains,
-            # sequential chains by default: parallel chains fork the process on
-            # macOS and segfault under multithreaded BLAS with large datasets
-            cores=cores,
             random_seed=seed,
             target_accept=0.9,
             progressbar=False,
+            **sampler_kwargs,
         )
     return idata
 
 
-_DRAW_VARIABLES = ("alpha_tract", "alpha_ward", "mu_city", "tau_tract", "beta", "sigma")
+_DRAW_VARIABLES = (
+    "alpha_area", "alpha_district", "mu_city", "tau_area",
+    "beta", "tau_gp", "w_spatial", "g0", "g", "nu",
+)
 
 
-def _thin_draws(idata, max_draws: int, seed: int) -> dict[str, np.ndarray]:
+def _thin_draws(
+    idata, max_draws: int, seed: int, nu_fixed: float | None = None
+) -> dict[str, np.ndarray]:
     """Flatten chains and keep one common random subset of joint posterior draws."""
     out: dict[str, np.ndarray] = {}
     subset = None
     for name in _DRAW_VARIABLES:
+        if name not in idata.posterior:
+            continue
         values = idata.posterior[name].values  # (chains, draws, ...)
         flat = values.reshape(-1, *values.shape[2:])
         if subset is None:
@@ -207,39 +321,56 @@ def _thin_draws(idata, max_draws: int, seed: int) -> dict[str, np.ndarray]:
                 else rng.choice(len(flat), size=max_draws, replace=False)
             )
         out[name] = flat[subset]
+    if "nu" not in out:
+        out["nu"] = np.full(len(out["beta"]), float(nu_fixed))
     return out
 
 
 def predict_price_draws(
     draws: dict[str, np.ndarray],
     x: np.ndarray,
-    tract: np.ndarray,
-    ward: np.ndarray,
+    basis: np.ndarray | None,
+    z_sigma: np.ndarray,
+    area: np.ndarray,
+    district: np.ndarray,
     *,
     seed: int,
+    time_adj_log: np.ndarray | None = None,
 ) -> np.ndarray:
-    """(n_draws, n_rows) posterior-predictive draws of price (levels, not logs)."""
+    """(n_draws, n_rows) posterior-predictive price draws at the sale/valuation
+    date (levels): reference-month draws shifted back by `time_adj_log`."""
     rng = np.random.default_rng(seed)
     n_draws = len(draws["beta"])
-    alpha = np.empty((n_draws, len(tract)))
-    seen = tract >= 0
-    alpha[:, seen] = draws["alpha_tract"][:, tract[seen]]
-    unseen_tract = (~seen) & (ward >= 0)
-    if unseen_tract.any():
-        alpha[:, unseen_tract] = draws["alpha_ward"][:, ward[unseen_tract]] + draws["tau_tract"][
-            :, None
-        ] * rng.standard_normal((n_draws, int(unseen_tract.sum())))
-    unseen_all = (~seen) & (ward < 0)
+    n_rows = len(area)
+
+    alpha = np.empty((n_draws, n_rows))
+    seen = area >= 0
+    alpha[:, seen] = draws["alpha_area"][:, area[seen]]
+    unseen_area = (~seen) & (district >= 0)
+    if unseen_area.any():
+        alpha[:, unseen_area] = draws["alpha_district"][:, district[unseen_area]] + draws[
+            "tau_area"
+        ][:, None] * rng.standard_normal((n_draws, int(unseen_area.sum())))
+    unseen_all = (~seen) & (district < 0)
     if unseen_all.any():
         alpha[:, unseen_all] = draws["mu_city"][:, None]
 
     mu = alpha + draws["beta"] @ x.T
-    log_pred = mu + draws["sigma"][:, None] * rng.standard_normal(mu.shape)
+    if basis is not None and "w_spatial" in draws:
+        mu = mu + (draws["tau_gp"][:, None] * draws["w_spatial"]) @ basis.T
+    log_sigma = draws["g0"][:, None] + draws["g"] @ z_sigma.T
+    t_noise = rng.standard_t(np.maximum(draws["nu"], 2.1)[:, None], size=mu.shape)
+    log_pred = mu + np.exp(log_sigma) * t_noise
+    if time_adj_log is not None:
+        log_pred = log_pred - time_adj_log[None, :]
     return np.exp(log_pred)
 
 
-def load_run(run_dir: Path) -> tuple[dict[str, np.ndarray], CovariateEncoder, GeoIndex]:
-    """Load a trained run's posterior draws, covariate encoder, and geography index."""
+def load_run(
+    run_dir: Path,
+) -> tuple[dict[str, np.ndarray], CovariateEncoder, GeoIndex, RBFBasis | None]:
+    """Load a trained run's posterior draws, encoder, geography, and (optional)
+    spatial basis."""
     with np.load(run_dir / "posterior_draws.npz") as data:
         draws = {name: data[name] for name in data.files}
     cov = json.loads((run_dir / "covariates.json").read_text())
@@ -248,9 +379,13 @@ def load_run(run_dir: Path) -> tuple[dict[str, np.ndarray], CovariateEncoder, Ge
     )
     g = json.loads((run_dir / "geography.json").read_text())
     geo = GeoIndex(
-        wards=g["wards"], tracts=g["tracts"], tract_to_ward_ix=np.array(g["tract_to_ward_ix"])
+        coarse=g["coarse"], fine=g["fine"], fine_to_coarse_ix=np.array(g["fine_to_coarse_ix"])
     )
-    return draws, encoder, geo
+    basis = None
+    if (run_dir / "rbf.json").exists():
+        r = json.loads((run_dir / "rbf.json").read_text())
+        basis = RBFBasis(centers=np.array(r["centers"]), bandwidth_m=r["bandwidth_m"])
+    return draws, encoder, geo, basis
 
 
 @dataclass(frozen=True)
@@ -265,6 +400,9 @@ def train_bayesian(
     data_dir: Path | None = None,
     *,
     test_fraction: float = 0.1,
+    time_adjusted: bool = True,
+    nu_fixed: float | None = 8.0,
+    spatial_basis: bool = False,
     draws: int = 800,
     tune: int = 800,
     chains: int = 2,
@@ -281,36 +419,56 @@ def train_bayesian(
     n_test = max(1, int(df.height * test_fraction))
     train_df, test_df = df.head(df.height - n_test), df.tail(n_test)
     logger.info(
-        "bayesian: %s train / %s test rows, sampling %d draws x %d chains",
+        "bayesian v2: %s train / %s test rows, %d draws x %d chains, time_adjusted=%s",
         f"{train_df.height:,}",
         f"{test_df.height:,}",
         draws,
         chains,
+        time_adjusted,
     )
 
     encoder = CovariateEncoder.fit(train_df)
     geo = GeoIndex.fit(train_df)
-    x_train = encoder.transform(train_df)
-    y_train = np.log(train_df["sale_price"].to_numpy())
-    tract_train, _ = geo.tract_indices(train_df)
-    # training rows always have a known tract by construction (fitted on train)
+    rbf = RBFBasis.fit(_xy(train_df), seed=seed) if spatial_basis else None
 
+    def target(frame: pl.DataFrame) -> np.ndarray:
+        y = np.log(frame["sale_price"].to_numpy())
+        if time_adjusted:
+            y = y + frame["time_adj_log"].to_numpy()
+        return y
+
+    x_train = encoder.transform(train_df)
+    area_train, _ = geo.indices(train_df)
     idata = _fit_posterior(
         x_train,
-        y_train,
-        tract_train,
+        rbf.transform(_xy(train_df)) if rbf is not None else None,
+        _sigma_design(train_df),
+        target(train_df),
+        area_train,
         geo,
         draws=draws,
         tune=tune,
         chains=chains,
         cores=cores,
         seed=seed,
+        nu_fixed=nu_fixed,
     )
 
-    x_test = encoder.transform(test_df)
-    tract_test, ward_test = geo.tract_indices(test_df)
-    posterior_draws = _thin_draws(idata, max_prediction_draws, seed)
-    price_draws = predict_price_draws(posterior_draws, x_test, tract_test, ward_test, seed=seed)
+    posterior_draws = _thin_draws(idata, max_prediction_draws, seed, nu_fixed=nu_fixed)
+    area_test, district_test = geo.indices(test_df)
+    test_adj = (
+        test_df["time_adj_log"].to_numpy() if time_adjusted else np.zeros(test_df.height)
+    )
+    price_draws = predict_price_draws(
+        posterior_draws,
+        encoder.transform(test_df),
+        rbf.transform(_xy(test_df)) if rbf is not None else None,
+        _sigma_design(test_df),
+        area_test,
+        district_test,
+        seed=seed,
+        time_adj_log=test_adj,
+    )
     point = np.median(price_draws, axis=0)
     pi_low = np.quantile(price_draws, PI_LOW, axis=0)
     pi_high = np.quantile(price_draws, PI_HIGH, axis=0)
@@ -320,8 +478,15 @@ def train_bayesian(
 
     from philly_assessments.models.baseline import _segments
 
+    segments = _segments(test_df)
+    district_counts = (
+        test_df.group_by("loc_district").len().filter(pl.col("len") >= MIN_DISTRICT_SEGMENT_N)
+    )
+    for district in sorted(district_counts["loc_district"].drop_nulls().to_list()):
+        segments.append(("district", district, test_df["loc_district"] == district))
+
     rows = []
-    for segment_type, segment, mask in _segments(test_df):
+    for segment_type, segment, mask in segments:
         m = mask.to_numpy()
         rows.append(
             {
@@ -339,7 +504,9 @@ def train_bayesian(
     overall = evaluation.filter(pl.col("segment_type") == "overall").to_dicts()[0]
 
     hyper_summary = []
-    for name in ("mu_city", "tau_ward", "tau_tract", "sigma"):
+    for name in ("mu_city", "tau_district", "tau_area", "tau_gp", "g0", "nu"):
+        if name not in idata.posterior:
+            continue
         flat = idata.posterior[name].values.reshape(-1)
         hyper_summary.append(
             {
@@ -361,6 +528,17 @@ def train_bayesian(
                 "q95": float(np.quantile(beta_flat[:, i], 0.95)),
             }
         )
+    g_flat = idata.posterior["g"].values.reshape(-1, 2)
+    for i, name in enumerate(("sigma_block_roll_missing", "sigma_knn_dist")):
+        hyper_summary.append(
+            {
+                "parameter": name,
+                "mean": float(g_flat[:, i].mean()),
+                "sd": float(g_flat[:, i].std()),
+                "q05": float(np.quantile(g_flat[:, i], 0.05)),
+                "q95": float(np.quantile(g_flat[:, i], 0.95)),
+            }
+        )
 
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-bayesian"
     run_dir = root / "models" / f"run_id={run_id}"
@@ -368,15 +546,21 @@ def train_bayesian(
     (run_dir / "params.json").write_text(
         json.dumps(
             {
+                "model_version": 2,
                 "draws": draws,
                 "tune": tune,
                 "chains": chains,
                 "test_fraction": test_fraction,
+                "time_adjusted": time_adjusted,
+                "nu_fixed": nu_fixed,
+                "spatial_basis": spatial_basis,
                 "max_prediction_draws": max_prediction_draws,
                 "seed": seed,
                 "covariates": encoder.feature_names,
-                "n_wards": len(geo.wards),
-                "n_tracts": len(geo.tracts),
+                "n_districts": len(geo.coarse),
+                "n_areas": len(geo.fine),
+                "n_rbf_centers": len(rbf.centers) if rbf is not None else 0,
+                "rbf_bandwidth_m": rbf.bandwidth_m if rbf is not None else None,
                 "test_start_date": str(test_df["sale_date"].min()),
             },
             indent=2,
@@ -385,7 +569,13 @@ def train_bayesian(
     )
     pl.DataFrame(hyper_summary).write_parquet(run_dir / "posterior_summary.parquet")
     evaluation.write_parquet(run_dir / "evaluation.parquet")
-    # scoring artifacts: enough state to price any property from this run
+    test_df.select("sale_id", "parcel_id", "sale_date", "sale_price").with_columns(
+        pl.Series("pred_median", point),
+        pl.Series("pi_low_90", pi_low),
+        pl.Series("pi_high_90", pi_high),
+        pl.Series("covered_90", covered),
+        pl.Series("opa_assessment", test_df["asmt_market_value_sale_year"].to_numpy()),
+    ).write_parquet(run_dir / "predictions.parquet")
     np.savez_compressed(run_dir / "posterior_draws.npz", **posterior_draws)
     (run_dir / "covariates.json").write_text(
         json.dumps(
@@ -402,21 +592,21 @@ def train_bayesian(
     (run_dir / "geography.json").write_text(
         json.dumps(
             {
-                "wards": geo.wards,
-                "tracts": geo.tracts,
-                "tract_to_ward_ix": geo.tract_to_ward_ix.tolist(),
+                "coarse": geo.coarse,
+                "fine": geo.fine,
+                "fine_to_coarse_ix": geo.fine_to_coarse_ix.tolist(),
             },
             indent=2,
         )
         + "\n"
     )
-    test_df.select("sale_id", "parcel_id", "sale_date", "sale_price").with_columns(
-        pl.Series("pred_median", point),
-        pl.Series("pi_low_90", pi_low),
-        pl.Series("pi_high_90", pi_high),
-        pl.Series("covered_90", covered),
-        pl.Series("opa_assessment", test_df["asmt_market_value_sale_year"].to_numpy()),
-    ).write_parquet(run_dir / "predictions.parquet")
+    if rbf is not None:
+        (run_dir / "rbf.json").write_text(
+            json.dumps(
+                {"centers": rbf.centers.tolist(), "bandwidth_m": rbf.bandwidth_m}, indent=2
+            )
+            + "\n"
+        )
 
     mart_manifest = read_derived_manifest(mart_path)
     manifest = DerivedManifest(

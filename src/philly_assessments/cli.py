@@ -97,6 +97,8 @@ def _cmd_train_bayesian(args: argparse.Namespace) -> int:
     result = train_bayesian(
         args.data_dir,
         test_fraction=args.test_fraction,
+        nu_fixed=None if args.learn_nu else args.nu,
+        spatial_basis=args.spatial_basis,
         draws=args.draws,
         tune=args.tune,
         chains=args.chains,
@@ -257,6 +259,15 @@ def main(argv: list[str] | None = None) -> int:
     bayes.add_argument("--tune", type=int, default=800)
     bayes.add_argument("--chains", type=int, default=2)
     bayes.add_argument("--cores", type=int, default=1)
+    bayes.add_argument("--nu", type=float, default=8.0, help="fixed Student-t dof")
+    bayes.add_argument(
+        "--learn-nu", action="store_true", help="learn nu (much slower sampling)"
+    )
+    bayes.add_argument(
+        "--spatial-basis",
+        action="store_true",
+        help="add the RBF spatial basis (measured >15x slower sampling)",
+    )
     bayes.add_argument("--data-dir", type=Path)
     bayes.set_defaults(func=_cmd_train_bayesian)
 
