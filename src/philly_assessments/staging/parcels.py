@@ -156,8 +156,53 @@ def parcel_shape_features(geojson: pl.Series) -> pl.DataFrame:
     )
 
 
-def stg_parcels(raw: pl.LazyFrame) -> pl.LazyFrame:
-    """PWD parcels with shape features, one row per OPA account (brt_id)."""
+MAX_OWNER_PARCELS = 20  # owners above this are institutional; not side-yard cases
+ADJACENCY_DISTANCE_M = 0.3
+
+
+def _owner_links(frame: pl.DataFrame, geoms) -> pl.DataFrame:
+    """Per-parcel owner-linked adjacency: neighboring parcels (within
+    ADJACENCY_DISTANCE_M) held by the same small (non-institutional) owner —
+    the house + side-yard pattern. Adds shp_n_linked_parcels and
+    shp_linked_lot_area_m2 (own + linked area)."""
+    import shapely
+
+    owner = (
+        frame["owner_norm"].fill_null("").to_numpy()
+    )
+    counts = frame.group_by("owner_norm").len().rename({"len": "owner_parcels"})
+    frame_counts = frame.join(counts, on="owner_norm", how="left")
+    linkable = (
+        (frame_counts["owner_parcels"].fill_null(0) <= MAX_OWNER_PARCELS).to_numpy()
+        & (owner != "")  # null owners can't join their group count; excluded here
+        & ~shapely.is_empty(geoms)
+    )
+
+    n = len(frame)
+    n_linked = np.zeros(n, dtype=np.int64)
+    linked_area = shapely.area(geoms).copy()
+    tree = shapely.STRtree(geoms[linkable])
+    linkable_ix = np.flatnonzero(linkable)
+    pairs = tree.query(geoms[linkable], predicate="dwithin", distance=ADJACENCY_DISTANCE_M)
+    a = linkable_ix[pairs[0]]
+    b = linkable_ix[pairs[1]]
+    mask = (a != b) & (owner[a] == owner[b])
+    a, b = a[mask], b[mask]
+    np.add.at(n_linked, a, 1)
+    np.add.at(linked_area, a, shapely.area(geoms[b]))
+    return frame.with_columns(
+        pl.Series("shp_n_linked_parcels", n_linked),
+        pl.Series(
+            "shp_linked_lot_area_m2", np.where(n_linked > 0, linked_area, np.nan)
+        ).fill_nan(None),
+    ).drop("owner_norm")
+
+
+def stg_parcels(raw: pl.LazyFrame, raw_opa: pl.LazyFrame) -> pl.LazyFrame:
+    """PWD parcels with shape features and owner-linked adjacency, one row per
+    OPA account (brt_id). Owner comes from the OPA roll (fresher than PWD)."""
+    import shapely
+
     frame = raw.select(
         "parcelid",
         "brt_id",
@@ -168,10 +213,30 @@ def stg_parcels(raw: pl.LazyFrame) -> pl.LazyFrame:
         "address",
         "geometry_geojson",
     ).collect()
-    shapes = parcel_shape_features(frame["geometry_geojson"])
+    owners = raw_opa.select(
+        pl.col("parcel_number").alias("brt_id"),
+        pl.col("owner_1")
+        .cast(pl.String)
+        .str.to_uppercase()
+        .str.replace_all(r"[^A-Z0-9]", "")
+        .alias("owner_norm"),
+    ).collect()
+    frame = frame.join(owners, on="brt_id", how="left")
+
+    geojson = frame["geometry_geojson"]
+    shapes = parcel_shape_features(geojson)
+    geoms = shapely.from_geojson(geojson.fill_null("").to_numpy(), on_invalid="ignore")
+    geoms = np.where(
+        (shapely.get_type_id(geoms) >= 3) & ~shapely.is_empty(geoms),
+        geoms,
+        shapely.Polygon(),
+    )
+    geoms = _tangent_project(geoms)
+
+    frame = pl.concat([frame.drop("geometry_geojson"), shapes], how="horizontal")
+    frame = _owner_links(frame, geoms)
     out = (
-        pl.concat([frame.drop("geometry_geojson"), shapes], how="horizontal")
-        .filter(pl.col("brt_id").is_not_null() & (pl.col("brt_id") != ""))
+        frame.filter(pl.col("brt_id").is_not_null() & (pl.col("brt_id") != ""))
         .sort("shp_parcel_area_m2", descending=True, nulls_last=True)
         .unique(subset=["brt_id"], keep="first")
         .sort("brt_id")

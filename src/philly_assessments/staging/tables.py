@@ -118,6 +118,62 @@ def stg_permits(raw: pl.LazyFrame) -> pl.LazyFrame:
     )
 
 
+def stg_delinquencies(raw: pl.LazyFrame) -> pl.LazyFrame:
+    """Real-estate tax delinquencies. CURRENT-ONLY snapshot: the table shows
+    today's delinquents, not historical delinquency status — features derived
+    from it carry the dist_ (current_only) prefix."""
+    lf = with_parsed_timestamp(raw, "most_recent_payment_date")
+    return lf.select(
+        # opa_number is NUMERIC at the source, destroying the leading zeros of
+        # 9-digit OPA accounts; restore them for the string join
+        pl.col("opa_number")
+        .cast(pl.Int64, strict=False)
+        .cast(pl.String)
+        .str.zfill(9)
+        .alias("opa_account_num"),
+        "total_due",
+        "principal_due",
+        "num_years_owed",
+        "oldest_year_owed",
+        "most_recent_year_owed",
+        "is_actionable",
+        "payment_agreement",
+        "sheriff_sale",
+        "bankruptcy",
+        "most_recent_payment_date",
+        "most_recent_payment_date_parsed",
+        "most_recent_payment_date_status",
+        "year_month",
+    )
+
+
+def stg_demolitions(raw: pl.LazyFrame) -> pl.LazyFrame:
+    """L&I demolitions with parsed event dates (true as-of event signal)."""
+    lf = raw
+    for column in ("start_date", "completed_date"):
+        lf = with_parsed_timestamp(lf, column)
+    return lf.select(
+        "caseorpermitnumber",
+        "opa_account_num",
+        "parcel_id_num",
+        "typeofwork",
+        "typeofworkdescription",
+        "city_demo",
+        "status",
+        "start_date",
+        "start_date_parsed",
+        "start_date_status",
+        "completed_date",
+        "completed_date_parsed",
+        "completed_date_status",
+        "address",
+        "zip",
+        "censustract",
+        "geocode_x",
+        "geocode_y",
+    )
+
+
 def stg_violations(raw: pl.LazyFrame) -> pl.LazyFrame:
     """L&I violations with parsed event dates, keyed to OPA accounts where linked."""
     lf = raw

@@ -37,6 +37,26 @@ Explicitly rejected: `off_street_open` — profiled as NOT a parking field
 (5,308 distinct values, mean ~2,050; semantics unknown). Parking signal stays
 with `garage_spaces`/`garage_type`.
 
+**Distress signals (2026-07-03, the q1 follow-up):** `evt_n_severe_violations_5y_before`
+/ `evt_n_open_severe_at_sale` (L&I case priority in HAZARDOUS/UNSAFE/IMMINENTLY
+DANGEROUS/UNFIT — as_of_sale), `evt_n_demolitions_before` / `evt_demo_days_since`
+(as_of_sale), and `dist_tax_delinquent`/`_years_owed`/`_total_due`/`_sheriff_sale`
+(**current_only** — the delinquency table shows today's delinquents). Result:
+best overall model to date (RMSE(log) 0.337, R² 0.810, COD 25.8; delinquency
+amount/years rank highest among the additions) but the **q1 median ratio stayed
+~1.20** — the cheap-tail gradient is dominated by unobservable interior
+condition, beyond what public distress records carry. Remaining q1 options are
+external (listings — access/terms-constrained; imagery — later-stage) or
+accepting the limit and letting the Bayesian intervals carry the tail
+uncertainty, which they do.
+
+**Owner-linked adjacency (`shp_n_linked_parcels`, `shp_linked_lot_area_m2`,
+2026-07-03):** same-small-owner parcels touching within 0.3m (institutional
+owners with >20 parcels excluded) — the house + side-yard assemblage signal.
+26,995 linked parcels citywide; negligible in the citywide model (assemblages
+are rare) but carried into the assessment screen, where 12,359 residential
+properties have linked parcels and 768 of those are also disagreement-flagged.
+
 **Parcel geometry (`shp_`, Tier 2.1, 2026-07-03):** CCAO's shape set computed
 from PWD parcel polygons (area, perimeter, vertices, edge-length SD,
 interior-angle SD, centroid-distance SD, minimum-rotated-rectangle ratios)

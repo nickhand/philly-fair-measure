@@ -112,7 +112,10 @@ def build_assessment_screen(
         if not path.exists():
             raise FileNotFoundError(f"{path} missing; run the pipeline first")
 
-    parcels_path = root / "staged" / "parcels.parquet"
+    optional = {}
+    for name in ("parcels", "demolitions", "delinquencies"):
+        path = root / "staged" / f"{name}.parquet"
+        optional[name] = pl.scan_parquet(path) if path.exists() else None
     features = assemble_assessment_features(
         pl.scan_parquet(paths["opa"]),
         pl.scan_parquet(paths["sales"]),
@@ -121,7 +124,9 @@ def build_assessment_screen(
         valuation_date,
         pl.scan_parquet(paths["market_areas"]),
         pl.read_parquet(paths["price_index"]),
-        pl.scan_parquet(parcels_path) if parcels_path.exists() else None,
+        optional["parcels"],
+        optional["demolitions"],
+        optional["delinquencies"],
     )
     logger.info("scoring %s residential properties", f"{features.height:,}")
     # persist the full feature frame: the comps CLI prices arbitrary parcels
@@ -158,6 +163,9 @@ def build_assessment_screen(
             "mkt_block_roll_n",
             "mkt_parcel_prev_price",
             "mkt_parcel_days_since_prev",
+            "shp_n_linked_parcels",
+            "shp_linked_lot_area_m2",
+            "dist_tax_delinquent",
             "opa_market_value",
         ).with_columns(
             pl.Series("pred_lightgbm", pred_lgb),

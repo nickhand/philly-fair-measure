@@ -92,7 +92,44 @@ SHP_COLUMNS = [
     "shp_parcel_mrr_side_ratio",
     "shp_parcel_num_brt",
     "shp_parcel_num_accounts",
+    # owner-linked adjacency (same small owner, touching parcels): the
+    # house + side-yard assemblage signal
+    "shp_n_linked_parcels",
+    "shp_linked_lot_area_m2",
 ]
+
+# L&I case-priority ladder; everything above STANDARD indicates real distress
+SEVERE_PRIORITIES = ["HAZARDOUS", "UNSAFE", "IMMINENTLY DANGEROUS", "UNFIT"]
+
+DIST_COLUMNS = [
+    "dist_tax_delinquent",
+    "dist_tax_years_owed",
+    "dist_tax_total_due",
+    "dist_sheriff_sale",
+]
+
+
+def join_delinquencies(frame: pl.DataFrame, delinquencies: pl.LazyFrame | None) -> pl.DataFrame:
+    """CURRENT-ONLY distress join (dist_ prefix): the delinquency table shows
+    today's delinquents, so these features are honest for recent sales and the
+    assessment screen, leaky for old sales — same caveat class as char_."""
+    if delinquencies is None:
+        return frame.with_columns(
+            *[pl.lit(None, dtype=pl.Float64).alias(c) for c in DIST_COLUMNS]
+        )
+    d = delinquencies.select(
+        pl.col("opa_account_num").alias("parcel_id"),
+        pl.lit(1.0).alias("dist_tax_delinquent"),
+        pl.col("num_years_owed").cast(pl.Float64).alias("dist_tax_years_owed"),
+        pl.col("total_due").cast(pl.Float64).alias("dist_tax_total_due"),
+        (pl.col("sheriff_sale").cast(pl.String).str.to_uppercase() == "Y")
+        .cast(pl.Float64)
+        .alias("dist_sheriff_sale"),
+    ).collect()
+    return frame.join(d, on="parcel_id", how="left").with_columns(
+        pl.col("dist_tax_delinquent").fill_null(0.0),
+        pl.col("dist_sheriff_sale").fill_null(0.0),
+    )
 
 
 def join_parcel_shapes(frame: pl.DataFrame, parcels: pl.LazyFrame | None) -> pl.DataFrame:
@@ -278,6 +315,8 @@ def assemble_sale_features(
     market_areas: pl.LazyFrame | None = None,
     price_index: pl.DataFrame | None = None,
     parcels: pl.LazyFrame | None = None,
+    demolitions: pl.LazyFrame | None = None,
+    delinquencies: pl.LazyFrame | None = None,
     *,
     min_sale_year: int = DEFAULT_MIN_SALE_YEAR,
 ) -> pl.DataFrame:
@@ -392,6 +431,11 @@ def assemble_sale_features(
             pl.col("opa_account_num").alias("parcel_id"),
             pl.col("violationdate_parsed").alias("event_date"),
             pl.col("violationresolutiondate_parsed").alias("resolved_date"),
+            pl.col("caseprioritydesc")
+            .cast(pl.String)
+            .is_in(SEVERE_PRIORITIES)
+            .fill_null(False)
+            .alias("is_severe"),
         )
         .collect()
     )
@@ -402,19 +446,60 @@ def assemble_sale_features(
             (pl.col("sale_date") - pl.col("event_date")).dt.total_days().alias("days_before")
         )
         .filter(pl.col("days_before") >= 0)
-        .group_by("sale_id")
-        .agg(
+        .with_columns(
             ((pl.col("days_before") > 0) & (pl.col("days_before") <= EVENT_WINDOW_DAYS))
-            .sum()
-            .alias("evt_n_violations_5y_before"),
+            .alias("in_window"),
             (
                 pl.col("resolved_date").is_null()
                 | (pl.col("resolved_date") > pl.col("sale_date"))
-            )
+            ).alias("is_open"),
+        )
+        .group_by("sale_id")
+        .agg(
+            pl.col("in_window").sum().alias("evt_n_violations_5y_before"),
+            pl.col("is_open").sum().alias("evt_n_open_violations_at_sale"),
+            (pl.col("in_window") & pl.col("is_severe"))
             .sum()
-            .alias("evt_n_open_violations_at_sale"),
+            .alias("evt_n_severe_violations_5y_before"),
+            (pl.col("is_open") & pl.col("is_severe"))
+            .sum()
+            .alias("evt_n_open_severe_at_sale"),
         )
     )
+
+    if demolitions is not None:
+        demo_events = (
+            demolitions.filter(
+                pl.col("opa_account_num").is_not_null()
+                & pl.coalesce("completed_date_parsed", "start_date_parsed").is_not_null()
+            )
+            .select(
+                pl.col("opa_account_num").alias("parcel_id"),
+                pl.coalesce("completed_date_parsed", "start_date_parsed").alias("event_date"),
+            )
+            .collect()
+        )
+        demo_feats = (
+            base.select("sale_id", "parcel_id", "sale_date")
+            .join(demo_events, on="parcel_id")
+            .with_columns(
+                (pl.col("sale_date") - pl.col("event_date")).dt.total_days().alias("days_before")
+            )
+            .filter(pl.col("days_before") > 0)
+            .group_by("sale_id")
+            .agg(
+                pl.len().alias("evt_n_demolitions_before"),
+                pl.col("days_before").min().alias("evt_demo_days_since"),
+            )
+        )
+    else:
+        demo_feats = pl.DataFrame(
+            schema={
+                "sale_id": pl.String,
+                "evt_n_demolitions_before": pl.UInt32,
+                "evt_demo_days_since": pl.Int64,
+            }
+        )
 
     asmt = (
         assessments.filter(pl.col("year_parsed").is_not_null())
@@ -440,6 +525,7 @@ def assemble_sale_features(
         .join(knn, on="sale_id", how="left")
         .join(permit_feats, on="sale_id", how="left")
         .join(violation_feats, on="sale_id", how="left")
+        .join(demo_feats, on="sale_id", how="left")
         .join(
             current_asmt,
             left_on=["parcel_id", "sale_year"],
@@ -467,6 +553,9 @@ def assemble_sale_features(
             pl.col("evt_n_permits_5y_before").fill_null(0),
             pl.col("evt_n_violations_5y_before").fill_null(0),
             pl.col("evt_n_open_violations_at_sale").fill_null(0),
+            pl.col("evt_n_severe_violations_5y_before").fill_null(0),
+            pl.col("evt_n_open_severe_at_sale").fill_null(0),
+            pl.col("evt_n_demolitions_before").fill_null(0),
             pl.when(pl.col("asmt_market_value_prev_year") > 0)
             .then(
                 pl.col("asmt_market_value_sale_year") / pl.col("asmt_market_value_prev_year")
@@ -477,6 +566,7 @@ def assemble_sale_features(
         .drop("asmt_year", "house_number_parsed", "livable_area", strict=False)
     )
     features = join_parcel_shapes(features, parcels)
+    features = join_delinquencies(features, delinquencies)
     return features.sort("sale_date", "sale_id")
 
 
@@ -505,11 +595,15 @@ def build_sale_features(
                 f"{path} missing; run snapshots, `philly stage`, `philly validate-sales`, "
                 "`philly build-market-areas`, and `philly build-price-index` first"
             )
-    parcels_path = root / "staged" / "parcels.parquet"
-    if parcels_path.exists():
-        paths["parcels"] = parcels_path
-    else:
-        logger.warning("staged parcels missing; shp_* features will be null")
+    optional = {}
+    for name in ("parcels", "demolitions", "delinquencies"):
+        path = root / "staged" / f"{name}.parquet"
+        if path.exists():
+            paths[name] = path
+            optional[name] = pl.scan_parquet(path)
+        else:
+            optional[name] = None
+            logger.warning("staged %s missing; its features will be null", name)
 
     frame = assemble_sale_features(
         pl.scan_parquet(paths["sale_validity"]),
@@ -519,7 +613,9 @@ def build_sale_features(
         pl.scan_parquet(paths["assessments"]),
         pl.scan_parquet(paths["market_areas"]),
         pl.read_parquet(paths["price_index"]),
-        pl.scan_parquet(parcels_path) if parcels_path.exists() else None,
+        optional["parcels"],
+        optional["demolitions"],
+        optional["delinquencies"],
         min_sale_year=min_sale_year,
     )
     inputs = []

@@ -79,6 +79,15 @@ NUMERIC_FEATURES = [
     "evt_days_since_last_permit",
     "evt_n_violations_5y_before",
     "evt_n_open_violations_at_sale",
+    # distress signals for the q1 tail (plan v2 follow-up)
+    "evt_n_severe_violations_5y_before",
+    "evt_n_open_severe_at_sale",
+    "evt_n_demolitions_before",
+    "evt_demo_days_since",
+    "dist_tax_delinquent",
+    "dist_tax_years_owed",
+    "dist_tax_total_due",
+    "dist_sheriff_sale",
     "loc_lon",
     "loc_lat",
     # parcel geometry (PWD polygons via the brt_id bridge; plan v2 Tier 2.1)
@@ -92,6 +101,8 @@ NUMERIC_FEATURES = [
     "shp_parcel_mrr_side_ratio",
     "shp_parcel_num_brt",
     "shp_parcel_num_accounts",
+    "shp_n_linked_parcels",
+    "shp_linked_lot_area_m2",
 ]
 TIME_FEATURES = ["time_sale_epoch_days", "time_quarter", "time_month"]
 CATEGORICAL_FEATURES = [

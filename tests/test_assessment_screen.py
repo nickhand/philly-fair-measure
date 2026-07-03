@@ -51,8 +51,10 @@ def _assemble(opa_rows, sale_rows, permits=None, violations=None):
             "opa_account_num": "zz",
             "violationdate_parsed": datetime(2020, 1, 1),
             "violationresolutiondate_parsed": None,
+            "caseprioritydesc": "STANDARD",
         }
     ]
+    violations = [{"caseprioritydesc": "STANDARD", **v} for v in violations]
     out = assemble_assessment_features(
         pl.LazyFrame(opa_rows),
         pl.LazyFrame(sale_rows),

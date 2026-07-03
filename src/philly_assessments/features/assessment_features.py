@@ -36,9 +36,11 @@ from philly_assessments.features.sale_features import (
     _LOC_RENAMES,
     PPSF_AREA_BOUNDS,
     ROLL_WINDOW_DAYS,
+    SEVERE_PRIORITIES,
     _block_id,
     _recency_weight,
     era_expr,
+    join_delinquencies,
     join_parcel_shapes,
     style_expr,
 )
@@ -68,6 +70,8 @@ def assemble_assessment_features(
     market_areas: pl.LazyFrame | None = None,
     price_index: pl.DataFrame | None = None,
     parcels: pl.LazyFrame | None = None,
+    demolitions: pl.LazyFrame | None = None,
+    delinquencies: pl.LazyFrame | None = None,
 ) -> pl.DataFrame:
     base = (
         opa.filter(pl.col("category_code_description").is_in(RESIDENTIAL_CATEGORIES))
@@ -233,18 +237,60 @@ def assemble_assessment_features(
             .dt.total_days()
             .alias("days_before"),
             pl.col("violationresolutiondate_parsed").alias("resolved_date"),
+            pl.col("caseprioritydesc")
+            .cast(pl.String)
+            .is_in(SEVERE_PRIORITIES)
+            .fill_null(False)
+            .alias("is_severe"),
         )
         .collect()
+        .with_columns(
+            ((pl.col("days_before") > 0) & (pl.col("days_before") <= ROLL_WINDOW_DAYS))
+            .alias("in_window"),
+            (pl.col("resolved_date").is_null() | (pl.col("resolved_date") > valuation_date))
+            .alias("is_open"),
+        )
         .group_by("parcel_id")
         .agg(
-            ((pl.col("days_before") > 0) & (pl.col("days_before") <= ROLL_WINDOW_DAYS))
+            pl.col("in_window").sum().alias("evt_n_violations_5y_before"),
+            pl.col("is_open").sum().alias("evt_n_open_violations_at_sale"),
+            (pl.col("in_window") & pl.col("is_severe"))
             .sum()
-            .alias("evt_n_violations_5y_before"),
-            (pl.col("resolved_date").is_null() | (pl.col("resolved_date") > valuation_date))
-            .sum()
-            .alias("evt_n_open_violations_at_sale"),
+            .alias("evt_n_severe_violations_5y_before"),
+            (pl.col("is_open") & pl.col("is_severe")).sum().alias("evt_n_open_severe_at_sale"),
         )
     )
+    if demolitions is not None:
+        demo_feats = (
+            demolitions.filter(
+                pl.col("opa_account_num").is_not_null()
+                & pl.coalesce("completed_date_parsed", "start_date_parsed").is_not_null()
+                & (pl.coalesce("completed_date_parsed", "start_date_parsed") < valuation_date)
+            )
+            .select(
+                pl.col("opa_account_num").alias("parcel_id"),
+                (
+                    pl.lit(valuation_date)
+                    - pl.coalesce("completed_date_parsed", "start_date_parsed")
+                )
+                .dt.total_days()
+                .alias("days_before"),
+            )
+            .collect()
+            .group_by("parcel_id")
+            .agg(
+                pl.len().alias("evt_n_demolitions_before"),
+                pl.col("days_before").min().alias("evt_demo_days_since"),
+            )
+        )
+    else:
+        demo_feats = pl.DataFrame(
+            schema={
+                "parcel_id": pl.String,
+                "evt_n_demolitions_before": pl.UInt32,
+                "evt_demo_days_since": pl.Int64,
+            }
+        )
 
     epoch_days = (valuation_date - datetime(1997, 1, 1)).days
     features = (
@@ -283,6 +329,7 @@ def assemble_assessment_features(
         .join(knn, on="parcel_id", how="left")
         .join(permit_events, on="parcel_id", how="left")
         .join(violation_events, on="parcel_id", how="left")
+        .join(demo_feats, on="parcel_id", how="left")
         .rename({**_CHAR_RENAMES, **_LOC_RENAMES})
         .rename(
             {
@@ -299,6 +346,9 @@ def assemble_assessment_features(
             pl.col("evt_n_permits_5y_before").fill_null(0),
             pl.col("evt_n_violations_5y_before").fill_null(0),
             pl.col("evt_n_open_violations_at_sale").fill_null(0),
+            pl.col("evt_n_severe_violations_5y_before").fill_null(0),
+            pl.col("evt_n_open_severe_at_sale").fill_null(0),
+            pl.col("evt_n_demolitions_before").fill_null(0),
             pl.lit(float(epoch_days)).alias("time_sale_epoch_days"),
             pl.lit((valuation_date.month - 1) // 3 + 1).alias("time_quarter"),
             pl.lit(valuation_date.month).alias("time_month"),
@@ -306,4 +356,5 @@ def assemble_assessment_features(
         )
         .drop("house_number_parsed", strict=False)
     )
-    return join_parcel_shapes(features, parcels)
+    features = join_parcel_shapes(features, parcels)
+    return join_delinquencies(features, delinquencies)

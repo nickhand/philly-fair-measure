@@ -68,8 +68,10 @@ def _assemble(sales, opa, permits=None, violations=None, assessments=None, **kwa
             "opa_account_num": "zzz",
             "violationdate_parsed": datetime(2019, 1, 1),
             "violationresolutiondate_parsed": None,
+            "caseprioritydesc": "STANDARD",
         }
     ]
+    violations = [{"caseprioritydesc": "STANDARD", **v} for v in violations]
     assessments = assessments or [
         {"parcel_number": "zzz", "year_parsed": 2020, "market_value": 1.0}
     ]
@@ -172,6 +174,68 @@ def test_event_features_do_not_leak_the_future():
     assert row["evt_days_since_last_permit"] == 214
     assert row["evt_n_violations_5y_before"] == 2
     assert row["evt_n_open_violations_at_sale"] == 1
+
+
+def test_distress_features_severity_demo_delinquency():
+    from philly_assessments.features.sale_features import assemble_sale_features
+
+    sales = [_sale("s", "p1", 80_000.0, datetime(2020, 6, 1))]
+    violations = [
+        {
+            "opa_account_num": "p1",
+            "violationdate_parsed": datetime(2019, 1, 1),
+            "violationresolutiondate_parsed": None,
+            "caseprioritydesc": "UNSAFE",  # severe, open at sale
+        },
+        {
+            "opa_account_num": "p1",
+            "violationdate_parsed": datetime(2019, 6, 1),
+            "violationresolutiondate_parsed": datetime(2019, 8, 1),
+            "caseprioritydesc": "STANDARD",  # not severe
+        },
+    ]
+    demolitions = pl.LazyFrame(
+        [
+            {  # before the sale: counts
+                "opa_account_num": "p1",
+                "completed_date_parsed": datetime(2018, 6, 1),
+                "start_date_parsed": datetime(2018, 5, 1),
+            },
+            {  # after the sale: leakage guard
+                "opa_account_num": "p1",
+                "completed_date_parsed": datetime(2021, 6, 1),
+                "start_date_parsed": None,
+            },
+        ]
+    )
+    delinquencies = pl.LazyFrame(
+        [
+            {
+                "opa_account_num": "p1",
+                "num_years_owed": 3,
+                "total_due": 4_200.0,
+                "sheriff_sale": "Y",
+            }
+        ]
+    )
+    out = assemble_sale_features(
+        pl.LazyFrame(sales),
+        pl.LazyFrame([_opa("p1")]),
+        pl.LazyFrame([{"opa_account_num": "zz", "permitissuedate_parsed": datetime(2019, 1, 1)}]),
+        pl.LazyFrame(violations),
+        pl.LazyFrame([{"parcel_number": "zz", "year_parsed": 2020, "market_value": 1.0}]),
+        demolitions=demolitions,
+        delinquencies=delinquencies,
+    )
+    row = out.to_dicts()[0]
+    assert row["evt_n_severe_violations_5y_before"] == 1
+    assert row["evt_n_open_severe_at_sale"] == 1
+    assert row["evt_n_violations_5y_before"] == 2
+    assert row["evt_n_demolitions_before"] == 1  # future demolition excluded
+    assert row["evt_demo_days_since"] == (datetime(2020, 6, 1) - datetime(2018, 6, 1)).days
+    assert row["dist_tax_delinquent"] == 1.0
+    assert row["dist_tax_years_owed"] == 3.0
+    assert row["dist_sheriff_sale"] == 1.0
 
 
 def test_assessment_join_and_population_window():

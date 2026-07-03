@@ -58,6 +58,12 @@ def test_multipolygon_uses_largest_part_and_invalid_is_null():
     assert rows[2]["shp_parcel_area_m2"] is None
 
 
+def _opa_owners(rows):
+    return pl.LazyFrame(
+        [{"parcel_number": brt, "owner_1": owner} for brt, owner in rows]
+    )
+
+
 def test_stg_parcels_dedupes_brt_keeping_largest():
     raw = pl.LazyFrame(
         {
@@ -76,9 +82,66 @@ def test_stg_parcels_dedupes_brt_keeping_largest():
             ],
         }
     )
-    out = stg_parcels(raw).collect()
+    owners = _opa_owners([("111", "SMITH J"), ("222", "DOE A")])
+    out = stg_parcels(raw, owners).collect()
     assert out["brt_id"].to_list() == ["111", "222"]
     row = out.filter(pl.col("brt_id") == "111").to_dicts()[0]
     assert row["parcelid"] == 1  # largest parcel wins
     assert row["shp_parcel_num_vertices"] == 4
     assert row["num_brt"] == 2
+
+
+def test_owner_linked_adjacency_side_yard_case():
+    # house (100x100 at origin) + touching side yard (50 wide), same owner;
+    # a touching neighbor with a different owner; a same-owner parcel far away
+    house = SQUARE_100
+    side_yard = _poly([(100, 0), (150, 0), (150, 100), (100, 100)])
+    neighbor = _poly([(-50, 0), (0, 0), (0, 100), (-50, 100)])
+    far_same_owner = _poly([(5000, 0), (5100, 0), (5100, 100), (5000, 100)])
+    raw = pl.LazyFrame(
+        {
+            "parcelid": [1, 2, 3, 4],
+            "brt_id": ["h1", "y1", "n1", "f1"],
+            "num_brt": [1] * 4,
+            "num_accounts": [1] * 4,
+            "gross_area": [100] * 4,
+            "pin": [1, 2, 3, 4],
+            "address": ["1 A ST", "3 A ST", "5 A ST", "9 Z ST"],
+            "geometry_geojson": [house, side_yard, neighbor, far_same_owner],
+        }
+    )
+    owners = _opa_owners(
+        [("h1", "Hand, Nick"), ("y1", "HAND NICK"), ("n1", "OTHER OWNER"), ("f1", "hand nick")]
+    )
+    out = stg_parcels(raw, owners).collect()
+    by = {r["brt_id"]: r for r in out.to_dicts()}
+    assert by["h1"]["shp_n_linked_parcels"] == 1  # side yard, not the far parcel
+    assert by["h1"]["shp_linked_lot_area_m2"] == pytest.approx(15_000, rel=0.01)
+    assert by["y1"]["shp_n_linked_parcels"] == 1
+    assert by["n1"]["shp_n_linked_parcels"] == 0
+    assert by["f1"]["shp_n_linked_parcels"] == 0
+    assert by["n1"]["shp_linked_lot_area_m2"] is None
+
+
+def test_institutional_owners_not_linked():
+    # 25 adjacent parcels under one owner: institutional, must not link
+    raw_rows = []
+    owner_rows = []
+    for i in range(25):
+        raw_rows.append(
+            {
+                "parcelid": i,
+                "brt_id": f"b{i}",
+                "num_brt": 1,
+                "num_accounts": 1,
+                "gross_area": 100,
+                "pin": i,
+                "address": f"{i} PHA ST",
+                "geometry_geojson": _poly(
+                    [(i * 100, 0), (i * 100 + 100, 0), (i * 100 + 100, 100), (i * 100, 100)]
+                ),
+            }
+        )
+        owner_rows.append((f"b{i}", "PHILA HOUSING AUTHORITY"))
+    out = stg_parcels(pl.LazyFrame(raw_rows), _opa_owners(owner_rows)).collect()
+    assert (out["shp_n_linked_parcels"] == 0).all()

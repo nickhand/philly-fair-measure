@@ -28,7 +28,9 @@ BUILDERS: dict[str, tuple[Callable[..., pl.LazyFrame], tuple[str, ...]]] = {
     "deeds": (tables.stg_deeds, ("rtt_summary",)),
     "permits": (tables.stg_permits, ("permits",)),
     "violations": (tables.stg_violations, ("violations",)),
-    "parcels": (stg_parcels, ("pwd_parcels",)),
+    "parcels": (stg_parcels, ("pwd_parcels", "opa_properties_public")),
+    "delinquencies": (tables.stg_delinquencies, ("real_estate_tax_delinquencies",)),
+    "demolitions": (tables.stg_demolitions, ("demolitions",)),
 }
 
 
