@@ -283,6 +283,35 @@ def _cmd_acs_sensitivity(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_ratio_study(args: argparse.Namespace) -> int:
+    import polars as pl
+
+    from philly_assessments.diagnostics.ratio_study import iaao_bridge, sale_chasing_check
+
+    bridge = iaao_bridge(args.data_dir)
+    columns = ("n", "n_trimmed", "median_ratio", "cod", "prd", "prb")
+    print("IAAO convention bridge (identical out-of-time test sales)\n")
+    print(f"{'estimator':<10}{'step':<18}{'segment':<10}" + "".join(f"{c:>13}" for c in columns))
+    for row in bridge.to_dicts():
+        cells = []
+        for column in columns:
+            value = row.get(column)
+            if value is None:
+                cells.append(f"{'-':>13}")
+            elif column in ("n", "n_trimmed"):
+                cells.append(f"{value:>13,}")
+            else:
+                cells.append(f"{value:>13.4f}")
+        print(f"{row['estimator']:<10}{row['step']:<18}{row['segment']:<10}" + "".join(cells))
+
+    chase = sale_chasing_check(args.data_dir)
+    print("\nsale-chasing check: same roll vs sales the assessor could/couldn't see")
+    print("(TASP ratios, 3xIQR-trimmed; drift removed by the index)\n")
+    with pl.Config(tbl_cols=-1, tbl_width_chars=120):
+        print(chase)
+    return 0
+
+
 def _cmd_comps(args: argparse.Namespace) -> int:
     import polars as pl
 
@@ -532,6 +561,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     acs.add_argument("--data-dir", type=Path)
     acs.set_defaults(func=_cmd_acs_sensitivity)
+
+    ratio_study = subparsers.add_parser(
+        "ratio-study",
+        help="IAAO convention bridge (our metrics vs OPA's reported ones) + "
+        "sale-chasing checks",
+    )
+    ratio_study.add_argument("--data-dir", type=Path)
+    ratio_study.set_defaults(func=_cmd_ratio_study)
 
     comps = subparsers.add_parser(
         "comps", help="comparable sales for a property (parcel id or address fragment)"

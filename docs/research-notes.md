@@ -58,17 +58,46 @@ socioeconomic features belong in *diagnostics*, not the valuation path
   singles COD 6.7, twins 8.1, rows 10.7. Target median ratio band 0.95–1.02.
 - STEB Common Level Ratio 94.3% (2025).
 
-**Reconciling their COD 10.1 with our measured COD 34.6 for OPA.** Both are
-real, on different questions. Keene's study asks "how uniform are assessments
-against *time-adjusted, validated, in-window* sales" (the IAAO convention —
-sales that partly informed the model, curated by the same pipeline, with
-evaluator review of outliers). Ours asks "how close was the certified value to
-what properties *actually later sold for*, out of time, on independently
-validated deeds." The gap between 10.1 and 34.6 is the sum of market movement
-after the window, time-adjustment removing drift, sample curation, and
-evaluator hand-review. Action: add a **time-adjusted ratio study mode** to our
-evaluation harness so we can report both conventions and compare
-apples-to-apples.
+**Reconciling their COD 10.1 with our measured COD 34.6 for OPA — now fully
+QUANTIFIED (2026-07-03, `philly ratio-study`).** Both numbers are real, on
+different questions, and the bridge decomposes the gap on identical
+out-of-time test sales (n=19,515):
+
+| step (cumulative) | OPA COD | our model COD |
+|---|---|---|
+| out-of-time, raw (our headline) | 34.5 | 26.2 |
+| + time-adjusted prices (TASP) | 32.8 | 26.2 |
+| + fresh roll / in-window refit¹ | 31.3 | 20.1 |
+| + IAAO 3×IQR ratio trim | 24.3 | 17.8 |
+| + clean-sale curation² | **16.8** | **16.8³ / PRD 1.005** |
+
+¹ OPA's row switches to the freshly reassessed TY2027 roll (the roll Keene
+actually studied — the per-sale-year rolls are partly stale carry-forwards);
+our row refits with the window inside training, the assessor-equivalent.
+² Documented filters only, no ratio peeking: no legal-entity buyer/seller
+(alone worth ~7 COD points — 43% of Philly arms-length sales involve an
+entity), no possible-related parties, price ≥ $50k, single family. n≈9.6k.
+³ Our 16.8 is the HONEST OUT-OF-TIME model on that sample (in-window would be
+several points lower); PRD 1.005 and PRB 0.036 are dead inside the IAAO
+bands (0.98–1.03 / ±0.05). By style, curated + trimmed: ours detached 13.7 /
+twin 13.2 / row 17.9 vs Keene's reported 6.7 / 8.1 / 10.7.
+
+The residual 16.8 → 10.1 for OPA is the layer we cannot reproduce from public
+data: evaluator hand-review of the sale sample (IAAO-sanctioned but
+discretionary — and the layer where validation that glances at the existing
+assessment mechanically shrinks COD), their own tighter validation pipeline
+(SVQs, deed review), time adjustment to their Jan-2026 valuation date rather
+than our latest index month, and window choices. **Sale-chasing is ruled
+out**: the same roll's trimmed TASP COD on sales OPA *could* see vs sales
+recorded only *after* certification differs by <2 points (26.0/27.9 for
+TY2025; 26.6/27.9 for TY2026), the %-within-2%-of-price is low and similar
+in both windows, and assesspy's distribution heuristics are negative — an
+exonerating finding worth stating plainly. Conclusion: the road from our
+numbers to theirs is convention + curation, not model quality; on equal
+footing our out-of-time model matches their in-window roll and beats it on
+vertical equity (PRD/PRB), and the only honest lever for further out-of-time
+COD is information the public data lacks (interior condition — the measured
+q1 limit).
 
 ---
 
