@@ -12,13 +12,20 @@ from philly_assessments.sources.carto import DEFAULT_PAGE_SIZE
 
 
 def _cmd_snapshot(args: argparse.Namespace) -> int:
-    result = snapshot_carto_table(
-        args.table,
-        dataset=args.dataset,
-        data_dir=args.data_dir,
-        page_size=args.page_size,
-        limit=args.limit,
-    )
+    if args.source == "arcgis":
+        from philly_assessments.ingest.snapshots import snapshot_arcgis_layer
+
+        result = snapshot_arcgis_layer(
+            args.table, dataset=args.dataset, data_dir=args.data_dir, limit=args.limit
+        )
+    else:
+        result = snapshot_carto_table(
+            args.table,
+            dataset=args.dataset,
+            data_dir=args.data_dir,
+            page_size=args.page_size,
+            limit=args.limit,
+        )
     print(f"{result.manifest.row_count:,} rows -> {result.directory}")
     return 0
 
@@ -264,8 +271,10 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     snapshot = subparsers.add_parser("snapshot", help="capture a raw snapshot of a source table")
-    snapshot.add_argument("source", choices=("carto",), help="source API")
-    snapshot.add_argument("table", help="table name, e.g. opa_properties_public")
+    snapshot.add_argument("source", choices=("carto", "arcgis"), help="source API")
+    snapshot.add_argument(
+        "table", help="CARTO table (e.g. opa_properties_public) or ArcGIS service (PWD_PARCELS)"
+    )
     snapshot.add_argument(
         "--dataset", help="dataset name used in the storage path (defaults to the table name)"
     )

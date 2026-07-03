@@ -39,6 +39,7 @@ from philly_assessments.features.sale_features import (
     _block_id,
     _recency_weight,
     era_expr,
+    join_parcel_shapes,
     style_expr,
 )
 from philly_assessments.features.spatial import knn_ppsf_at_date
@@ -66,6 +67,7 @@ def assemble_assessment_features(
     valuation_date: datetime,
     market_areas: pl.LazyFrame | None = None,
     price_index: pl.DataFrame | None = None,
+    parcels: pl.LazyFrame | None = None,
 ) -> pl.DataFrame:
     base = (
         opa.filter(pl.col("category_code_description").is_in(RESIDENTIAL_CATEGORIES))
@@ -304,4 +306,4 @@ def assemble_assessment_features(
         )
         .drop("house_number_parsed", strict=False)
     )
-    return features
+    return join_parcel_shapes(features, parcels)

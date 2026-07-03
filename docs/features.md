@@ -37,6 +37,17 @@ Explicitly rejected: `off_street_open` — profiled as NOT a parking field
 (5,308 distinct values, mean ~2,050; semantics unknown). Parking signal stays
 with `garage_spaces`/`garage_type`.
 
+**Parcel geometry (`shp_`, Tier 2.1, 2026-07-03):** CCAO's shape set computed
+from PWD parcel polygons (area, perimeter, vertices, edge-length SD,
+interior-angle SD, centroid-distance SD, minimum-rotated-rectangle ratios)
+plus `shp_parcel_num_brt`/`num_accounts` via the `brt_id` bridge. Coverage
+99.7%. **Honest result: ~no metric movement in Philly** (COD 25.96 vs 26.00) —
+rowhome lots are uniform rectangles (mean 6 vertices), so the features that
+earn their keep on Cook County's irregular suburban lots have little variance
+here (1.9% of model gain). Kept: cheap, mildly helpful on PRD/MAPE, more
+relevant for detached segments, and the parcel-polygon snapshots enable future
+geometry-change detection regardless.
+
 ## Market signals (`mkt_`) — informed by CCAO's condo model
 
 | Feature | Definition | Notes |

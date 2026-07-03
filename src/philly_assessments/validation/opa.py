@@ -112,6 +112,7 @@ def build_assessment_screen(
         if not path.exists():
             raise FileNotFoundError(f"{path} missing; run the pipeline first")
 
+    parcels_path = root / "staged" / "parcels.parquet"
     features = assemble_assessment_features(
         pl.scan_parquet(paths["opa"]),
         pl.scan_parquet(paths["sales"]),
@@ -120,6 +121,7 @@ def build_assessment_screen(
         valuation_date,
         pl.scan_parquet(paths["market_areas"]),
         pl.read_parquet(paths["price_index"]),
+        pl.scan_parquet(parcels_path) if parcels_path.exists() else None,
     )
     logger.info("scoring %s residential properties", f"{features.height:,}")
     # persist the full feature frame: the comps CLI prices arbitrary parcels

@@ -81,6 +81,17 @@ NUMERIC_FEATURES = [
     "evt_n_open_violations_at_sale",
     "loc_lon",
     "loc_lat",
+    # parcel geometry (PWD polygons via the brt_id bridge; plan v2 Tier 2.1)
+    "shp_parcel_area_m2",
+    "shp_parcel_perimeter_m",
+    "shp_parcel_num_vertices",
+    "shp_parcel_edge_len_sd_m",
+    "shp_parcel_interior_angle_sd_deg",
+    "shp_parcel_centroid_dist_sd_m",
+    "shp_parcel_mrr_area_ratio",
+    "shp_parcel_mrr_side_ratio",
+    "shp_parcel_num_brt",
+    "shp_parcel_num_accounts",
 ]
 TIME_FEATURES = ["time_sale_epoch_days", "time_quarter", "time_month"]
 CATEGORICAL_FEATURES = [

@@ -10,6 +10,9 @@ uv run philly freshness      # heartbeat: exits 1 if any core dataset is missing
 ```
 
 The core table set lives in `philly_assessments.config.CORE_CARTO_TABLES`.
+Parcel polygons (`philly snapshot arcgis PWD_PARCELS`, ~10 min) change rarely;
+refresh them occasionally rather than weekly, then re-run
+`philly stage --tables parcels`.
 A full weekly capture is currently ~842MB of zstd Parquet (~44GB/year).
 Per the project brief, do not prematurely optimize away full snapshots;
 revisit with delta tables once change detection lands.

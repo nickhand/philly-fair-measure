@@ -81,6 +81,35 @@ _LOC_RENAMES = {
     "lonlat_status": "loc_lonlat_status",
 }
 
+SHP_COLUMNS = [
+    "shp_parcel_area_m2",
+    "shp_parcel_perimeter_m",
+    "shp_parcel_num_vertices",
+    "shp_parcel_edge_len_sd_m",
+    "shp_parcel_interior_angle_sd_deg",
+    "shp_parcel_centroid_dist_sd_m",
+    "shp_parcel_mrr_area_ratio",
+    "shp_parcel_mrr_side_ratio",
+    "shp_parcel_num_brt",
+    "shp_parcel_num_accounts",
+]
+
+
+def join_parcel_shapes(frame: pl.DataFrame, parcels: pl.LazyFrame | None) -> pl.DataFrame:
+    """Attach shp_* columns by OPA account; null columns when parcels are absent
+    so the model feature set is stable either way."""
+    if parcels is None:
+        return frame.with_columns(
+            *[pl.lit(None, dtype=pl.Float64).alias(c) for c in SHP_COLUMNS]
+        )
+    shp = parcels.select(
+        pl.col("brt_id").alias("parcel_id"),
+        pl.col("num_brt").cast(pl.Float64).alias("shp_parcel_num_brt"),
+        pl.col("num_accounts").cast(pl.Float64).alias("shp_parcel_num_accounts"),
+        *[c for c in SHP_COLUMNS if not c.endswith(("_num_brt", "_num_accounts"))],
+    ).collect()
+    return frame.join(shp, on="parcel_id", how="left")
+
 # standalone (non-ROW/TWIN) style names observed in building_code_description_new
 _DETACHED_STYLES = [
     "CONVENTIONAL", "CAPE", "COLONIAL", "SPLIT LEVEL", "RANCH", "RANCHER",
@@ -248,6 +277,7 @@ def assemble_sale_features(
     assessments: pl.LazyFrame,
     market_areas: pl.LazyFrame | None = None,
     price_index: pl.DataFrame | None = None,
+    parcels: pl.LazyFrame | None = None,
     *,
     min_sale_year: int = DEFAULT_MIN_SALE_YEAR,
 ) -> pl.DataFrame:
@@ -446,6 +476,7 @@ def assemble_sale_features(
         )
         .drop("asmt_year", "house_number_parsed", "livable_area", strict=False)
     )
+    features = join_parcel_shapes(features, parcels)
     return features.sort("sale_date", "sale_id")
 
 
@@ -474,6 +505,11 @@ def build_sale_features(
                 f"{path} missing; run snapshots, `philly stage`, `philly validate-sales`, "
                 "`philly build-market-areas`, and `philly build-price-index` first"
             )
+    parcels_path = root / "staged" / "parcels.parquet"
+    if parcels_path.exists():
+        paths["parcels"] = parcels_path
+    else:
+        logger.warning("staged parcels missing; shp_* features will be null")
 
     frame = assemble_sale_features(
         pl.scan_parquet(paths["sale_validity"]),
@@ -483,6 +519,7 @@ def build_sale_features(
         pl.scan_parquet(paths["assessments"]),
         pl.scan_parquet(paths["market_areas"]),
         pl.read_parquet(paths["price_index"]),
+        pl.scan_parquet(parcels_path) if parcels_path.exists() else None,
         min_sale_year=min_sale_year,
     )
     inputs = []

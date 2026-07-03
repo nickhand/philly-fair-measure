@@ -17,6 +17,7 @@ from philly_assessments.ingest.manifests import (
     write_derived_manifest,
 )
 from philly_assessments.staging import tables
+from philly_assessments.staging.parcels import stg_parcels
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ BUILDERS: dict[str, tuple[Callable[..., pl.LazyFrame], tuple[str, ...]]] = {
     "deeds": (tables.stg_deeds, ("rtt_summary",)),
     "permits": (tables.stg_permits, ("permits",)),
     "violations": (tables.stg_violations, ("violations",)),
+    "parcels": (stg_parcels, ("pwd_parcels",)),
 }
 
 

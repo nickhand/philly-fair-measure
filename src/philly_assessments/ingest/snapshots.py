@@ -159,3 +159,105 @@ def snapshot_carto_table(
     finally:
         if owns_client:
             client.close()
+
+
+def snapshot_arcgis_layer(
+    service: str,
+    layer: int = 0,
+    *,
+    dataset: str | None = None,
+    data_dir: Path | None = None,
+    limit: int | None = None,
+    client=None,
+) -> SnapshotResult:
+    """Capture an ArcGIS FeatureServer layer as a raw snapshot (geometry kept
+    verbatim as GeoJSON strings). Mirrors snapshot_carto_table."""
+    import pyarrow as pa
+
+    from philly_assessments.sources import arcgis
+
+    dataset = dataset or service.lower()
+    owns_client = client is None
+    client = client or arcgis.ArcGISClient()
+    try:
+        fetched_at = datetime.now(UTC)
+        started = time.monotonic()
+        fields = client.get_fields(service, layer)
+        schema = arcgis.arrow_schema(fields)
+        source_row_count = client.count(service, layer)
+
+        root = data_dir if data_dir is not None else config.data_dir()
+        final_dir = (
+            root
+            / "raw"
+            / "source=arcgis"
+            / f"dataset={dataset}"
+            / f"fetched_at={fetched_at.strftime(FETCHED_AT_FORMAT)}"
+        )
+        work_dir = final_dir.with_name(final_dir.name + ".incomplete")
+        work_dir.mkdir(parents=True, exist_ok=False)
+        data_path = work_dir / DATA_FILENAME
+
+        row_count = 0
+        num_pages = 0
+        with pq.ParquetWriter(data_path, schema, compression="zstd") as writer:
+            for page in client.iter_pages(service, layer):
+                if limit is not None and row_count + len(page) > limit:
+                    page = page[: limit - row_count]
+                writer.write_table(pa.Table.from_pylist(page, schema=schema))
+                row_count += len(page)
+                num_pages += 1
+                if num_pages % 25 == 0:
+                    logger.info(
+                        "%s: %s rows fetched (%d pages)", dataset, f"{row_count:,}", num_pages
+                    )
+                if limit is not None and row_count >= limit:
+                    break
+
+        completed_at = datetime.now(UTC)
+        manifest = SnapshotManifest(
+            source="arcgis",
+            dataset=dataset,
+            endpoint=client.layer_url(service, layer) + "/query",
+            query=(
+                f'{service}/FeatureServer/{layer}: outFields=*, outSR=4326, f=geojson, '
+                f'keyset on "{arcgis.KEYSET_FIELD}"'
+            ),
+            fetched_at=fetched_at,
+            completed_at=completed_at,
+            duration_seconds=round(time.monotonic() - started, 3),
+            source_row_count=source_row_count,
+            row_count=row_count,
+            page_size=arcgis.DEFAULT_PAGE_SIZE,
+            num_pages=num_pages,
+            order_key=arcgis.KEYSET_FIELD,
+            row_limit=limit,
+            excluded_columns=[],
+            columns=[
+                ColumnInfo(
+                    name=f["name"],
+                    pg_type=f["esri_type"],  # source (esri) type
+                    arrow_type=str(schema.field(f["name"]).type),
+                )
+                for f in fields
+            ]
+            + [
+                ColumnInfo(name=arcgis.GEOMETRY_COLUMN, pg_type="geojson", arrow_type="string")
+            ],
+            files=[
+                FileInfo(
+                    path=DATA_FILENAME,
+                    rows=row_count,
+                    size_bytes=data_path.stat().st_size,
+                    sha256=_sha256(data_path),
+                )
+            ],
+            package_version=__version__,
+        )
+        write_manifest(manifest, work_dir)
+        work_dir.rename(final_dir)
+        logger.info("snapshot complete: %s rows -> %s", f"{row_count:,}", final_dir)
+        return SnapshotResult(directory=final_dir, manifest=manifest)
+    finally:
+        if owns_client:
+            client.close()
