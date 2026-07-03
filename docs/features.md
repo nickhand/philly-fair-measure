@@ -22,6 +22,21 @@ Coverage figures below measured on the 2026-07-02 build (209,680 sales).
 `sale_id` (rtt record_id), `parcel_id` (OPA account), `sale_date`, `sale_year`,
 **`sale_price`** (target).
 
+## Plan-v2 additions (2026-07-02; see feature-plan-v2.md for mechanisms)
+
+| Feature | Definition | Notes |
+|---|---|---|
+| `time_adj_log` | District price-index adjustment to the reference month (marts/price_index.parquet) | Models train on log(price)+adj and drop time features (OPA practice). Fixed the median-ratio drift: 0.92 → **0.99**. |
+| `mkt_knn_log_ppsf` (+`_n`, `_mean_dist_m`) | Distance-weighted mean time-adjusted log $/sqft of ~15 nearest strictly-prior sales, own parcel excluded, quarter-blocked trees | OPA's `SPATIAL` analog. 96.7% coverage, mean neighbor distance 29m; #3 by gain immediately. |
+| `mkt_block_roll_ppsf` | $/sqft version of the block rolling mean | Disentangles neighbor size from location value. |
+| `mkt_area_level_log_ppsf` | Learned market-area median (time-detrended) log $/sqft | #5 by gain. |
+| `loc_market_area`, `loc_district` | Learned GMA analog (350 areas / 18 districts, marts/market_areas.parquet) | OPA's GMAs are PDF-only; boundaries learned from sales embed all-time info (like annually redrawn GMAs). |
+| `char_style`, `char_era` | Parsed style (row/twin/detached/other/unknown) and era bands | Enables Keene-style segmented evaluation; style COD gradient matches theirs. |
+
+Explicitly rejected: `off_street_open` — profiled as NOT a parking field
+(5,308 distinct values, mean ~2,050; semantics unknown). Parking signal stays
+with `garage_spaces`/`garage_type`.
+
 ## Market signals (`mkt_`) — informed by CCAO's condo model
 
 | Feature | Definition | Notes |

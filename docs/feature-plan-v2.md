@@ -1,5 +1,16 @@
 # Feature Engineering Plan v2
 
+> **Results (Tier 1 executed 2026-07-02, same out-of-time test):** LightGBM
+> RMSE(log) 0.350 → **0.341**, R² 0.796 → **0.807**, median ratio 0.919 →
+> **0.990** (target hit — time adjustment removed the drift), COD 25.5 → 26.0
+> (flat), PRD ≈ 1.11 (flat). Deeper trees add nothing (COD 25.95), so the
+> residual dispersion is an information limit, not model capacity: the path to
+> COD ≤ 20 runs through richer characteristics/ACS sensitivity, heteroscedastic
+> or segmented modeling, and the Tier-3 Bayesian bundle — not more boosting.
+> TASP convention on identical sales: ours COD 26.0 vs OPA 33.0 (Keene's 10.1
+> is on OPA's curated in-window sample — mostly a sample-selection gap).
+> Style gradient matches Keene's ordering (detached 18.8 < twin 21.9 < row 27.0).
+
 Goal: improve the measured metrics from the v1 baselines. Grounded in OPA's
 TY2027 methodology and the 2026 literature (see
 [research-notes.md](research-notes.md)); every item states the mechanism by

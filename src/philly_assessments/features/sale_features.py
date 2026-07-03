@@ -1,4 +1,4 @@
-"""Model-ready feature table for validated arms-length sales (Milestone 5).
+"""Model-ready feature table for validated arms-length sales (Milestone 5 + plan v2).
 
 Feature name prefixes encode temporal quality (full registry: docs/features.md):
 
@@ -9,14 +9,23 @@ Feature name prefixes encode temporal quality (full registry: docs/features.md):
     evt_*   event-dated permit/violation counts strictly before the sale — as_of_sale.
     asmt_*  assessment-roll values for the sale year — before_sale (rolls are
             certified ahead of their year).
-    loc_*   location identifiers — quasi-static.
+    loc_*   location identifiers — quasi-static (market areas/districts are
+            learned from the full sales history: their *boundaries* embed
+            all-time information, like OPA's annually redrawn GMAs).
     time_*  sale-date encodings — as_of_sale.
 
-The block-level rolling average adapts CCAO's condo-model insight (leave-one-out,
-time-weighted 5-year mean of prior sales among neighbors) to rowhome blocks:
-same street_code, same 100-number block, other parcels only, prior sales only,
-logistic recency decay. It is the main defense against unobservable interior
-condition.
+Market signals come in three radii, all leakage-tested (strictly earlier
+sales, own parcel excluded):
+
+    block   leave-one-out time-weighted rolling mean on the same street block
+            (price level and $/sqft) — CCAO condo-model design;
+    kNN     distance-weighted mean time-adjusted $/sqft of the ~15 nearest
+            prior sales (features/spatial.py) — OPA's `SPATIAL` analog;
+    area    learned market-area price level (features/market_areas.py).
+
+`time_adj_log` carries the district price-index adjustment to the reference
+month (features/price_index.py); models may train on adjusted prices
+(log price + time_adj_log) and drop time features, per OPA practice.
 """
 
 from __future__ import annotations
@@ -37,6 +46,7 @@ ROLL_WINDOW_DAYS = 1825
 ROLL_DECAY_YEARS = 3.0
 EVENT_WINDOW_DAYS = 1825
 DEFAULT_MIN_SALE_YEAR = 2016
+PPSF_AREA_BOUNDS = (300.0, 10_000.0)
 
 _CHAR_RENAMES = {
     "total_livable_area": "char_livable_area",
@@ -71,6 +81,52 @@ _LOC_RENAMES = {
     "lonlat_status": "loc_lonlat_status",
 }
 
+# standalone (non-ROW/TWIN) style names observed in building_code_description_new
+_DETACHED_STYLES = [
+    "CONVENTIONAL", "CAPE", "COLONIAL", "SPLIT LEVEL", "RANCH", "RANCHER",
+    "BUNGALOW", "TUDOR", "VICTORIAN", "CONTEMPORARY",
+]
+
+
+def style_expr(source: str = "char_building_type") -> pl.Expr:
+    bt = pl.col(source).cast(pl.String).str.strip_chars()
+    return (
+        pl.when(bt.is_null())
+        .then(pl.lit("unknown"))
+        .when(bt.str.starts_with("ROW"))
+        .then(pl.lit("row"))
+        .when(bt.str.starts_with("TWIN") | bt.str.starts_with("SEMI"))
+        .then(pl.lit("twin"))
+        .when(bt.str.starts_with("DET") | bt.is_in(_DETACHED_STYLES))
+        .then(pl.lit("detached"))
+        .otherwise(pl.lit("other"))
+        .alias("char_style")
+    )
+
+
+def era_expr(source: str = "char_year_built") -> pl.Expr:
+    y = pl.col(source)
+    return (
+        pl.when(y.is_null())
+        .then(pl.lit("unknown"))
+        .when(y < 1900)
+        .then(pl.lit("pre1900"))
+        .when(y < 1920)
+        .then(pl.lit("1900s"))
+        .when(y < 1940)
+        .then(pl.lit("1920s_30s"))
+        .when(y < 1960)
+        .then(pl.lit("1940s_50s"))
+        .when(y < 1980)
+        .then(pl.lit("1960s_70s"))
+        .when(y < 2000)
+        .then(pl.lit("1980s_90s"))
+        .when(y < 2010)
+        .then(pl.lit("2000s"))
+        .otherwise(pl.lit("2010plus"))
+        .alias("char_era")
+    )
+
 
 def _block_id() -> pl.Expr:
     block_number = (pl.col("house_number_parsed") // 100) * 100
@@ -91,10 +147,12 @@ def _recency_weight(days: pl.Expr) -> pl.Expr:
 
 
 def _block_rolling_features(pool: pl.DataFrame) -> pl.DataFrame:
-    """Leave-one-out, time-weighted rolling mean of prior block sales per sale."""
+    """Leave-one-out, time-weighted rolling means (price level and $/sqft) of
+    prior block sales per sale."""
     p = pool.filter(pl.col("loc_block_id").is_not_null()).select(
-        "sale_id", "parcel_id", "loc_block_id", "sale_date", "sale_price"
+        "sale_id", "parcel_id", "loc_block_id", "sale_date", "sale_price", "livable_area"
     )
+    lo, hi = PPSF_AREA_BOUNDS
     pairs = (
         p.join(p, on="loc_block_id", suffix="_o")
         .filter(
@@ -106,12 +164,21 @@ def _block_rolling_features(pool: pl.DataFrame) -> pl.DataFrame:
         )
         .filter(pl.col("days_ago") <= ROLL_WINDOW_DAYS)
         .with_columns(_recency_weight(pl.col("days_ago")).alias("w"))
+        .with_columns(
+            pl.when(pl.col("livable_area_o").is_between(lo, hi))
+            .then(pl.col("sale_price_o") / pl.col("livable_area_o"))
+            .alias("ppsf_o")
+        )
     )
     return pairs.group_by("sale_id").agg(
         ((pl.col("w") * pl.col("sale_price_o")).sum() / pl.col("w").sum()).alias(
             "mkt_block_roll_mean_price"
         ),
         pl.len().alias("mkt_block_roll_n"),
+        (
+            (pl.col("w") * pl.col("ppsf_o")).sum()
+            / pl.when(pl.col("ppsf_o").is_not_null()).then(pl.col("w")).otherwise(0.0).sum()
+        ).alias("mkt_block_roll_ppsf"),
     )
 
 
@@ -130,20 +197,58 @@ def _parcel_prior_sale_features(pool: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def _knn_surface(pool: pl.DataFrame) -> pl.DataFrame:
+    """As-of kNN $/sqft surface for every pooled sale (see features/spatial.py)."""
+    from philly_assessments.features.market_areas import project_xy
+    from philly_assessments.features.spatial import knn_ppsf_for_sales
+
+    lo, hi = PPSF_AREA_BOUNDS
+    points = (
+        pool.filter(
+            (pl.col("lonlat_status") == "ok")
+            & pl.col("livable_area").is_between(lo, hi)
+        )
+        .with_columns((pl.col("sale_price") / pl.col("livable_area")).alias("ppsf"))
+        .filter(pl.col("ppsf").is_between(10.0, 2000.0))
+        .with_columns(
+            (pl.col("ppsf").log() + pl.col("time_adj_log")).alias("adj_log_ppsf"),
+            *project_xy(pl.col("lon"), pl.col("lat")),
+        )
+        .select("sale_id", "parcel_id", "x_m", "y_m", "sale_date", "adj_log_ppsf")
+    )
+    if points.height == 0:
+        return pl.DataFrame(
+            schema={
+                "sale_id": pl.String,
+                "mkt_knn_log_ppsf": pl.Float64,
+                "mkt_knn_n": pl.Int32,
+                "mkt_knn_mean_dist_m": pl.Float64,
+            }
+        )
+    return knn_ppsf_for_sales(points)
+
+
 def assemble_sale_features(
     sales: pl.LazyFrame,
     opa: pl.LazyFrame,
     permits: pl.LazyFrame,
     violations: pl.LazyFrame,
     assessments: pl.LazyFrame,
+    market_areas: pl.LazyFrame | None = None,
+    price_index: pl.DataFrame | None = None,
     *,
     min_sale_year: int = DEFAULT_MIN_SALE_YEAR,
 ) -> pl.DataFrame:
     """Pure assembly from staged/mart frames; see module docstring for semantics.
 
     The full arms-length pool (all years) feeds the rolling windows; the output
-    contains only sales from `min_sale_year` onward.
+    contains only sales from `min_sale_year` onward. `market_areas` and
+    `price_index` are optional so unit tests can run without them: without an
+    index every `time_adj_log` is 0.0; without market areas the loc_market_area
+    columns are null.
     """
+    from philly_assessments.features.price_index import with_time_adjustment
+
     pool = (
         sales.filter(
             (pl.col("validity_status") == "arms_length")
@@ -169,14 +274,45 @@ def assemble_sale_features(
         *[c for c in _LOC_RENAMES if c != "street_code"],
     ).collect()
 
-    pool = pool.join(
-        opa_cols.select("parcel_id", "street_code", "house_number_parsed"),
-        on="parcel_id",
-        how="left",
-    ).with_columns(_block_id())
+    area_cols = ["parcel_id", "market_area", "district", "ma_med_adj_log_ppsf"]
+    if market_areas is not None:
+        areas = market_areas.select(area_cols).collect()
+    else:
+        areas = pl.DataFrame(
+            schema={
+                "parcel_id": pl.String,
+                "market_area": pl.String,
+                "district": pl.String,
+                "ma_med_adj_log_ppsf": pl.Float64,
+            }
+        )
+
+    pool = (
+        pool.join(
+            opa_cols.select(
+                "parcel_id",
+                "street_code",
+                "house_number_parsed",
+                pl.col("total_livable_area").alias("livable_area"),
+                "lon",
+                "lat",
+                "lonlat_status",
+            ),
+            on="parcel_id",
+            how="left",
+        )
+        .with_columns(_block_id())
+        .join(areas, on="parcel_id", how="left")
+        .rename({"market_area": "loc_market_area", "district": "loc_district"})
+    )
+    if price_index is not None:
+        pool = with_time_adjustment(pool, price_index)
+    else:
+        pool = pool.with_columns(pl.lit(0.0).alias("time_adj_log"))
 
     block_roll = _block_rolling_features(pool)
     parcel_prior = _parcel_prior_sale_features(pool)
+    knn = _knn_surface(pool)
 
     base = pool.filter(pl.col("sale_year") >= min_sale_year)
 
@@ -251,9 +387,15 @@ def assemble_sale_features(
     prior_asmt = asmt.rename({"asmt_market_value": "asmt_market_value_prev_year"})
 
     features = (
-        base.join(opa_cols.drop("street_code", "house_number_parsed"), on="parcel_id", how="left")
+        # lon/lat/livable_area were pool-side helpers; the canonical copies come
+        # from the opa_cols join below
+        base.drop("lon", "lat", "lonlat_status", "livable_area")
+        .join(
+            opa_cols.drop("street_code", "house_number_parsed"), on="parcel_id", how="left"
+        )
         .join(block_roll, on="sale_id", how="left")
         .join(parcel_prior, on="sale_id", how="left")
+        .join(knn, on="sale_id", how="left")
         .join(permit_feats, on="sale_id", how="left")
         .join(violation_feats, on="sale_id", how="left")
         .join(
@@ -270,11 +412,15 @@ def assemble_sale_features(
         )
         .rename({**_CHAR_RENAMES, **_LOC_RENAMES})
         .rename({"zip5": "loc_zip5", "category_code_description": "char_category"})
+        .rename({"ma_med_adj_log_ppsf": "mkt_area_level_log_ppsf"})
         .with_columns(
+            style_expr(),
+            era_expr(),
             pl.col("sale_date").dt.quarter().alias("time_quarter"),
             pl.col("sale_date").dt.month().alias("time_month"),
             pl.col("sale_date").dt.weekday().alias("time_weekday"),
             pl.col("mkt_block_roll_n").fill_null(0),
+            pl.col("mkt_knn_n").fill_null(0),
             pl.col("mkt_parcel_n_prior_sales").fill_null(0),
             pl.col("evt_n_permits_5y_before").fill_null(0),
             pl.col("evt_n_violations_5y_before").fill_null(0),
@@ -286,7 +432,7 @@ def assemble_sale_features(
             )
             .alias("asmt_value_yoy_change"),
         )
-        .drop("asmt_year", "house_number_parsed", strict=False)
+        .drop("asmt_year", "house_number_parsed", "livable_area", strict=False)
     )
     return features.sort("sale_date", "sale_id")
 
@@ -307,11 +453,14 @@ def build_sale_features(
         "permits": root / "staged" / "permits.parquet",
         "violations": root / "staged" / "violations.parquet",
         "assessments": root / "staged" / "assessments.parquet",
+        "market_areas": root / "marts" / "market_areas.parquet",
+        "price_index": root / "marts" / "price_index.parquet",
     }
     for path in paths.values():
         if not path.exists():
             raise FileNotFoundError(
-                f"{path} missing; run `philly stage` and `philly validate-sales` first"
+                f"{path} missing; run snapshots, `philly stage`, `philly validate-sales`, "
+                "`philly build-market-areas`, and `philly build-price-index` first"
             )
 
     frame = assemble_sale_features(
@@ -320,6 +469,8 @@ def build_sale_features(
         pl.scan_parquet(paths["permits"]),
         pl.scan_parquet(paths["violations"]),
         pl.scan_parquet(paths["assessments"]),
+        pl.scan_parquet(paths["market_areas"]),
+        pl.read_parquet(paths["price_index"]),
         min_sale_year=min_sale_year,
     )
     inputs = []

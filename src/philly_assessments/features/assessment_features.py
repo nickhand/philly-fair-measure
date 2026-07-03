@@ -7,13 +7,17 @@ sale dates"; this module answers "what does every property look like *today*"
 Semantics mirror features/sale_features.py exactly, with the target sale
 replaced by a common valuation date:
 
-- block rolling average: time-weighted mean of arms-length sales on the
-  property's block in the 5 years up to the valuation date, excluding the
-  property's own sales (leave-own-parcel-out, computed by aggregate
-  subtraction rather than pair joins — every parcel shares one date).
-- parcel prior-sale features: the property's own latest arms-length sale.
-- event features: permits/violations strictly before the valuation date.
-- time features: encodings of the valuation date (constant across rows).
+- block rolling averages (price and $/sqft): time-weighted means of
+  arms-length sales on the property's block in the 5 years up to the
+  valuation date, excluding the property's own sales (leave-own-parcel-out by
+  aggregate subtraction — every parcel shares one date).
+- kNN $/sqft surface: nearest prior sales in the trailing window
+  (features/spatial.py), own parcel excluded.
+- market area / district / time adjustment: from the learned market-area and
+  price-index marts; at the valuation date the adjustment is ~0 by
+  construction (index normalized to the latest month).
+- parcel prior-sale, permit/violation event windows, style/era: as in
+  sale_features.
 
 Characteristics remain current_only — for scoring "today" that is exactly
 right, since today's roll is the best available description of today's stock.
@@ -25,13 +29,19 @@ from datetime import datetime
 
 import polars as pl
 
+from philly_assessments.features.market_areas import project_xy
+from philly_assessments.features.price_index import with_time_adjustment
 from philly_assessments.features.sale_features import (
     _CHAR_RENAMES,
     _LOC_RENAMES,
+    PPSF_AREA_BOUNDS,
     ROLL_WINDOW_DAYS,
     _block_id,
     _recency_weight,
+    era_expr,
+    style_expr,
 )
+from philly_assessments.features.spatial import knn_ppsf_at_date
 from philly_assessments.models.baseline import RESIDENTIAL_CATEGORIES
 
 
@@ -54,6 +64,8 @@ def assemble_assessment_features(
     permits: pl.LazyFrame,
     violations: pl.LazyFrame,
     valuation_date: datetime,
+    market_areas: pl.LazyFrame | None = None,
+    price_index: pl.DataFrame | None = None,
 ) -> pl.DataFrame:
     base = (
         opa.filter(pl.col("category_code_description").is_in(RESIDENTIAL_CATEGORIES))
@@ -71,30 +83,82 @@ def assemble_assessment_features(
         .collect()
         .with_columns(_block_id())
     )
+    if market_areas is not None:
+        areas = market_areas.select(
+            "parcel_id", "market_area", "district", "ma_med_adj_log_ppsf"
+        ).collect()
+    else:
+        areas = pl.DataFrame(
+            schema={
+                "parcel_id": pl.String,
+                "market_area": pl.String,
+                "district": pl.String,
+                "ma_med_adj_log_ppsf": pl.Float64,
+            }
+        )
+    base = base.join(areas, on="parcel_id", how="left").rename(
+        {"market_area": "loc_market_area", "district": "loc_district"}
+    )
 
     pool = _arms_length_sales(sales, valuation_date)
+    # sale-side context: block, own area (for $/sqft), coordinates, district
+    sale_context = base.select(
+        "parcel_id",
+        "loc_block_id",
+        "loc_district",
+        pl.col("total_livable_area").alias("livable_area"),
+        "lon",
+        "lat",
+        "lonlat_status",
+    ).unique(subset=["parcel_id"])
+    pool = pool.join(sale_context, on="parcel_id", how="left")
+    if price_index is not None:
+        pool = with_time_adjustment(pool, price_index)
+        base_adj = with_time_adjustment(
+            base.with_columns(pl.lit(valuation_date).alias("_val_date")),
+            price_index,
+            date_col="_val_date",
+        ).drop("_val_date")
+    else:
+        pool = pool.with_columns(pl.lit(0.0).alias("time_adj_log"))
+        base_adj = base.with_columns(pl.lit(0.0).alias("time_adj_log"))
+    base = base_adj
+
+    lo_a, hi_a = PPSF_AREA_BOUNDS
     windowed = (
         pool.with_columns(
             (pl.lit(valuation_date) - pl.col("sale_date")).dt.total_days().alias("days_ago")
         )
-        .filter((pl.col("days_ago") > 0) & (pl.col("days_ago") <= ROLL_WINDOW_DAYS))
-        .join(
-            base.select("parcel_id", "loc_block_id").unique(subset=["parcel_id"]),
-            on="parcel_id",
-            how="left",
+        .filter(
+            (pl.col("days_ago") > 0)
+            & (pl.col("days_ago") <= ROLL_WINDOW_DAYS)
+            & pl.col("loc_block_id").is_not_null()
         )
-        .filter(pl.col("loc_block_id").is_not_null())
         .with_columns(_recency_weight(pl.col("days_ago")).alias("w"))
-        .with_columns((pl.col("w") * pl.col("sale_price")).alias("wp"))
+        .with_columns(
+            (pl.col("w") * pl.col("sale_price")).alias("wp"),
+            pl.when(pl.col("livable_area").is_between(lo_a, hi_a))
+            .then(pl.col("w") * (pl.col("sale_price") / pl.col("livable_area")))
+            .otherwise(None)
+            .alias("wppsf"),
+            pl.when(pl.col("livable_area").is_between(lo_a, hi_a))
+            .then(pl.col("w"))
+            .otherwise(0.0)
+            .alias("w_ppsf"),
+        )
     )
     block_totals = windowed.group_by("loc_block_id").agg(
         pl.col("w").sum().alias("block_w"),
         pl.col("wp").sum().alias("block_wp"),
+        pl.col("wppsf").sum().alias("block_wppsf"),
+        pl.col("w_ppsf").sum().alias("block_w_ppsf"),
         pl.len().alias("block_n"),
     )
     own_totals = windowed.group_by("loc_block_id", "parcel_id").agg(
         pl.col("w").sum().alias("own_w"),
         pl.col("wp").sum().alias("own_wp"),
+        pl.col("wppsf").sum().alias("own_wppsf"),
+        pl.col("w_ppsf").sum().alias("own_w_ppsf"),
         pl.len().alias("own_n"),
     )
 
@@ -113,6 +177,28 @@ def assemble_assessment_features(
         )
         .drop("last_sale_date")
     )
+
+    # kNN surface from the trailing window (own parcel excluded inside)
+    knn_points = (
+        pool.filter(
+            (pl.col("lonlat_status") == "ok")
+            & pl.col("livable_area").is_between(lo_a, hi_a)
+        )
+        .with_columns((pl.col("sale_price") / pl.col("livable_area")).alias("ppsf"))
+        .filter(pl.col("ppsf").is_between(10.0, 2000.0))
+        .with_columns(
+            (pl.col("ppsf").log() + pl.col("time_adj_log")).alias("adj_log_ppsf"),
+            *project_xy(pl.col("lon"), pl.col("lat")),
+        )
+        .select("parcel_id", "x_m", "y_m", "sale_date", "adj_log_ppsf")
+    )
+    knn_targets = (
+        base.filter(pl.col("lonlat_status") == "ok")
+        .select("parcel_id", "lon", "lat")
+        .with_columns(*project_xy(pl.col("lon"), pl.col("lat")))
+        .select("parcel_id", "x_m", "y_m")
+    )
+    knn = knn_ppsf_at_date(knn_points, knn_targets, valuation_date)
 
     permit_events = (
         permits.filter(
@@ -163,11 +249,14 @@ def assemble_assessment_features(
         base.join(block_totals, on="loc_block_id", how="left")
         .join(own_totals, on=["loc_block_id", "parcel_id"], how="left")
         .with_columns(
-            pl.col("own_w").fill_null(0.0),
-            pl.col("own_wp").fill_null(0.0),
+            *[
+                pl.col(c).fill_null(0.0)
+                for c in (
+                    "own_w", "own_wp", "own_wppsf", "own_w_ppsf",
+                    "block_w", "block_wp", "block_wppsf", "block_w_ppsf",
+                )
+            ],
             pl.col("own_n").fill_null(0),
-            pl.col("block_w").fill_null(0.0),
-            pl.col("block_wp").fill_null(0.0),
             pl.col("block_n").fill_null(0),
         )
         .with_columns(
@@ -176,16 +265,34 @@ def assemble_assessment_features(
                 (pl.col("block_wp") - pl.col("own_wp")) / (pl.col("block_w") - pl.col("own_w"))
             )
             .alias("mkt_block_roll_mean_price"),
+            pl.when(pl.col("block_w_ppsf") - pl.col("own_w_ppsf") > 0)
+            .then(
+                (pl.col("block_wppsf") - pl.col("own_wppsf"))
+                / (pl.col("block_w_ppsf") - pl.col("own_w_ppsf"))
+            )
+            .alias("mkt_block_roll_ppsf"),
             (pl.col("block_n") - pl.col("own_n")).alias("mkt_block_roll_n"),
         )
-        .drop("block_w", "block_wp", "block_n", "own_w", "own_wp", "own_n")
+        .drop(
+            "block_w", "block_wp", "block_wppsf", "block_w_ppsf", "block_n",
+            "own_w", "own_wp", "own_wppsf", "own_w_ppsf", "own_n",
+        )
         .join(prior_sales, on="parcel_id", how="left")
+        .join(knn, on="parcel_id", how="left")
         .join(permit_events, on="parcel_id", how="left")
         .join(violation_events, on="parcel_id", how="left")
         .rename({**_CHAR_RENAMES, **_LOC_RENAMES})
-        .rename({"category_code_description": "char_category"})
+        .rename(
+            {
+                "category_code_description": "char_category",
+                "ma_med_adj_log_ppsf": "mkt_area_level_log_ppsf",
+            }
+        )
         .with_columns(
+            style_expr(),
+            era_expr(),
             pl.col("mkt_block_roll_n").fill_null(0),
+            pl.col("mkt_knn_n").fill_null(0),
             pl.col("mkt_parcel_n_prior_sales").fill_null(0),
             pl.col("evt_n_permits_5y_before").fill_null(0),
             pl.col("evt_n_violations_5y_before").fill_null(0),

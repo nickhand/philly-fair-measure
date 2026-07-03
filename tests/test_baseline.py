@@ -7,7 +7,7 @@ import pytest
 
 from philly_assessments.ingest.derived import write_derived_table
 from philly_assessments.ingest.manifests import InputRef
-from philly_assessments.models.baseline import FEATURES, train_baseline
+from philly_assessments.models.baseline import feature_lists, train_baseline
 from philly_assessments.models.metrics import fit_metrics, ratio_metrics
 
 
@@ -40,15 +40,18 @@ def _synthetic_mart(n=800, seed=42):
     block_roll = price * np.exp(rng.normal(0, 0.08, n))
     asmt = price * rng.uniform(0.75, 1.15, n)
 
+    numeric, categorical = feature_lists(time_adjusted=False)
     rows = []
     for i in range(n):
-        row = dict.fromkeys(FEATURES, 0.0)
+        row = dict.fromkeys(numeric, 0.0)
+        row.update(dict.fromkeys(categorical, "x"))
         row.update(
             {
                 "sale_id": f"s{i}",
                 "parcel_id": f"p{i}",
                 "sale_date": start + timedelta(days=3 * i),
                 "sale_price": float(price[i]),
+                "time_adj_log": 0.0,
                 "asmt_market_value_sale_year": float(asmt[i]),
                 "char_livable_area": float(area[i]),
                 "char_lot_area": float(area[i] * 0.8),
@@ -56,13 +59,20 @@ def _synthetic_mart(n=800, seed=42):
                 "char_baths": 1.0,
                 "char_year_built": 1925.0,
                 "mkt_block_roll_mean_price": float(block_roll[i]),
+                "mkt_block_roll_ppsf": float(block_roll[i] / area[i]),
                 "mkt_block_roll_n": 5.0,
+                "mkt_knn_log_ppsf": float(np.log(150.0 * zip_factor[i])),
+                "mkt_knn_n": 10.0,
+                "mkt_knn_mean_dist_m": 80.0,
+                "mkt_area_level_log_ppsf": float(np.log(zip_factor[i])),
                 "loc_lon": -75.15,
                 "loc_lat": 39.95,
                 "time_quarter": float(((start + timedelta(days=3 * i)).month - 1) // 3 + 1),
                 "time_month": float((start + timedelta(days=3 * i)).month),
                 "char_category": "SINGLE FAMILY",
-                "char_building_type": "ROW",
+                "char_building_type": "ROW TYPICAL",
+                "char_style": "row",
+                "char_era": "1920s_30s",
                 "char_exterior_condition": "4",
                 "char_interior_condition": "4",
                 "char_quality_grade_raw": "C",
@@ -75,6 +85,8 @@ def _synthetic_mart(n=800, seed=42):
                 "loc_zip5": str(zips[i]),
                 "loc_ward": "05",
                 "loc_census_tract_raw": "001",
+                "loc_market_area": f"ma_{zips[i]}",
+                "loc_district": "d_00",
             }
         )
         row.pop("time_sale_epoch_days")  # derived inside the trainer
@@ -118,3 +130,19 @@ def test_train_baseline_end_to_end(tmp_path):
     assert predictions.height == 120
     # out-of-time split: every test sale is later than the training cutoff implies
     assert predictions["sale_date"].min() > datetime(2021, 6, 1)
+
+    # both ratio-study conventions and style segments are reported
+    evaluation = result.evaluation
+    conventions = set(evaluation["convention"].unique().to_list())
+    assert conventions == {"out_of_time", "time_adjusted"}
+    assert "style" in evaluation["segment_type"].unique().to_list()
+
+    # scoring from the persisted run reproduces training-time predictions
+    from philly_assessments.models.scoring import score_lightgbm
+
+    frame_scored = _synthetic_mart().tail(120).with_columns(
+        (pl.col("sale_date") - pl.datetime(1997, 1, 1)).dt.total_days()
+        .alias("time_sale_epoch_days")
+    )
+    scored = score_lightgbm(result.run_dir, frame_scored)
+    np.testing.assert_allclose(scored, predictions["pred_lightgbm"].to_numpy(), rtol=1e-6)

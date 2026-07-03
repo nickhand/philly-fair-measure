@@ -1,5 +1,5 @@
-"""Baseline valuation models (Milestone 6): LightGBM plus a Ridge benchmark,
-evaluated against sale prices and against OPA's own assessments.
+"""Baseline valuation models (Milestone 6 + plan v2): LightGBM plus a Ridge
+benchmark, evaluated against sale prices and against OPA's own assessments.
 
 Design decisions:
 
@@ -7,19 +7,25 @@ Design decisions:
   baseline is an independent estimate to compare *against* OPA; a model that
   can see the assessment would trivially copy it and the comparison would be
   circular. They are used only as the incumbent benchmark on the test set.
+- **Time-adjusted training (default, OPA practice):** the target is
+  log(price) + time_adj_log — the sale expressed in reference-month dollars
+  via the district price index — and time features are dropped. Predictions
+  are moved back to the sale date with the same adjustment before evaluation,
+  so metrics remain comparable with the v1 raw-time design
+  (`time_adjusted=False`).
 - **Out-of-time split** (CCAO practice): the most recent `test_fraction` of
   sales by date is the test set; the most recent slice of the remainder is the
   early-stopping validation set.
-- The OPA comparison slightly favors the model on market timing: the model
-  sees sale-date features, while an assessment for year Y was certified before
-  Y began. Interpret the gap accordingly — it is still the practically relevant
-  benchmark ("which number is closer to what the property actually sold for").
-- Residential scope: SINGLE FAMILY + MULTI FAMILY (Philly has no separate
-  condominium category in `category_code_description`).
+- Evaluation reports two conventions: `out_of_time` (estimate at sale date vs
+  actual price — our headline) and `time_adjusted` (estimate vs time-adjusted
+  price, the IAAO/Keene ratio-study convention, overall only). Segments cover
+  category, price quintile, and parsed style (singles/twins/rows analog).
+- Residential scope: SINGLE FAMILY + MULTI FAMILY.
 
-Every run writes to data/models/run_id=<stamp>-baseline/: model, params,
-categorical encodings, predictions, feature importance, evaluation table, and
-a provenance manifest — the CCAO run_id discipline.
+Every run writes to data/models/run_id=<stamp>-baseline/: model, params
+(including exact feature lists, so scoring is run-portable), categorical
+encodings, predictions, feature importance, evaluation table, and a
+provenance manifest.
 """
 
 from __future__ import annotations
@@ -60,7 +66,12 @@ NUMERIC_FEATURES = [
     "char_garage_spaces",
     "char_fireplaces",
     "mkt_block_roll_mean_price",
+    "mkt_block_roll_ppsf",
     "mkt_block_roll_n",
+    "mkt_knn_log_ppsf",
+    "mkt_knn_n",
+    "mkt_knn_mean_dist_m",
+    "mkt_area_level_log_ppsf",
     "mkt_parcel_n_prior_sales",
     "mkt_parcel_days_since_prev",
     "mkt_parcel_prev_price",
@@ -70,13 +81,13 @@ NUMERIC_FEATURES = [
     "evt_n_open_violations_at_sale",
     "loc_lon",
     "loc_lat",
-    "time_sale_epoch_days",
-    "time_quarter",
-    "time_month",
 ]
+TIME_FEATURES = ["time_sale_epoch_days", "time_quarter", "time_month"]
 CATEGORICAL_FEATURES = [
     "char_category",
     "char_building_type",
+    "char_style",
+    "char_era",
     "char_exterior_condition",
     "char_interior_condition",
     "char_quality_grade_raw",
@@ -89,8 +100,10 @@ CATEGORICAL_FEATURES = [
     "loc_zip5",
     "loc_ward",
     "loc_census_tract_raw",
+    "loc_market_area",
+    "loc_district",
 ]
-FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
+STYLE_SEGMENTS = ("row", "twin", "detached")
 
 DEFAULT_LGB_PARAMS = {
     "objective": "regression",
@@ -107,21 +120,25 @@ DEFAULT_LGB_PARAMS = {
     "seed": 42,
 }
 
-# Ridge benchmark: a deliberately simple hedonic spec
-RIDGE_NUMERIC = [
+RIDGE_NUMERIC_BASE = [
     "char_livable_area",
     "char_lot_area",
     "char_beds",
     "char_baths",
     "char_year_built",
     "mkt_block_roll_mean_price",
-    "time_sale_epoch_days",
+    "mkt_knn_log_ppsf",
 ]
 RIDGE_ONEHOT = ["char_category", "loc_zip5"]
 
 
+def feature_lists(time_adjusted: bool) -> tuple[list[str], list[str]]:
+    numeric = list(NUMERIC_FEATURES) + ([] if time_adjusted else list(TIME_FEATURES))
+    return numeric, list(CATEGORICAL_FEATURES)
+
+
 def _load_frame(mart_path: Path) -> pl.DataFrame:
-    return (
+    frame = (
         pl.read_parquet(mart_path)
         .filter(pl.col("char_category").is_in(RESIDENTIAL_CATEGORIES))
         .with_columns(
@@ -131,34 +148,42 @@ def _load_frame(mart_path: Path) -> pl.DataFrame:
         )
         .sort("sale_date", "sale_id")
     )
+    if "time_adj_log" not in frame.columns:
+        frame = frame.with_columns(pl.lit(0.0).alias("time_adj_log"))
+    return frame
 
 
-def _fit_category_mappings(df: pl.DataFrame) -> dict[str, dict[str, int]]:
+def _fit_category_mappings(df: pl.DataFrame, categorical: list[str]) -> dict[str, dict[str, int]]:
     mappings = {}
-    for column in CATEGORICAL_FEATURES:
+    for column in categorical:
         values = df[column].cast(pl.String).drop_nulls().unique().sort().to_list()
         mappings[column] = {value: code for code, value in enumerate(values)}
     return mappings
 
 
-def _encode(df: pl.DataFrame, mappings: dict[str, dict[str, int]]) -> np.ndarray:
-    exprs = [pl.col(c).cast(pl.Float64) for c in NUMERIC_FEATURES]
+def _encode(
+    df: pl.DataFrame,
+    mappings: dict[str, dict[str, int]],
+    numeric: list[str],
+    categorical: list[str],
+) -> np.ndarray:
+    exprs = [pl.col(c).cast(pl.Float64) for c in numeric]
     exprs += [
         pl.col(c).cast(pl.String).replace_strict(mappings[c], default=None).cast(pl.Float64)
-        for c in CATEGORICAL_FEATURES
+        for c in categorical
     ]
     return df.select(exprs).to_numpy()
 
 
-def _train_ridge(train_df: pl.DataFrame, y_train: np.ndarray):
+def _train_ridge(train_df: pl.DataFrame, y_train: np.ndarray, ridge_numeric: list[str]):
     from sklearn.compose import ColumnTransformer
     from sklearn.impute import SimpleImputer
     from sklearn.linear_model import Ridge
     from sklearn.pipeline import Pipeline
     from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-    numeric_ix = list(range(len(RIDGE_NUMERIC)))
-    onehot_ix = list(range(len(RIDGE_NUMERIC), len(RIDGE_NUMERIC) + len(RIDGE_ONEHOT)))
+    numeric_ix = list(range(len(ridge_numeric)))
+    onehot_ix = list(range(len(ridge_numeric), len(ridge_numeric) + len(RIDGE_ONEHOT)))
     pipeline = Pipeline(
         [
             (
@@ -189,7 +214,7 @@ def _train_ridge(train_df: pl.DataFrame, y_train: np.ndarray):
 
     def matrix(df: pl.DataFrame) -> np.ndarray:
         return df.select(
-            *[pl.col(c).cast(pl.Float64) for c in RIDGE_NUMERIC],
+            *[pl.col(c).cast(pl.Float64) for c in ridge_numeric],
             *[pl.col(c).cast(pl.String).fill_null("__missing__") for c in RIDGE_ONEHOT],
         ).to_numpy()
 
@@ -202,6 +227,9 @@ def _segments(test_df: pl.DataFrame) -> list[tuple[str, str, pl.Series]]:
     out = [("overall", "overall", pl.Series([True] * test_df.height))]
     for category in RESIDENTIAL_CATEGORIES:
         out.append(("category", category, test_df["char_category"] == category))
+    if "char_style" in test_df.columns:
+        for style in STYLE_SEGMENTS:
+            out.append(("style", style, test_df["char_style"] == style))
     edges = np.quantile(test_df["sale_price"].to_numpy(), [0.2, 0.4, 0.6, 0.8])
     quintile = np.digitize(test_df["sale_price"].to_numpy(), edges) + 1
     for q in range(1, 6):
@@ -222,6 +250,7 @@ def train_baseline(
     *,
     test_fraction: float = 0.1,
     validation_fraction: float = 0.1,
+    time_adjusted: bool = True,
     lgb_params: dict | None = None,
     num_boost_round: int = 5000,
     early_stopping_rounds: int = 100,
@@ -232,27 +261,38 @@ def train_baseline(
         raise FileNotFoundError(f"{mart_path} missing; run `philly build-features` first")
 
     df = _load_frame(mart_path)
+    numeric, categorical = feature_lists(time_adjusted)
+    features = numeric + categorical
+
     n_test = max(1, int(df.height * test_fraction))
     train_df, test_df = df.head(df.height - n_test), df.tail(n_test)
     n_val = max(1, int(train_df.height * validation_fraction))
     fit_df, val_df = train_df.head(train_df.height - n_val), train_df.tail(n_val)
     logger.info(
-        "residential sales: %s train / %s val / %s test (test from %s)",
+        "residential sales: %s train / %s val / %s test (test from %s, time_adjusted=%s)",
         f"{fit_df.height:,}",
         f"{val_df.height:,}",
         f"{test_df.height:,}",
         test_df["sale_date"].min(),
+        time_adjusted,
     )
 
-    mappings = _fit_category_mappings(fit_df)
-    y = {name: np.log(frame["sale_price"].to_numpy()) for name, frame in
+    mappings = _fit_category_mappings(fit_df, categorical)
+
+    def target(frame: pl.DataFrame) -> np.ndarray:
+        y = np.log(frame["sale_price"].to_numpy())
+        if time_adjusted:
+            y = y + frame["time_adj_log"].to_numpy()
+        return y
+
+    y = {name: target(frame) for name, frame in
          (("fit", fit_df), ("val", val_df), ("test", test_df))}
-    x = {name: _encode(frame, mappings) for name, frame in
+    x = {name: _encode(frame, mappings, numeric, categorical) for name, frame in
          (("fit", fit_df), ("val", val_df), ("test", test_df))}
 
     params = {**DEFAULT_LGB_PARAMS, **(lgb_params or {})}
     train_set = lgb.Dataset(
-        x["fit"], label=y["fit"], feature_name=FEATURES, categorical_feature=CATEGORICAL_FEATURES
+        x["fit"], label=y["fit"], feature_name=features, categorical_feature=categorical
     )
     val_set = train_set.create_valid(x["val"], label=y["val"])
     booster = lgb.train(
@@ -262,10 +302,15 @@ def train_baseline(
         valid_sets=[val_set],
         callbacks=[lgb.early_stopping(early_stopping_rounds, verbose=False)],
     )
-    pred_lgb = np.exp(booster.predict(x["test"], num_iteration=booster.best_iteration))
 
-    ridge, ridge_matrix = _train_ridge(fit_df, y["fit"])
-    pred_ridge = np.exp(ridge.predict(ridge_matrix(test_df)))
+    test_adj = test_df["time_adj_log"].to_numpy() if time_adjusted else np.zeros(test_df.height)
+    pred_lgb_ref = booster.predict(x["test"], num_iteration=booster.best_iteration)
+    pred_lgb = np.exp(pred_lgb_ref - test_adj)
+
+    ridge_numeric = RIDGE_NUMERIC_BASE + ([] if time_adjusted else ["time_sale_epoch_days"])
+    ridge, ridge_matrix = _train_ridge(fit_df, y["fit"], ridge_numeric)
+    pred_ridge_ref = ridge.predict(ridge_matrix(test_df))
+    pred_ridge = np.exp(pred_ridge_ref - test_adj)
 
     sale_price = test_df["sale_price"].to_numpy()
     opa_value = test_df["asmt_market_value_sale_year"].to_numpy()
@@ -278,15 +323,35 @@ def train_baseline(
             rows.append(
                 {
                     "model": model,
+                    "convention": "out_of_time",
                     "segment_type": segment_type,
                     "segment": segment,
                     **evaluate_estimates(estimate[m], sale_price[m]),
                 }
             )
+    # IAAO/Keene convention: estimates vs time-adjusted sale prices, overall only
+    price_tasp = sale_price * np.exp(test_adj)
+    tasp_estimates = {
+        "lightgbm": np.exp(pred_lgb_ref),
+        "ridge": np.exp(pred_ridge_ref),
+        "opa_assessment": opa_value,
+    }
+    for model, estimate in tasp_estimates.items():
+        rows.append(
+            {
+                "model": model,
+                "convention": "time_adjusted",
+                "segment_type": "overall",
+                "segment": "overall",
+                **evaluate_estimates(estimate, price_tasp),
+            }
+        )
     evaluation = pl.DataFrame(rows)
     overall = {
         row["model"]: row
-        for row in evaluation.filter(pl.col("segment_type") == "overall").to_dicts()
+        for row in evaluation.filter(
+            (pl.col("segment_type") == "overall") & (pl.col("convention") == "out_of_time")
+        ).to_dicts()
     }
 
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-baseline"
@@ -301,8 +366,10 @@ def train_baseline(
                 "num_boost_round": num_boost_round,
                 "test_fraction": test_fraction,
                 "validation_fraction": validation_fraction,
-                "features": FEATURES,
-                "categorical_features": CATEGORICAL_FEATURES,
+                "time_adjusted": time_adjusted,
+                "features": features,
+                "numeric_features": numeric,
+                "categorical_features": categorical,
                 "residential_categories": list(RESIDENTIAL_CATEGORIES),
                 "test_start_date": str(test_df["sale_date"].min()),
             },
@@ -314,7 +381,7 @@ def train_baseline(
     evaluation.write_parquet(run_dir / "evaluation.parquet")
     pl.DataFrame(
         {
-            "feature": FEATURES,
+            "feature": features,
             "gain": booster.feature_importance(importance_type="gain"),
             "splits": booster.feature_importance(importance_type="split"),
         }

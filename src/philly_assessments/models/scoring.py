@@ -25,12 +25,24 @@ def latest_run_dir(kind: str, data_dir: Path | None = None) -> Path:
     return runs[-1]
 
 
+def run_params(run_dir: Path) -> dict:
+    return json.loads((run_dir / "params.json").read_text())
+
+
 def score_lightgbm(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
+    """Price estimates from a persisted run, using the run's own feature lists.
+
+    If the run was trained on time-adjusted prices, the returned estimates are
+    at the index reference month; the caller moves them to a date by
+    multiplying with exp(-time_adj_log(date)).
+    """
     import lightgbm as lgb
 
     booster = lgb.Booster(model_file=str(run_dir / "model_lightgbm.txt"))
     mappings = json.loads((run_dir / "categorical_mappings.json").read_text())
-    return np.exp(booster.predict(_encode(df, mappings)))
+    params = run_params(run_dir)
+    x = _encode(df, mappings, params["numeric_features"], params["categorical_features"])
+    return np.exp(booster.predict(x))
 
 
 def lightgbm_median_ratio(run_dir: Path) -> float:

@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
 import polars as pl
 
 from philly_assessments import config
@@ -36,6 +37,7 @@ from philly_assessments.ingest.manifests import DerivedManifest, InputRef, read_
 from philly_assessments.models.scoring import (
     latest_run_dir,
     lightgbm_median_ratio,
+    run_params,
     score_bayesian_intervals,
     score_lightgbm,
 )
@@ -103,6 +105,8 @@ def build_assessment_screen(
         "sales": root / "marts" / "sale_validity.parquet",
         "permits": root / "staged" / "permits.parquet",
         "violations": root / "staged" / "violations.parquet",
+        "market_areas": root / "marts" / "market_areas.parquet",
+        "price_index": root / "marts" / "price_index.parquet",
     }
     for path in paths.values():
         if not path.exists():
@@ -114,12 +118,17 @@ def build_assessment_screen(
         pl.scan_parquet(paths["permits"]),
         pl.scan_parquet(paths["violations"]),
         valuation_date,
+        pl.scan_parquet(paths["market_areas"]),
+        pl.read_parquet(paths["price_index"]),
     )
     logger.info("scoring %s residential properties", f"{features.height:,}")
 
     baseline_run = latest_run_dir("baseline", data_dir)
     bayesian_run = latest_run_dir("bayesian", data_dir)
     pred_lgb = score_lightgbm(baseline_run, features)
+    if run_params(baseline_run).get("time_adjusted"):
+        # ref-month estimates -> valuation-date estimates
+        pred_lgb = pred_lgb * np.exp(-features["time_adj_log"].to_numpy())
     calibration = lightgbm_median_ratio(baseline_run)
     median, lo, hi = score_bayesian_intervals(bayesian_run, features, chunk_size=chunk_size)
 
