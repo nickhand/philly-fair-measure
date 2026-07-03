@@ -63,11 +63,15 @@ def sale_points(sales: pl.LazyFrame, opa: pl.LazyFrame) -> pl.DataFrame:
         "lonlat_status",
         pl.col("total_livable_area").alias("livable_area"),
     )
+    from philly_assessments.config import CONDO_ACCOUNT_PREFIX
+
     points = (
         sales.filter(
             (pl.col("validity_status") == "arms_length")
             & pl.col("sale_date").is_not_null()
             & (pl.col("sale_price") > 0)
+            # condo units carry building-scale areas: poison for $/sqft signals
+            & ~pl.col("parcel_id").str.starts_with(CONDO_ACCOUNT_PREFIX)
         )
         .select("sale_id", "parcel_id", "sale_date", "sale_price")
         .join(geo, on="parcel_id", how="inner")

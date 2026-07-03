@@ -176,6 +176,19 @@ def test_event_features_do_not_leak_the_future():
     assert row["evt_n_open_violations_at_sale"] == 1
 
 
+def test_condo_accounts_excluded_from_scope_and_pools():
+    # an 88-prefix (condo) sale on the block must neither appear in the output
+    # nor feed the block rolling average of its neighbors
+    sales = [
+        _sale("condo", "880001111", 500_000.0, datetime(2020, 1, 1)),
+        _sale("house", "p1", 300_000.0, datetime(2021, 1, 1)),
+    ]
+    opa = [_opa("880001111", house_number=101), _opa("p1", house_number=103)]
+    by_id = _assemble(sales, opa)
+    assert "condo" not in by_id
+    assert by_id["house"]["mkt_block_roll_n"] == 0
+
+
 def test_distress_features_severity_demo_delinquency():
     from philly_assessments.features.sale_features import assemble_sale_features
 

@@ -328,6 +328,7 @@ def assemble_sale_features(
     index every `time_adj_log` is 0.0; without market areas the loc_market_area
     columns are null.
     """
+    from philly_assessments.config import CONDO_ACCOUNT_PREFIX
     from philly_assessments.features.price_index import with_time_adjustment
 
     pool = (
@@ -335,6 +336,10 @@ def assemble_sale_features(
             (pl.col("validity_status") == "arms_length")
             & pl.col("sale_date").is_not_null()
             & (pl.col("sale_price") > 0)
+            # 88-prefix = condo units: excluded from the residential scope AND
+            # from the market-signal pools (their building-scale areas corrupt
+            # $/sqft rolls and the kNN surface)
+            & ~pl.col("parcel_id").str.starts_with(CONDO_ACCOUNT_PREFIX)
         )
         .select(
             "sale_id",

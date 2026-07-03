@@ -143,6 +143,19 @@ def build_assessment_screen(
 
     baseline_run = latest_run_dir("baseline", data_dir)
     bayesian_run = latest_run_dir("bayesian", data_dir)
+    # models trained on an older feature mart are incoherent with fresh
+    # features (e.g. relearned market-area labels shift under the model)
+    mart_built = read_derived_manifest(root / "marts" / "sale_features.parquet").built_at
+    for run_dir in (baseline_run, bayesian_run):
+        run_manifest = read_derived_manifest(run_dir / "run.parquet")
+        if run_manifest.built_at < mart_built:
+            logger.warning(
+                "%s predates the current sale_features mart (%s < %s): retrain before "
+                "trusting this screen",
+                run_dir.name,
+                run_manifest.built_at,
+                mart_built,
+            )
     pred_lgb = score_lightgbm(baseline_run, features)
     if run_params(baseline_run).get("time_adjusted"):
         # ref-month estimates -> valuation-date estimates

@@ -73,8 +73,15 @@ def assemble_assessment_features(
     demolitions: pl.LazyFrame | None = None,
     delinquencies: pl.LazyFrame | None = None,
 ) -> pl.DataFrame:
+    from philly_assessments.config import CONDO_ACCOUNT_PREFIX
+
     base = (
-        opa.filter(pl.col("category_code_description").is_in(RESIDENTIAL_CATEGORIES))
+        opa.filter(
+            pl.col("category_code_description").is_in(RESIDENTIAL_CATEGORIES)
+            # condos (88-prefix) are out of residential scope; they need a
+            # dedicated model (docs/ccao-lessons.md condo playbook)
+            & ~pl.col("parcel_number").str.starts_with(CONDO_ACCOUNT_PREFIX)
+        )
         .select(
             pl.col("parcel_number").alias("parcel_id"),
             pl.col("location").alias("address"),

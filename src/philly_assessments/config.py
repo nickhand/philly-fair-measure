@@ -7,6 +7,13 @@ from pathlib import Path
 
 DEFAULT_DATA_DIR = Path("data")
 
+# OPA accounts beginning with 88 are condominium units (and related condo
+# parcels: parking, storage, common elements). They carry building-scale or
+# token characteristics under residential category codes, so they are excluded
+# from the residential model scope and market-signal pools; condos need a
+# dedicated model (see the CCAO condo playbook in docs/ccao-lessons.md).
+CONDO_ACCOUNT_PREFIX = "88"
+
 # The recurring snapshot set: every table here is captured by `philly snapshot-all`.
 # Page sizes reflect row width (verified in docs/source_inventory.md).
 CORE_CARTO_TABLES: dict[str, int] = {

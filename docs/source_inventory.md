@@ -42,7 +42,14 @@ so bulk geometry pulls need `resultOffset` paging or envelope tiling.
   (`sale_date`, `sale_price`, `recording_date`, `book_and_page`), owner/mailing
   fields, `census_tract`, point geometry.
 - **Keys:** `parcel_number` (9-digit OPA/BRT account, string — preserve leading
-  zeros); `pin` also present.
+  zeros); `pin` also present. **Accounts beginning `88` are condominium units
+  and related condo parcels** (user-confirmed 2026-07-03; verified: 36,459
+  carry category SINGLE FAMILY and 2,945 MULTI FAMILY with building-scale or
+  token characteristics). Condos are excluded from the residential model scope
+  and market-signal pools; they need a dedicated model. Category note:
+  `MULTI FAMILY` means 2–4-unit duplexed rowhomes/twins (verified from
+  building codes); large apartments are the separate `APARTMENTS > 4 UNITS`
+  category.
 - **Relevance:** The central table: current characteristics + current assessment.
 - **Limitations:** **Current-state only** — characteristics reflect the latest
   known values, not values as of past sale dates (the project's core temporal
