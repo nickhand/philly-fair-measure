@@ -42,6 +42,7 @@ from philly_assessments.features.sale_features import (
     era_expr,
     join_delinquencies,
     join_parcel_shapes,
+    join_proximity,
     style_expr,
 )
 from philly_assessments.features.spatial import knn_ppsf_at_date
@@ -72,6 +73,7 @@ def assemble_assessment_features(
     parcels: pl.LazyFrame | None = None,
     demolitions: pl.LazyFrame | None = None,
     delinquencies: pl.LazyFrame | None = None,
+    proximity: pl.LazyFrame | None = None,
 ) -> pl.DataFrame:
     from philly_assessments.config import CONDO_ACCOUNT_PREFIX
 
@@ -364,4 +366,5 @@ def assemble_assessment_features(
         .drop("house_number_parsed", strict=False)
     )
     features = join_parcel_shapes(features, parcels)
-    return join_delinquencies(features, delinquencies)
+    features = join_delinquencies(features, delinquencies)
+    return join_proximity(features, proximity)

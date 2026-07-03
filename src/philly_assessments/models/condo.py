@@ -54,6 +54,9 @@ CONDO_NUMERIC = [
     "mkt_knn_n",
     "mkt_knn_mean_dist_m",
     "mkt_area_level_log_ppsf",
+    "prox_dist_rapid_transit_m",
+    "prox_dist_regional_rail_m",
+    "prox_dist_park_m",
     "loc_lon",
     "loc_lat",
 ]

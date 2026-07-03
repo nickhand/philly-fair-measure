@@ -62,6 +62,7 @@ uv run philly stage
 uv run philly validate-sales
 uv run philly build-market-areas   # optional; relabels geography — forces retrains
 uv run philly build-price-index
+uv run philly build-proximity      # after refreshing SEPTA/parks/centerline snapshots
 uv run philly build-features
 uv run philly build-condo-features
 uv run philly train-baseline

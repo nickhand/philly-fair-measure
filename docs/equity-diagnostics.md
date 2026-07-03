@@ -90,6 +90,22 @@ ratios above 1.2 in the Controller era). The equity problem is not that OPA
 can't assess accurately; it's that its accuracy is distributed along lines
 that track wealth and race.
 
+## What would the banned features buy? Nothing (measured 2026-07-03)
+
+`philly acs-sensitivity` retrains the residential LightGBM with tract ACS
+aggregates (racial shares, median income, poverty rate) as features, on the
+identical split/params/seed — a diagnostic only; the augmented model is never
+persisted or used. Result: ACS features carry **1.15% of total gain**;
+overall RMSE(log) 0.3402 → 0.3410 (a hair *worse*), COD unchanged
+(26.286 → 26.284), q1 unimproved, and no majority-race group's ratio or COD
+moves by more than noise (Black-tract COD 32.8 → 32.9, White-tract
+17.60 → 17.56). The learned spatial machinery (kNN sale surface, market
+areas, block rolls) already subsumes whatever tract demographics would
+proxy. **The legal ban on people-data costs nothing** — accuracy and legal
+parity are not in tension here, which strengthens the civic version of this
+argument: there is no accuracy excuse for demographic-correlated assessment
+error. (Artifact: `data/diagnostics/acs_sensitivity.parquet`.)
+
 ## Caveats
 
 - Ecological, tract-level; ACS 2022 composition; the city layer's own

@@ -174,13 +174,29 @@ Bayesian model.
 - **FEMA flood zones** — CCAO: ~zero contribution once coordinates + flood-risk
   scores exist; we skip flood entirely for now.
 - **School ratings** — CCAO dropped them in 2025.
-- **ACS tract aggregates** — planned, not yet built (needs the Census API
-  fetcher); will be tested with/without given AGENTS.md's proxy caution, and
-  fairness diagnostics stay separate from the valuation target.
-- **Proximity distances** (transit/parks/water/roads) — planned; needs the
-  ArcGIS/GTFS fetchers.
-- **Parcel-shape metrics** — planned; needs PWD/DOR parcel polygon ingestion.
+- **ACS tract aggregates** — measured, excluded (2026-07-03): the
+  `philly acs-sensitivity` diagnostic retrain shows tract demographics carry
+  1.15% of gain and move NO metric (overall, q1, or any majority-race group)
+  beyond noise — the learned spatial machinery subsumes them. The legal ban
+  costs nothing; demographics remain diagnostics-only by design AND by
+  measurement (docs/equity-diagnostics.md).
 - **Imagery** — later-stage per the project brief.
+
+## Proximity (`prox_`/`loc_street_class`, 2026-07-03 — the last OPA-parity family)
+
+`philly build-proximity` → `marts/proximity.parquet` (quasi-static,
+per-parcel; joined into all three feature builds). Sources live-verified:
+SEPTA's ArcGIS org (BSL 24 + MFL 28 rapid-transit stations, 155 regional-rail
+stations), city PPR_Properties (506 park polygons), city Street_Centerline
+(41,271 segments; `st_code` joins OPA street_code 100%). Features: distance
+to nearest rapid-transit station / regional-rail station / park boundary
+(0 inside) / expressway (class 1, a disamenity) / arterial (class 2-3), plus
+`loc_street_class` (modal class of the parcel's own street, categorical).
+Median parcel: 1.4km to rapid transit, 231m to a park, 107m to an arterial.
+**Honest result: 0.68% of model gain, COD 26.29 → 26.18, condo a wash** —
+same verdict as parcel shapes: the kNN sale surface + market areas already
+price location; kept because cheap, interpretable, and closing OPA variable
+parity.
 
 ## Provenance
 

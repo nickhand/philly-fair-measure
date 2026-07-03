@@ -181,6 +181,14 @@ def _cmd_build_price_index(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_build_proximity(args: argparse.Namespace) -> int:
+    from philly_assessments.features.proximity import build_proximity
+
+    result = build_proximity(args.data_dir)
+    print(f"{result.manifest.row_count:,} rows -> {result.path}")
+    return 0
+
+
 def _cmd_screen_assessments(args: argparse.Namespace) -> int:
     from philly_assessments.validation.opa import build_assessment_screen
 
@@ -490,6 +498,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     price_index.add_argument("--data-dir", type=Path)
     price_index.set_defaults(func=_cmd_build_price_index)
+
+    proximity = subparsers.add_parser(
+        "build-proximity",
+        help="per-parcel SEPTA/park/road-class proximity features (quasi-static mart)",
+    )
+    proximity.add_argument("--data-dir", type=Path)
+    proximity.set_defaults(func=_cmd_build_proximity)
 
     screen = subparsers.add_parser(
         "screen-assessments",

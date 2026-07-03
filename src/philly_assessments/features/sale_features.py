@@ -132,6 +132,20 @@ def join_delinquencies(frame: pl.DataFrame, delinquencies: pl.LazyFrame | None) 
     )
 
 
+def join_proximity(frame: pl.DataFrame, proximity: pl.LazyFrame | None) -> pl.DataFrame:
+    """Quasi-static per-parcel proximity mart (features/proximity.py): station,
+    park, and road distances change only when infrastructure does."""
+    from philly_assessments.features.proximity import PROX_COLUMNS, STREET_CLASS_COLUMN
+
+    if proximity is None:
+        return frame.with_columns(
+            *[pl.lit(None, dtype=pl.Float64).alias(c) for c in PROX_COLUMNS],
+            pl.lit(None, dtype=pl.String).alias(STREET_CLASS_COLUMN),
+        )
+    prox = proximity.select("parcel_id", *PROX_COLUMNS, STREET_CLASS_COLUMN).collect()
+    return frame.join(prox, on="parcel_id", how="left")
+
+
 def join_parcel_shapes(frame: pl.DataFrame, parcels: pl.LazyFrame | None) -> pl.DataFrame:
     """Attach shp_* columns by OPA account; null columns when parcels are absent
     so the model feature set is stable either way."""
@@ -317,6 +331,7 @@ def assemble_sale_features(
     parcels: pl.LazyFrame | None = None,
     demolitions: pl.LazyFrame | None = None,
     delinquencies: pl.LazyFrame | None = None,
+    proximity: pl.LazyFrame | None = None,
     *,
     min_sale_year: int = DEFAULT_MIN_SALE_YEAR,
 ) -> pl.DataFrame:
@@ -572,6 +587,7 @@ def assemble_sale_features(
     )
     features = join_parcel_shapes(features, parcels)
     features = join_delinquencies(features, delinquencies)
+    features = join_proximity(features, proximity)
     return features.sort("sale_date", "sale_id")
 
 
@@ -609,6 +625,13 @@ def build_sale_features(
         else:
             optional[name] = None
             logger.warning("staged %s missing; its features will be null", name)
+    proximity_path = root / "marts" / "proximity.parquet"
+    if proximity_path.exists():
+        paths["proximity"] = proximity_path
+        optional["proximity"] = pl.scan_parquet(proximity_path)
+    else:
+        optional["proximity"] = None
+        logger.warning("marts/proximity.parquet missing; prox_ features will be null")
 
     frame = assemble_sale_features(
         pl.scan_parquet(paths["sale_validity"]),
@@ -621,6 +644,7 @@ def build_sale_features(
         optional["parcels"],
         optional["demolitions"],
         optional["delinquencies"],
+        optional["proximity"],
         min_sale_year=min_sale_year,
     )
     inputs = []

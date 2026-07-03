@@ -251,6 +251,7 @@ def assemble_condo_features(
     market_areas: pl.LazyFrame | None = None,
     price_index: pl.DataFrame | None = None,
     assessments: pl.LazyFrame | None = None,
+    proximity: pl.LazyFrame | None = None,
     *,
     min_sale_year: int = DEFAULT_MIN_SALE_YEAR,
 ) -> pl.DataFrame:
@@ -366,6 +367,9 @@ def assemble_condo_features(
         )
         .drop("street_code", "house_number_parsed", "lonlat_status", "_bldg_area", strict=False)
     )
+    from philly_assessments.features.sale_features import join_proximity
+
+    features = join_proximity(features, proximity)
     return features.sort("sale_date", "sale_id")
 
 
@@ -375,6 +379,7 @@ def assemble_condo_assessment_features(
     valuation_date,
     market_areas: pl.LazyFrame | None = None,
     price_index: pl.DataFrame | None = None,
+    proximity: pl.LazyFrame | None = None,
 ) -> pl.DataFrame:
     """Feature table for EVERY residential condo unit at a valuation date.
 
@@ -492,7 +497,7 @@ def assemble_condo_assessment_features(
     )
     knn = knn_ppsf_at_date(knn_points, knn_targets, valuation_date)
 
-    return (
+    out = (
         units.join(bldg_totals, on="building_id", how="left")
         .join(own_totals, on=["building_id", "parcel_id"], how="left")
         .with_columns(
@@ -540,6 +545,9 @@ def assemble_condo_assessment_features(
         )
         .drop("street_code", "house_number_parsed", "lonlat_status", "_bldg_area", strict=False)
     )
+    from philly_assessments.features.sale_features import join_proximity
+
+    return join_proximity(out, proximity)
 
 
 @dataclass(frozen=True)
@@ -562,12 +570,20 @@ def build_condo_features(
     for path in paths.values():
         if not path.exists():
             raise FileNotFoundError(f"{path} missing; run the pipeline first")
+    proximity_path = root / "marts" / "proximity.parquet"
+    proximity = None
+    if proximity_path.exists():
+        paths["proximity"] = proximity_path
+        proximity = pl.scan_parquet(proximity_path)
+    else:
+        logger.warning("marts/proximity.parquet missing; prox_ features will be null")
     frame = assemble_condo_features(
         pl.scan_parquet(paths["sale_validity"]),
         pl.scan_parquet(paths["opa_properties"]),
         pl.scan_parquet(paths["market_areas"]),
         pl.read_parquet(paths["price_index"]),
         pl.scan_parquet(paths["assessments"]),
+        proximity,
         min_sale_year=min_sale_year,
     )
     inputs = []

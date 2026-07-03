@@ -128,6 +128,8 @@ def build_assessment_screen(
     for name in ("parcels", "demolitions", "delinquencies"):
         path = root / "staged" / f"{name}.parquet"
         optional[name] = pl.scan_parquet(path) if path.exists() else None
+    proximity_path = root / "marts" / "proximity.parquet"
+    optional["proximity"] = pl.scan_parquet(proximity_path) if proximity_path.exists() else None
     features = assemble_assessment_features(
         pl.scan_parquet(paths["opa"]),
         pl.scan_parquet(paths["sales"]),
@@ -139,6 +141,7 @@ def build_assessment_screen(
         optional["parcels"],
         optional["demolitions"],
         optional["delinquencies"],
+        optional["proximity"],
     )
     logger.info("scoring %s residential properties", f"{features.height:,}")
     # persist the full feature frame: the comps CLI prices arbitrary parcels
@@ -284,12 +287,14 @@ def _condo_screen_frame(
                 built,
             )
 
+    proximity_path = root / "marts" / "proximity.parquet"
     features = assemble_condo_assessment_features(
         pl.scan_parquet(paths["opa"]),
         pl.scan_parquet(paths["sales"]),
         valuation_date,
         pl.scan_parquet(paths["market_areas"]),
         pl.read_parquet(paths["price_index"]),
+        pl.scan_parquet(proximity_path) if proximity_path.exists() else None,
     )
     logger.info("scoring %s residential condo units", f"{features.height:,}")
     features_path, _ = write_derived_table(

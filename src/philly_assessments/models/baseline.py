@@ -103,6 +103,12 @@ NUMERIC_FEATURES = [
     "shp_parcel_num_accounts",
     "shp_n_linked_parcels",
     "shp_linked_lot_area_m2",
+    # quasi-static proximity (features/proximity.py; the last OPA-parity family)
+    "prox_dist_rapid_transit_m",
+    "prox_dist_regional_rail_m",
+    "prox_dist_park_m",
+    "prox_dist_expressway_m",
+    "prox_dist_arterial_m",
 ]
 TIME_FEATURES = ["time_sale_epoch_days", "time_quarter", "time_month"]
 CATEGORICAL_FEATURES = [
@@ -124,6 +130,7 @@ CATEGORICAL_FEATURES = [
     "loc_census_tract_raw",
     "loc_market_area",
     "loc_district",
+    "loc_street_class",
 ]
 STYLE_SEGMENTS = ("row", "twin", "detached")
 
