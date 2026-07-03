@@ -76,6 +76,35 @@ def _cmd_build_features(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_build_condo_features(args: argparse.Namespace) -> int:
+    from philly_assessments.features.condo_features import build_condo_features
+
+    result = build_condo_features(args.data_dir)
+    print(f"{result.manifest.row_count:,} rows -> {result.path}")
+    return 0
+
+
+def _cmd_train_condo(args: argparse.Namespace) -> int:
+    from philly_assessments.models.condo import train_condo
+
+    result = train_condo(args.data_dir)
+    print(f"run {result.run_id} -> {result.run_dir}\n")
+    columns = ("n", "rmse_log", "mape", "r2_log", "median_ratio", "cod", "prd", "prb")
+    print(f"{'model':<16}" + "".join(f"{c:>13}" for c in columns))
+    for model, row in result.overall.items():
+        cells = []
+        for column in columns:
+            value = row.get(column)
+            if value is None:
+                cells.append(f"{'-':>13}")
+            elif column == "n":
+                cells.append(f"{value:>13,}")
+            else:
+                cells.append(f"{value:>13.4f}")
+        print(f"{model:<16}" + "".join(cells))
+    return 0
+
+
 def _cmd_train_baseline(args: argparse.Namespace) -> int:
     from philly_assessments.models import train_baseline
 
@@ -312,6 +341,18 @@ def main(argv: list[str] | None = None) -> int:
     build_features.add_argument("--min-sale-year", type=int, default=2016)
     build_features.add_argument("--data-dir", type=Path)
     build_features.set_defaults(func=_cmd_build_features)
+
+    condo_features = subparsers.add_parser(
+        "build-condo-features", help="build marts/condo_sale_features.parquet"
+    )
+    condo_features.add_argument("--data-dir", type=Path)
+    condo_features.set_defaults(func=_cmd_build_condo_features)
+
+    train_condo_cmd = subparsers.add_parser(
+        "train-condo", help="train the condominium model and benchmark against OPA"
+    )
+    train_condo_cmd.add_argument("--data-dir", type=Path)
+    train_condo_cmd.set_defaults(func=_cmd_train_condo)
 
     train = subparsers.add_parser(
         "train-baseline", help="train LightGBM + Ridge baselines and benchmark against OPA"

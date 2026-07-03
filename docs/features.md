@@ -68,6 +68,24 @@ here (1.9% of model gain). Kept: cheap, mildly helpful on PRD/MAPE, more
 relevant for detached segments, and the parcel-polygon snapshots enable future
 geometry-change detection regardless.
 
+## Condo model (`marts/condo_sale_features.parquet`, 2026-07-03)
+
+Separate model per CCAO practice (`philly build-condo-features` +
+`philly train-condo`). Population: 88-prefix units with livable areas ≥250
+sqft and prices ≥$25k (the public-data analog of CCAO's parking/storage
+exclusions). Building key: 30m union-find clustering of unit geocodes —
+coordinate rounding and PWD-parcel containment both fragment buildings (tried
+and measured); units are geocoded at distinct points within a building.
+**Philly reality vs Cook County:** the measured ceiling for building-roll
+coverage is ~18–26% (small conversions, few towers), so the kNN condo
+surface (90% coverage) is the workhorse and the building roll assists.
+v0 results (760-sale out-of-time test): model RMSE(log) 0.619 / R² 0.79 /
+COD 55.7 / PRD 1.06 vs OPA 0.701 / 0.74 / 56.3 / 1.20 — better on most
+metrics, but both are poor in absolute terms; condo sales are wild and thin.
+Notable: **OPA assesses condos at a median 75% of sale price** — systematic
+under-assessment of the (skewing affluent) condo stock, the mirror image of
+cheap-rowhome over-assessment.
+
 ## Market signals (`mkt_`) — informed by CCAO's condo model
 
 | Feature | Definition | Notes |
