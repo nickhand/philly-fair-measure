@@ -68,23 +68,55 @@ here (1.9% of model gain). Kept: cheap, mildly helpful on PRD/MAPE, more
 relevant for detached segments, and the parcel-polygon snapshots enable future
 geometry-change detection regardless.
 
-## Condo model (`marts/condo_sale_features.parquet`, 2026-07-03)
+## Condo model (`marts/condo_sale_features.parquet`, v1 2026-07-03)
 
 Separate model per CCAO practice (`philly build-condo-features` +
-`philly train-condo`). Population: 88-prefix units with livable areas ≥250
-sqft and prices ≥$25k (the public-data analog of CCAO's parking/storage
-exclusions). Building key: 30m union-find clustering of unit geocodes —
-coordinate rounding and PWD-parcel containment both fragment buildings (tried
-and measured); units are geocoded at distinct points within a building.
-**Philly reality vs Cook County:** the measured ceiling for building-roll
-coverage is ~18–26% (small conversions, few towers), so the kNN condo
-surface (90% coverage) is the workhorse and the building roll assists.
-v0 results (760-sale out-of-time test): model RMSE(log) 0.619 / R² 0.79 /
-COD 55.7 / PRD 1.06 vs OPA 0.701 / 0.74 / 56.3 / 1.20 — better on most
-metrics, but both are poor in absolute terms; condo sales are wild and thin.
-Notable: **OPA assesses condos at a median 75% of sale price** — systematic
-under-assessment of the (skewing affluent) condo stock, the mirror image of
-cheap-rowhome over-assessment.
+`philly train-condo`).
+
+**The v0→v1 story is a data-linkage detective story.** v0 (COD 55.7, "wild
+thin market") was trained on the wrong population: RTT leaves
+`opa_account_num` null on most condo unit deeds (0% of Academy House's 327
+resales were linked), so the 88-linked "condo" sale pool was actually 85%
+commercial parcels, whole apartment buildings, and industrial condos. Two
+fixes: (1) **condo link recovery** in staged deeds — unlinked deeds matched
+to 88 accounts on (normalized address, unit token), 100,159 rows recovered,
+precision proxy 84% with within-building near-misses; (2) **scope filters** —
+residential roll categories only, unit-scale areas 250–12,000 sqft (The Drake
+is a "MULTI FAMILY" 88 account with 677k sqft and a $233M bulk sale), ppsf
+20–5,000. Sales validation also now pools condo units separately
+(`pool_category = "CONDO UNIT"`) so tower $/sqft doesn't distort rowhome
+reference pools; and (3) the roll's own **"RES CONDO" building-code marker**
+scopes true units (unit-less "residential" 88s are whole apartment buildings,
+condo parking, and nominally-assessed common elements — screening those as
+"under-assessed" would be wrong on the merits). Result: **18,688 true condo
+unit sales 2014+ (was 747 residential-coded), building-roll coverage
+26% → ~95%** — the CCAO design assumption (units in a building price
+together) holds in Philly after all; the towers were always there, their
+sales were unlinked. Building key stays the measured 30m union-find
+clustering of unit geocodes. `char_floor` parsed from unit tokens (2204 → 22)
+adds a small gain.
+
+v1 results (2,803-sale out-of-time test): model RMSE(log) 0.279 / R² 0.82 /
+COD 22.5 / PRD 1.03 vs OPA 0.278 / 0.82 / **18.8** / 1.03 — a statistical
+tie on log-accuracy; OPA wins ratio dispersion. **Retraction:** v0's "OPA
+assesses condos at a median 75% of sale price" finding was an artifact of
+the contaminated pool (bulk building sales vs income-approach assessments).
+On true condo units OPA's median ratio is 0.91 with COD 19 — **condos are
+OPA's best-assessed segment**, far better than their rowhome COD ~33. The
+equity asymmetry is therefore *between* segments: the condo-owning
+(affluent-skewing) stock gets accurate, slightly-under assessments while
+cheap rowhomes get severely dispersed, regressive ones.
+
+**Screen integration:** `philly screen-assessments` now scores every RES
+CONDO unit (250–12,000 sqft) alongside residential — point estimate from the
+condo run, 90% interval from spatially weighted conformal offsets
+(`interval_method="conformal_knn"`; the condo model has no Bayesian arm).
+The screen mart gained `model_family` and neutral column names
+(`model_median`/`model_pi_low_90`/`model_pi_high_90`). First screen: 32,153
+condo units, 861 over- / 4,085 under-assessed candidates (median OPA/model
+0.928, matching the test-set OPA ratio); flagged leads include a 320 sqft
+unit assessed at $858k (OPA data error) and $29k assessments on 2,400 sqft
+Society Hill units.
 
 ## Market signals (`mkt_`) — informed by CCAO's condo model
 

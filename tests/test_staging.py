@@ -120,6 +120,60 @@ def test_stg_deeds_classifies_and_flags():
     assert by_id["r6"]["sale_date"] is not None
 
 
+def test_stg_deeds_recovers_condo_links_by_address_unit():
+    raw = pl.LazyFrame(
+        [
+            # unit token in the address, no rtt link -> recovered
+            _deed_row(
+                record_id="c1",
+                opa_account_num=None,
+                street_address="1420 LOCUST ST APT 33K",
+            ),
+            # rtt's own unit_num field, hyphen + leading-zero variants normalize
+            _deed_row(
+                record_id="c2",
+                opa_account_num=None,
+                street_address="1420 LOCUST ST",
+                unit_num="0-8L",
+            ),
+            # ambiguous (address, unit) on the OPA side -> NOT recovered
+            _deed_row(
+                record_id="c3",
+                opa_account_num=None,
+                street_address="200 LOCUST ST UNIT 5A",
+            ),
+            # native link untouched
+            _deed_row(record_id="c4"),
+            # no unit anywhere -> stays unlinked
+            _deed_row(record_id="c5", opa_account_num=None),
+        ]
+    )
+    raw_opa = pl.LazyFrame(
+        {
+            "parcel_number": ["888080493", "888080358", "888051001", "888051002", "123456789"],
+            "location": [
+                "1420 LOCUST ST",
+                "1420  LOCUST ST",  # double space normalizes
+                "200 LOCUST ST",
+                "200 LOCUST ST",  # duplicate (base, unit) key -> ambiguous
+                "108 ELFRETHS ALY",
+            ],
+            "unit": ["33K", "8L", "5A", "5A", None],
+        }
+    )
+    out = stg_deeds(raw, raw_opa).collect()
+    by_id = {row["record_id"]: row for row in out.to_dicts()}
+    assert by_id["c1"]["opa_account_num"] == "888080493"
+    assert by_id["c1"]["has_opa_link"] is True
+    assert by_id["c1"]["opa_link_source"] == "address_unit"
+    assert by_id["c2"]["opa_account_num"] == "888080358"
+    assert by_id["c3"]["opa_account_num"] is None
+    assert by_id["c3"]["opa_link_source"] is None
+    assert by_id["c4"]["opa_account_num"] == "123456789"
+    assert by_id["c4"]["opa_link_source"] == "rtt"
+    assert by_id["c5"]["opa_account_num"] is None
+
+
 def test_stg_opa_properties_adds_parsed_columns():
     raw = pl.LazyFrame(
         {

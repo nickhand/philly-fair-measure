@@ -114,7 +114,7 @@ def frame_residuals(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
     return y - pred_log
 
 
-def _xy_district(df: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+def xy_district(df: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     from philly_assessments.features.market_areas import project_xy
 
     xy = df.select(*project_xy(pl.col("loc_lon"), pl.col("loc_lat"))).cast(pl.Float64).to_numpy()
@@ -132,7 +132,7 @@ class CalibrationSet:
 def calibration_from_run(run_dir: Path, data_dir: Path | None = None) -> CalibrationSet:
     _, val_df, _ = split_frames(run_dir, data_dir)
     residual = frame_residuals(run_dir, val_df)
-    xy, district = _xy_district(val_df)
+    xy, district = xy_district(val_df)
     ok = np.isfinite(residual)
     if not ok.all():
         logger.info("dropping %d calibration rows with non-finite residuals", int((~ok).sum()))
@@ -258,7 +258,7 @@ def _screen_flag_agreement(
         "parcel_id", "loc_lon", "loc_lat", "loc_district"
     )
     df = screen.join(coords, on="parcel_id", how="left")
-    xy, district = _xy_district(df)
+    xy, district = xy_district(df)
     lo, hi = conformal_offsets(cal, xy, district, alpha=alpha, method="knn", k=k)
     # pred_lightgbm carries the isotonic calibration the residuals were
     # measured against (NOT the screen's extra median-ratio division)
@@ -296,12 +296,12 @@ def conformal_check(
     run_dir = latest_run_dir("baseline", data_dir)
     _, val_df, test_df = split_frames(run_dir, data_dir)
     residual = frame_residuals(run_dir, val_df)
-    xy_v, district_v = _xy_district(val_df)
+    xy_v, district_v = xy_district(val_df)
     ok = np.isfinite(residual)
     cal = CalibrationSet(residual=residual[ok], xy=xy_v[ok], district=district_v[ok])
 
     test_resid = frame_residuals(run_dir, test_df)
-    xy_t, district_t = _xy_district(test_df)
+    xy_t, district_t = xy_district(test_df)
     price = test_df["sale_price"].to_numpy()
 
     covered: dict[str, np.ndarray] = {}

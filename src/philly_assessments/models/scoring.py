@@ -51,13 +51,15 @@ def score_lightgbm(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
     return np.exp(pred_log)
 
 
-def lightgbm_median_ratio(run_dir: Path) -> float:
+def lightgbm_median_ratio(run_dir: Path, model: str = "lightgbm") -> float:
     """Out-of-time median estimate/price ratio of the run — a transparent global
-    calibration factor (the baseline undershoots recent appreciation slightly)."""
+    calibration factor (the baseline undershoots recent appreciation slightly).
+    Condo runs store their evaluation under model="condo_lightgbm"."""
     evaluation = pl.read_parquet(run_dir / "evaluation.parquet")
-    row = evaluation.filter(
-        (pl.col("model") == "lightgbm") & (pl.col("segment_type") == "overall")
-    )
+    predicate = (pl.col("model") == model) & (pl.col("segment_type") == "overall")
+    if "convention" in evaluation.columns:
+        predicate &= pl.col("convention") == "out_of_time"
+    row = evaluation.filter(predicate)
     return float(row["median_ratio"][0])
 
 

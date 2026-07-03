@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 BUILDERS: dict[str, tuple[Callable[..., pl.LazyFrame], tuple[str, ...]]] = {
     "assessments": (tables.stg_assessments, ("assessments",)),
     "opa_properties": (tables.stg_opa_properties, ("opa_properties_public",)),
-    "deeds": (tables.stg_deeds, ("rtt_summary",)),
+    "deeds": (tables.stg_deeds, ("rtt_summary", "opa_properties_public")),
     "permits": (tables.stg_permits, ("permits",)),
     "violations": (tables.stg_violations, ("violations",)),
     "parcels": (stg_parcels, ("pwd_parcels", "opa_properties_public")),

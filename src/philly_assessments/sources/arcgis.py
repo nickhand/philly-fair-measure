@@ -24,6 +24,10 @@ from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponen
 logger = logging.getLogger(__name__)
 
 PHL_ARCGIS_BASE = "https://services.arcgis.com/fLeGjb7u4uXqeF9q/ArcGIS/rest/services"
+# SEPTA's own ArcGIS org (station layers live there, not in the city org;
+# verified live 2026-07-03: Broad_Street_Line_Stations 24, Market_Frankford_
+# Line_Stations 28, Regional_Rail_Stations 155)
+SEPTA_ARCGIS_BASE = "https://services2.arcgis.com/9U43PSoL47wawX5S/ArcGIS/rest/services"
 DEFAULT_PAGE_SIZE = 2000
 KEYSET_FIELD = "objectid"
 GEOMETRY_COLUMN = "geometry_geojson"
@@ -47,6 +51,12 @@ class ArcGISError(RuntimeError):
 
 def _is_retryable(exc: BaseException) -> bool:
     if isinstance(exc, httpx.TransportError):
+        return True
+    # in-payload REST errors ("Unable to perform query", code 400) are usually
+    # transient capacity blips (verified 2026-07-03: the same Street_Centerline
+    # query failed once and succeeded on immediate retry); genuinely bad
+    # queries still fail after the attempt budget
+    if isinstance(exc, ArcGISError):
         return True
     return isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in _RETRYABLE_STATUS
 

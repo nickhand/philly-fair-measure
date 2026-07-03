@@ -14,9 +14,15 @@ from philly_assessments.sources.carto import DEFAULT_PAGE_SIZE
 def _cmd_snapshot(args: argparse.Namespace) -> int:
     if args.source == "arcgis":
         from philly_assessments.ingest.snapshots import snapshot_arcgis_layer
+        from philly_assessments.sources.arcgis import SEPTA_ARCGIS_BASE
 
+        base_url = SEPTA_ARCGIS_BASE if args.org == "septa" else None
         result = snapshot_arcgis_layer(
-            args.table, dataset=args.dataset, data_dir=args.data_dir, limit=args.limit
+            args.table,
+            dataset=args.dataset,
+            data_dir=args.data_dir,
+            limit=args.limit,
+            base_url=base_url,
         )
     else:
         result = snapshot_carto_table(
@@ -244,6 +250,31 @@ def _cmd_conformal_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_acs_sensitivity(args: argparse.Namespace) -> int:
+    import polars as pl
+
+    from philly_assessments.diagnostics.acs_sensitivity import run_acs_sensitivity
+
+    table = run_acs_sensitivity(args.data_dir)
+    columns = ("n", "rmse_log", "r2_log", "median_ratio", "cod", "prd")
+    for segment_type in table["segment_type"].unique(maintain_order=True).to_list():
+        print(f"\n== {segment_type} ==")
+        sub = table.filter(pl.col("segment_type") == segment_type)
+        print(f"{'model':<16}{'segment':<14}" + "".join(f"{c:>13}" for c in columns))
+        for row in sub.sort("segment", "model").to_dicts():
+            cells = []
+            for column in columns:
+                value = row.get(column)
+                if value is None:
+                    cells.append(f"{'-':>13}")
+                elif column == "n":
+                    cells.append(f"{value:>13,}")
+                else:
+                    cells.append(f"{value:>13.4f}")
+            print(f"{row['model']:<16}{row['segment']:<14}" + "".join(cells))
+    return 0
+
+
 def _cmd_comps(args: argparse.Namespace) -> int:
     import polars as pl
 
@@ -281,9 +312,9 @@ def _cmd_comps(args: argparse.Namespace) -> int:
         if row.height:
             r = row.to_dicts()[0]
             print(
-                f"  model: ${r['bayes_median']:,.0f} "
-                f"(90% PI ${r['bayes_pi_low_90']:,.0f} - ${r['bayes_pi_high_90']:,.0f}) "
-                f"-> {r['assessment_flag']}"
+                f"  model: ${r['model_median']:,.0f} "
+                f"(90% PI ${r['model_pi_low_90']:,.0f} - ${r['model_pi_high_90']:,.0f}, "
+                f"{r['interval_method']}) -> {r['assessment_flag']}"
             )
 
     print(f"\ntop {result.comps.height} comparable arms-length sales:")
@@ -368,6 +399,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     snapshot.add_argument("--page-size", type=int, default=DEFAULT_PAGE_SIZE)
     snapshot.add_argument("--limit", type=int, help="fetch at most this many rows (smoke tests)")
+    snapshot.add_argument(
+        "--org",
+        choices=("phl", "septa"),
+        default="phl",
+        help="ArcGIS org hosting the layer (SEPTA station layers live in SEPTA's org)",
+    )
     snapshot.add_argument(
         "--data-dir", type=Path, help="data lake root (default ./data or $PHILLY_DATA_DIR)"
     )
@@ -472,6 +509,14 @@ def main(argv: list[str] | None = None) -> int:
     conformal.add_argument("--k", type=int, default=500, help="calibration neighbors (knn method)")
     conformal.add_argument("--data-dir", type=Path)
     conformal.set_defaults(func=_cmd_conformal_check)
+
+    acs = subparsers.add_parser(
+        "acs-sensitivity",
+        help="DIAGNOSTIC retrain measuring what the demographic-features ban "
+        "costs in accuracy (never a production model)",
+    )
+    acs.add_argument("--data-dir", type=Path)
+    acs.set_defaults(func=_cmd_acs_sensitivity)
 
     comps = subparsers.add_parser(
         "comps", help="comparable sales for a property (parcel id or address fragment)"

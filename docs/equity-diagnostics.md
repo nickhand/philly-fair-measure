@@ -69,6 +69,27 @@ level bias by racial composition is a modeling artifact, not a data
 inevitability*. This mirrors the national finding (arXiv:2605.15020) that
 better models improve accuracy and equity together.
 
+## The condo contrast (added 2026-07-03, corrected same day)
+
+A between-segment asymmetry complements the tract-level story. After the
+condo deed-link recovery (see docs/features.md — the earlier "OPA assesses
+condos at 75% of sale price" figure is **retracted**; it was measured on a
+contaminated pool of bulk building sales), the honest comparison on true
+condo units is:
+
+| Segment | OPA median ratio | OPA COD |
+|---|---|---|
+| Residential condo units (test, n=2,802) | 0.91 | 18.8 |
+| All non-condo residential (test, n=19,463) | 0.98 | 34.5 |
+
+Condos — an affluent-skewing, heavily Center City stock — are OPA's
+best-assessed segment: accurate, tight, and slightly *under* market. Cheap
+rowhomes — disproportionately in majority-Black and majority-Hispanic
+tracts — get dispersed, regressive assessments (cheapest-quintile median
+ratios above 1.2 in the Controller era). The equity problem is not that OPA
+can't assess accurately; it's that its accuracy is distributed along lines
+that track wealth and race.
+
 ## Caveats
 
 - Ecological, tract-level; ACS 2022 composition; the city layer's own
@@ -77,3 +98,6 @@ better models improve accuracy and equity together.
   the Keene/IAAO TASP convention shifts levels, not group orderings.
 - Sales-based ratio studies see only sold properties; unsold-stock bias applies
   to every study of this kind, including the Controller's.
+- The condo-segment rows use each model run's out-of-time test window; condo
+  ratios rest on recovered deed links (84% precision proxy, within-building
+  near-misses).

@@ -203,19 +203,64 @@ def stg_violations(raw: pl.LazyFrame) -> pl.LazyFrame:
     )
 
 
-def stg_deeds(raw: pl.LazyFrame) -> pl.LazyFrame:
+_UNIT_TOKEN_REGEX = r"\b(?:APT|UNIT|STE|SUITE|PH|FL|#)\s*([0-9A-Z-]+)$"
+_UNIT_SUFFIX_REGEX = r"\s+(?:APT|UNIT|STE|SUITE|PH|FL|#)\s*[0-9A-Z-]*$"
+
+
+def _norm_unit(expr: pl.Expr) -> pl.Expr:
+    return (
+        expr.cast(pl.String)
+        .str.to_uppercase()
+        .str.replace_all(r"[^0-9A-Z]", "")
+        .str.strip_chars_start("0")
+    )
+
+
+def _norm_address(expr: pl.Expr) -> pl.Expr:
+    return expr.cast(pl.String).str.to_uppercase().str.replace_all(r"\s+", " ").str.strip_chars()
+
+
+def _condo_unit_lookup(raw_opa: pl.LazyFrame) -> pl.LazyFrame:
+    """(normalized address, unit) -> 88-prefix account, unique keys only."""
+    from philly_assessments.config import CONDO_ACCOUNT_PREFIX
+
+    keyed = (
+        raw_opa.filter(
+            pl.col("parcel_number").cast(pl.String).str.starts_with(CONDO_ACCOUNT_PREFIX)
+            & pl.col("unit").is_not_null()
+        )
+        .select(
+            pl.col("parcel_number").cast(pl.String).alias("recovered_opa_account"),
+            _norm_address(pl.col("location")).alias("_match_base"),
+            _norm_unit(pl.col("unit")).alias("_match_unit"),
+        )
+        .filter(pl.col("_match_unit") != "")
+    )
+    return keyed.filter(pl.len().over("_match_base", "_match_unit") == 1)
+
+
+def stg_deeds(raw: pl.LazyFrame, raw_opa: pl.LazyFrame | None = None) -> pl.LazyFrame:
     """Deed-family transfer records classified and typed for sales validation.
 
     Grain: one row per record_id (document x property). Non-deed documents
     (mortgages, satisfactions, ...) are excluded here; nominal or distressed
     deeds are kept and *labeled* downstream, not dropped.
+
+    Condo link recovery: RTT leaves `opa_account_num` null on most condo unit
+    deeds (measured 2026-07-03: 0% of Academy House / Symphony House resales
+    carried a link), which silently removed condos from every sale pool. When
+    `raw_opa` is given, unlinked deeds are matched to 88-prefix accounts on
+    (normalized street address, normalized unit token) — unit from RTT's
+    `unit_num`, falling back to an APT/UNIT suffix in `street_address` —
+    accepting only unique (address, unit) keys. Recovered rows get
+    `opa_link_source = "address_unit"`; native links are `"rtt"`.
     """
     doc_type = pl.col("document_type").str.strip_chars()
     lf = raw.filter(doc_type.is_in(list(DEED_KIND)))
     lf = lf.with_columns(doc_type.replace_strict(DEED_KIND).alias("deed_kind"))
     for column in ("display_date", "recording_date", "document_date"):
         lf = with_parsed_timestamp(lf, column)
-    return lf.with_columns(
+    lf = lf.with_columns(
         pl.coalesce("display_date_parsed", "document_date_parsed", "recording_date_parsed").alias(
             "sale_date"
         ),
@@ -271,3 +316,29 @@ def stg_deeds(raw: pl.LazyFrame) -> pl.LazyFrame:
         "matched_regmap",
         "discrepancy",
     )
+    if raw_opa is None:
+        return lf.with_columns(
+            pl.when(pl.col("has_opa_link")).then(pl.lit("rtt")).alias("opa_link_source")
+        )
+    lf = lf.with_columns(
+        _norm_address(pl.col("street_address").str.replace(_UNIT_SUFFIX_REGEX, "")).alias(
+            "_match_base"
+        ),
+        pl.coalesce(
+            _norm_unit(pl.col("unit_num")),
+            _norm_unit(pl.col("street_address").str.extract(_UNIT_TOKEN_REGEX, 1)),
+        ).alias("_match_unit"),
+    ).join(_condo_unit_lookup(raw_opa), on=["_match_base", "_match_unit"], how="left")
+    recovered = ~pl.col("has_opa_link") & pl.col("recovered_opa_account").is_not_null()
+    return lf.with_columns(
+        pl.when(recovered)
+        .then(pl.col("recovered_opa_account"))
+        .otherwise(pl.col("opa_account_num"))
+        .alias("opa_account_num"),
+        pl.when(pl.col("has_opa_link"))
+        .then(pl.lit("rtt"))
+        .when(recovered)
+        .then(pl.lit("address_unit"))
+        .alias("opa_link_source"),
+        (pl.col("has_opa_link") | recovered).alias("has_opa_link"),
+    ).drop("_match_base", "_match_unit", "recovered_opa_account")

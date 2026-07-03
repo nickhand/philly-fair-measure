@@ -44,6 +44,7 @@ CONDO_NUMERIC = [
     "char_beds",
     "char_baths",
     "char_year_built",
+    "char_floor",
     "unit_area_share",
     "bldg_n_units",
     "mkt_bldg_roll_mean_price",

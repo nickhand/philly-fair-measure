@@ -109,9 +109,9 @@ def test_calibration_and_coverage_from_trained_run(tmp_path):
     assert cal.residual.size == val_df.height
 
     test_resid = frame_residuals(result.run_dir, test_df)
-    from philly_assessments.models.conformal import _xy_district
+    from philly_assessments.models.conformal import xy_district
 
-    xy, district = _xy_district(test_df)
+    xy, district = xy_district(test_df)
     lo, hi = conformal_offsets(cal, xy, district, method="knn", k=50)
     assert np.isfinite(lo).all() and np.isfinite(hi).all()
     assert (hi > lo).all()

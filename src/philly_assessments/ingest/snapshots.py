@@ -169,16 +169,21 @@ def snapshot_arcgis_layer(
     data_dir: Path | None = None,
     limit: int | None = None,
     client=None,
+    base_url: str | None = None,
 ) -> SnapshotResult:
     """Capture an ArcGIS FeatureServer layer as a raw snapshot (geometry kept
-    verbatim as GeoJSON strings). Mirrors snapshot_carto_table."""
+    verbatim as GeoJSON strings). Mirrors snapshot_carto_table. `base_url`
+    selects a non-city org (e.g. arcgis.SEPTA_ARCGIS_BASE)."""
     import pyarrow as pa
 
     from philly_assessments.sources import arcgis
 
     dataset = dataset or service.lower()
     owns_client = client is None
-    client = client or arcgis.ArcGISClient()
+    if client is None:
+        client = (
+            arcgis.ArcGISClient(base_url) if base_url is not None else arcgis.ArcGISClient()
+        )
     try:
         fetched_at = datetime.now(UTC)
         started = time.monotonic()

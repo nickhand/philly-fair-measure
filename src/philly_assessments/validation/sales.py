@@ -16,8 +16,11 @@ recorded as supplementary flags/reasons but never flip the status by themselves.
 
 Group outlier detection: z-scores of log(price) and price-per-sqft within
 (zip5, property category, sale year) groups with at least MIN_GROUP_SIZE
-eligible sales. Livable area is current-state only, so the price-per-sqft
-screen inherits that temporal caveat.
+eligible sales. 88-prefix condo units pool separately as "CONDO UNIT"
+regardless of their roll category — their $/sqft distribution would otherwise
+distort the SINGLE FAMILY reference pools in condo-heavy zips (and vice
+versa). Livable area is current-state only, so the price-per-sqft screen
+inherits that temporal caveat.
 """
 
 from __future__ import annotations
@@ -157,9 +160,20 @@ def classify_sales(deeds: pl.LazyFrame, opa: pl.LazyFrame) -> pl.LazyFrame:
     ppsf = pl.when(pl.col("total_livable_area").fill_null(0) > 0).then(
         pl.col("sale_price") / pl.col("total_livable_area")
     )
-    lf = lf.with_columns(eligible.alias("in_reference_pool"), ppsf.alias("price_per_sqft"))
+    lf = lf.with_columns(
+        eligible.alias("in_reference_pool"),
+        ppsf.alias("price_per_sqft"),
+        pl.when(
+            pl.col("opa_account_num").cast(pl.String).str.starts_with(
+                config.CONDO_ACCOUNT_PREFIX
+            )
+        )
+        .then(pl.lit("CONDO UNIT"))
+        .otherwise(pl.col("category_code_description"))
+        .alias("pool_category"),
+    )
 
-    group_keys = ["zip5", "category_code_description", "sale_year"]
+    group_keys = ["zip5", "pool_category", "sale_year"]
     stats = (
         lf.filter(pl.col("in_reference_pool"))
         .group_by(group_keys)
@@ -261,6 +275,7 @@ def classify_sales(deeds: pl.LazyFrame, opa: pl.LazyFrame) -> pl.LazyFrame:
         "confidence",
         "zip5",
         "category_code_description",
+        "pool_category",
         "sale_year",
         "price_per_sqft",
         "z_log_price",

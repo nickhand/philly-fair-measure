@@ -107,6 +107,24 @@ def test_resale_flags():
     assert by_id["slow_resale"]["validity_status"] == "arms_length"
 
 
+def test_condo_units_pool_separately():
+    day = datetime(2023, 3, 1)
+    # 24 rowhome sales around $300k and 21 condo units around $900k in one zip;
+    # the condo roll category is SINGLE FAMILY (as in the real roll), so
+    # without the CONDO UNIT pool the condos would all z-score as outliers
+    deeds = [_deed(f"h{i}", f"p{i}", 295_000.0 + 1_000.0 * i, day) for i in range(24)]
+    deeds += [_deed(f"c{i}", f"88{i:07d}", 890_000.0 + 2_000.0 * i, day) for i in range(21)]
+    opa = [_opa(f"p{i}") for i in range(24)]
+    opa += [_opa(f"88{i:07d}", category="SINGLE FAMILY") for i in range(21)]
+    by_id = _classify(deeds, opa)
+
+    assert by_id["c5"]["pool_category"] == "CONDO UNIT"
+    assert by_id["h5"]["pool_category"] == "SINGLE FAMILY"
+    assert by_id["c5"]["group_n"] == 21  # condos compare against condos only
+    assert by_id["h5"]["group_n"] == 24
+    assert by_id["c5"]["validity_status"] == "arms_length"
+
+
 def test_group_price_outlier():
     deeds = [
         _deed(f"normal{i}", f"g{i}", 280_000.0 + 5_000.0 * i, datetime(2023, 3, 1 + i))

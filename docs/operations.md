@@ -50,3 +50,27 @@ After a fresh capture, rebuild derived layers:
 uv run philly stage
 uv run philly validate-sales
 ```
+
+## Full model refresh (coherence chain)
+
+Relearning market areas relabels geography, and any mart rebuild can shift
+training rows, so models must retrain before re-screening (the screen warns
+when a run predates its mart). The full order:
+
+```bash
+uv run philly stage
+uv run philly validate-sales
+uv run philly build-market-areas   # optional; relabels geography — forces retrains
+uv run philly build-price-index
+uv run philly build-features
+uv run philly build-condo-features
+uv run philly train-baseline
+uv run philly train-bayesian       # ~5-10 min (nutpie)
+uv run philly train-condo
+uv run philly screen-assessments   # residential (Bayesian PI) + condo (conformal) rows
+uv run philly conformal-check      # frequentist cross-check of the screen intervals
+```
+
+`philly acs-sensitivity` is an on-demand diagnostic (never a production
+model); rerun it after major feature changes to keep the measured cost of the
+demographics ban current.

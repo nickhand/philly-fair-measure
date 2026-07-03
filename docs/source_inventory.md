@@ -42,12 +42,18 @@ so bulk geometry pulls need `resultOffset` paging or envelope tiling.
   (`sale_date`, `sale_price`, `recording_date`, `book_and_page`), owner/mailing
   fields, `census_tract`, point geometry.
 - **Keys:** `parcel_number` (9-digit OPA/BRT account, string — preserve leading
-  zeros); `pin` also present. **Accounts beginning `88` are condominium units
-  and related condo parcels** (user-confirmed 2026-07-03; verified: 36,459
-  carry category SINGLE FAMILY and 2,945 MULTI FAMILY with building-scale or
-  token characteristics). Condos are excluded from the residential model scope
-  and market-signal pools; they need a dedicated model. Category note:
-  `MULTI FAMILY` means 2–4-unit duplexed rowhomes/twins (verified from
+  zeros); `pin` also present. **Accounts beginning `88` are condominium-regime
+  parcels, NOT only condo units** (user-confirmed prefix 2026-07-03; scope
+  measured same day): residential condo units are the 88s with categories
+  SINGLE FAMILY (36,459) / MULTI FAMILY (2,945), RES CONDO building codes, 87%
+  with `unit` numbers, median 1,119 sqft — but the prefix also covers
+  commercial condos (COMMERCIAL 8,584), whole apartment buildings coded
+  APARTMENTS > 4 UNITS (3,971; The Drake is a MULTI FAMILY 88 with 677k sqft),
+  INDUSTRIAL (3,622), VACANT LAND (5,457), and parking/storage accounts.
+  Any "condo = 88" filter needs category + unit-scale-area guards. Condos are
+  excluded from the residential model scope and market-signal pools; the
+  dedicated condo model covers residential units at 250–12,000 sqft. Category
+  note: `MULTI FAMILY` means 2–4-unit duplexed rowhomes/twins (verified from
   building codes); large apartments are the separate `APARTMENTS > 4 UNITS`
   category.
 - **Relevance:** The central table: current characteristics + current assessment.
@@ -113,6 +119,16 @@ so bulk geometry pulls need `resultOffset` paging or envelope tiling.
   like "DEED MISCELLANEOUS" and sheriff's deeds need classification during
   staging). Names are messy free text. Consideration can be nominal
   ($1 family transfers).
+- **Condo linkage hole (measured 2026-07-03):** `opa_account_num` is null on
+  essentially all condo *unit* deeds (0% of Academy House's 408 deeds and
+  Symphony House's 21 were linked), which silently removed condos from any
+  OPA-keyed sale pool. The unit sits in `street_address` ("… APT 33K") and in
+  `unit_num`. Staged deeds recover the link by matching (normalized address,
+  normalized unit) against 88-prefix roll accounts, unique keys only:
+  100,159 rows recovered all-time, 84% precision proxy on the sliver that
+  carries both a native link and a unit token (disagreements are
+  within-building near-misses). Recovered rows carry
+  `opa_link_source = "address_unit"`.
 
 ### 4. L&I building & trade permits (`permits`)
 

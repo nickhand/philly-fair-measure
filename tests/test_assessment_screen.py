@@ -121,9 +121,9 @@ def test_finalize_screen_flags_and_ranking():
             "parcel_id": ["over", "under", "ok", "none"],
             "opa_market_value": [900_000.0, 100_000.0, 310_000.0, None],
             "pred_lightgbm_calibrated": [300_000.0, 300_000.0, 300_000.0, 300_000.0],
-            "bayes_median": [300_000.0, 300_000.0, 300_000.0, 300_000.0],
-            "bayes_pi_low_90": [150_000.0] * 4,
-            "bayes_pi_high_90": [600_000.0] * 4,
+            "model_median": [300_000.0, 300_000.0, 300_000.0, 300_000.0],
+            "model_pi_low_90": [150_000.0] * 4,
+            "model_pi_high_90": [600_000.0] * 4,
         }
     )
     out = finalize_screen(df)
@@ -136,7 +136,31 @@ def test_finalize_screen_flags_and_ranking():
     }
     by_id = {row["parcel_id"]: row for row in out.to_dicts()}
     assert by_id["over"]["screen_z"] > 0 and by_id["under"]["screen_z"] < 0
-    assert by_id["over"]["opa_vs_bayes_ratio"] == pytest.approx(3.0)
+    assert by_id["over"]["opa_vs_model_ratio"] == pytest.approx(3.0)
     # ranked by |screen_z|, most confident disagreement first; nulls last
     assert out["parcel_id"].to_list()[-1] == "none"
     assert abs(out["screen_z"][0]) >= abs(out["screen_z"][1])
+    # mixed model families finalize together (diagonal concat null-fills)
+    mixed = pl.concat(
+        [
+            df.with_columns(pl.lit("residential").alias("model_family")),
+            pl.DataFrame(
+                {
+                    "parcel_id": ["condo_over"],
+                    "opa_market_value": [900_000.0],
+                    "pred_lightgbm_calibrated": [300_000.0],
+                    "model_median": [300_000.0],
+                    "model_pi_low_90": [200_000.0],
+                    "model_pi_high_90": [450_000.0],
+                    "model_family": ["condo"],
+                    "bldg_n_units": [42],
+                }
+            ),
+        ],
+        how="diagonal",
+    )
+    out2 = finalize_screen(mixed)
+    row = out2.filter(pl.col("parcel_id") == "condo_over").to_dicts()[0]
+    assert row["assessment_flag"] == "over_assessed_candidate"
+    assert row["bldg_n_units"] == 42
+    assert out2.filter(pl.col("model_family") == "residential")["bldg_n_units"].is_null().all()
