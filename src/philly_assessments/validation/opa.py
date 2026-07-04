@@ -95,19 +95,10 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def twin_uniformity(features: pl.DataFrame, *, min_set: int = 5) -> pl.DataFrame:
-    """Strict identical-twin uniformity stats per parcel (PA uniformity clause).
-
-    ~40% of residential Philadelphia sits in same-block runs of physically
-    identical rowhomes. The STRICT key requires every recorded characteristic
-    to match — area, lot, style, stories, year built, exterior/interior
-    condition, quality grade, basement, garage, central air — so a parcel
-    assessed above its twins' median differs in NOTHING OPA's own records
-    capture. Measured 2026-07-03: 22.6% of residential parcels sit in strict
-    sets of >=5; OPA is uniform on 77% of sets (all-equal assessments,
-    median spread 0.0%), and the residue (624 parcels >10% above twin
-    median) is the sharpest appeal evidence public data can produce."""
-    strict_key = pl.concat_str(
+def strict_twin_key() -> pl.Expr:
+    """Every recorded characteristic, concatenated: two parcels sharing this
+    key on the same block are identical per OPA's own records."""
+    return pl.concat_str(
         [
             pl.col("loc_block_id"),
             pl.col("char_livable_area").cast(pl.String),
@@ -124,11 +115,25 @@ def twin_uniformity(features: pl.DataFrame, *, min_set: int = 5) -> pl.DataFrame
         ],
         separator="|",
     )
+
+
+def twin_uniformity(features: pl.DataFrame, *, min_set: int = 5) -> pl.DataFrame:
+    """Strict identical-twin uniformity stats per parcel (PA uniformity clause).
+
+    ~40% of residential Philadelphia sits in same-block runs of physically
+    identical rowhomes. The STRICT key requires every recorded characteristic
+    to match — area, lot, style, stories, year built, exterior/interior
+    condition, quality grade, basement, garage, central air — so a parcel
+    assessed above its twins' median differs in NOTHING OPA's own records
+    capture. Measured 2026-07-03: 22.6% of residential parcels sit in strict
+    sets of >=5; OPA is uniform on 77% of sets (all-equal assessments,
+    median spread 0.0%), and the residue (624 parcels >10% above twin
+    median) is the sharpest appeal evidence public data can produce."""
     eligible = features.filter(
         (pl.col("opa_market_value").fill_null(0) > 0)
         & pl.col("loc_block_id").is_not_null()
         & (pl.col("char_livable_area").fill_null(0) > 0)
-    ).select("parcel_id", "opa_market_value", strict_key.alias("_twin_key"))
+    ).select("parcel_id", "opa_market_value", strict_twin_key().alias("_twin_key"))
     return (
         eligible.with_columns(pl.len().over("_twin_key").alias("twin_n"))
         .filter(pl.col("twin_n") >= min_set)

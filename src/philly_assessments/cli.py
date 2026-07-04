@@ -360,6 +360,18 @@ def _cmd_aerial_score(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_report(args: argparse.Namespace) -> int:
+    from philly_assessments.report import build_property_report
+
+    try:
+        path = build_property_report(args.query, args.data_dir, args.out)
+    except KeyError as exc:
+        print(exc.args[0])
+        return 1
+    print(f"report -> {path}")
+    return 0
+
+
 def _cmd_comps(args: argparse.Namespace) -> int:
     import polars as pl
 
@@ -642,6 +654,15 @@ def main(argv: list[str] | None = None) -> int:
     aerial_score.add_argument("--limit", type=int)
     aerial_score.add_argument("--data-dir", type=Path)
     aerial_score.set_defaults(func=_cmd_aerial_score)
+
+    report = subparsers.add_parser(
+        "report",
+        help="static HTML property report / appeal packet (parcel id or address)",
+    )
+    report.add_argument("query")
+    report.add_argument("--out", type=Path, help="output directory (default data/reports/)")
+    report.add_argument("--data-dir", type=Path)
+    report.set_defaults(func=_cmd_report)
 
     comps = subparsers.add_parser(
         "comps", help="comparable sales for a property (parcel id or address fragment)"

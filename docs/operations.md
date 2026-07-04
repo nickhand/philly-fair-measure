@@ -90,3 +90,15 @@ percentile ≈ 10% false-positive budget; catches ~42% of known structural
 change per the pilot). Keep runs to the flagged set — citywide would be ~1M
 requests against Penn State's free service. `philly aerial-pilot` re-runs
 the ground-truth validation.
+
+## Property reports
+
+```bash
+uv run philly report "108 ELFRETHS ALY"   # or a parcel id
+```
+
+Writes a self-contained printable HTML packet to `data/reports/<parcel>.html`:
+assessment vs the model's 90% interval, comps, the identical-twin uniformity
+exhibit (PA uniformity clause), aerial/complaint/tenure evidence, assessment
+and sale history, provenance. Sections render only when evidence exists;
+condo parcels get a reduced packet (no comps/twins yet).
