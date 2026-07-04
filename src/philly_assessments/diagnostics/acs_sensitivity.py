@@ -149,7 +149,8 @@ def run_acs_sensitivity(
     )
 
     def target(frame: pl.DataFrame) -> np.ndarray:
-        return np.log(frame["sale_price"].to_numpy()) + frame["time_adj_log"].to_numpy()
+        y = np.log(frame["sale_price"].to_numpy()) + frame["time_adj_log"].to_numpy()
+        return np.asarray(y, dtype=np.float64)
 
     y_fit, y_val = target(fit_df), target(val_df)
     test_adj = test_df["time_adj_log"].to_numpy()

@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import pyarrow as pa
@@ -97,7 +97,7 @@ class ArcGISClient:
         if isinstance(payload, dict) and "error" in payload:
             raise ArcGISError(f"ArcGIS error from {url}: {payload['error']}")
         response.raise_for_status()
-        return payload
+        return cast(dict[str, Any], payload)
 
     def get_fields(self, service: str, layer: int = 0) -> list[dict[str, Any]]:
         meta = self._get(self.layer_url(service, layer), {"f": "json"})
@@ -118,7 +118,7 @@ class ArcGISClient:
         OBJECTID, ...)."""
         for f in self.get_fields(service, layer):
             if f["esri_type"] == "esriFieldTypeOID":
-                return f["name"]
+                return str(f["name"])
         return KEYSET_FIELD
 
     def iter_pages(

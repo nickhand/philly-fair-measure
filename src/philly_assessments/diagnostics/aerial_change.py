@@ -35,11 +35,17 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import polars as pl
 
 from philly_assessments import catalog, config
+from philly_assessments.scalars import as_float
+
+if TYPE_CHECKING:
+    import httpx
+    from shapely.geometry.base import BaseGeometry
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +68,7 @@ class TilePair:
     mask: np.ndarray  # parcel-polygon pixels
 
 
-def _square_bbox(geom) -> tuple[float, float, float, float]:
+def _square_bbox(geom: BaseGeometry) -> tuple[float, float, float, float]:
     """Square WGS84 bbox around the parcel with padding and a size floor."""
     lon0, lat0, lon1, lat1 = geom.bounds
     c_lon, c_lat = (lon0 + lon1) / 2, (lat0 + lat1) / 2
@@ -77,7 +83,9 @@ def _square_bbox(geom) -> tuple[float, float, float, float]:
     )
 
 
-def fetch_tile(client, year: int, bbox: tuple[float, float, float, float]) -> np.ndarray | None:
+def fetch_tile(
+    client: httpx.Client, year: int, bbox: tuple[float, float, float, float]
+) -> np.ndarray | None:
     """One grayscale tile in [0,1], or None on failure/blank coverage."""
     from PIL import Image
 
@@ -112,13 +120,14 @@ def _quantile_match(late: np.ndarray, early: np.ndarray) -> np.ndarray:
     return matched.reshape(late.shape)
 
 
-def _polygon_mask(geom, bbox: tuple[float, float, float, float]) -> np.ndarray:
+def _polygon_mask(geom: BaseGeometry, bbox: tuple[float, float, float, float]) -> np.ndarray:
     import shapely
 
     lon = np.linspace(bbox[0], bbox[2], TILE_PX)
     lat = np.linspace(bbox[3], bbox[1], TILE_PX)  # row 0 = north
     lon_g, lat_g = np.meshgrid(lon, lat)
-    return shapely.contains_xy(geom, lon_g.ravel(), lat_g.ravel()).reshape(TILE_PX, TILE_PX)
+    inside = shapely.contains_xy(geom, lon_g.ravel(), lat_g.ravel())
+    return np.asarray(inside, dtype=bool).reshape(TILE_PX, TILE_PX)
 
 
 _DS = 4  # downsample factor: ~15cm px -> ~60cm blocks (structure scale)
@@ -126,7 +135,8 @@ _DS = 4  # downsample factor: ~15cm px -> ~60cm blocks (structure scale)
 
 def _block_mean(img: np.ndarray, factor: int) -> np.ndarray:
     n = img.shape[0] // factor
-    return img[: n * factor, : n * factor].reshape(n, factor, n, factor).mean(axis=(1, 3))
+    blocks = img[: n * factor, : n * factor].reshape(n, factor, n, factor).mean(axis=(1, 3))
+    return np.asarray(blocks, dtype=np.float64)
 
 
 def change_metrics(pair: TilePair) -> dict:
@@ -134,7 +144,9 @@ def change_metrics(pair: TilePair) -> dict:
 
     late = _quantile_match(pair.late, pair.early)
 
-    def masked_scores(early: np.ndarray, late_m: np.ndarray, mask: np.ndarray):
+    def masked_scores(
+        early: np.ndarray, late_m: np.ndarray, mask: np.ndarray
+    ) -> tuple[float | None, float | None]:
         a, b = early[mask], late_m[mask]
         if len(a) >= 30 and a.std() > 0 and b.std() > 0:
             return float(1 - np.corrcoef(a, b)[0, 1]), float(np.abs(a - b).mean())
@@ -431,7 +443,7 @@ def run_aerial_score(
         data_dir=data_dir,
         workers=workers,
     )
-    threshold = float(
+    threshold = as_float(
         table.filter(pl.col("group") == "control")["score_corr"].drop_nulls().quantile(0.9)
     )
     pair = f"{vintage_early}_vs_{vintage_late}"
@@ -486,8 +498,8 @@ def pilot_summary(table: pl.DataFrame) -> pl.DataFrame:
                     "n_event": event.drop_nulls(metric).height,
                     "n_control": control.drop_nulls(metric).height,
                     "auc_vs_control": float(auc),
-                    "median_event": float(event[metric].drop_nulls().median()),
-                    "median_control": float(control[metric].drop_nulls().median()),
+                    "median_event": as_float(event[metric].drop_nulls().median()),
+                    "median_control": as_float(control[metric].drop_nulls().median()),
                 }
             )
     return pl.DataFrame(rows)

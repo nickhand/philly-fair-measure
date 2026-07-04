@@ -49,11 +49,11 @@ def _cmd_catalog(args: argparse.Namespace) -> int:
         ref = raw_refs[dataset]
         rows = ref.manifest().row_count
         print(f"{ref.view_name:<34} {rows:>12,}  {ref.fetched_at:<21} {ref.source}")
-    for ref in derived_refs:
-        manifest = ref.manifest()
+    for dref in derived_refs:
+        manifest = dref.manifest()
         built = manifest.built_at.strftime("%Y%m%dT%H%M%SZ")
         inputs = ", ".join(i.dataset for i in manifest.inputs)
-        print(f"{ref.view_name:<34} {manifest.row_count:>12,}  {built:<21} {inputs}")
+        print(f"{dref.view_name:<34} {manifest.row_count:>12,}  {built:<21} {inputs}")
     return 0
 
 
@@ -243,8 +243,8 @@ def _cmd_conformal_check(args: argparse.Namespace) -> int:
         .sort("method")
     )
     print("\ncoverage across districts (min - max):")
-    for row in spread.to_dicts():
-        print(f"  {row['method']:<20} {row['min']:.3f} - {row['max']:.3f}")
+    for stats in spread.to_dicts():
+        print(f"  {stats['method']:<20} {stats['min']:.3f} - {stats['max']:.3f}")
 
     if result.flag_agreement is not None:
         print("\nscreen flag agreement (bayesian rows x conformal-knn columns):")
@@ -253,10 +253,10 @@ def _cmd_conformal_check(args: argparse.Namespace) -> int:
         ).fill_null(0)
         cols = [c for c in pivot.columns if c != "bayesian_flag"]
         print(f"  {'bayesian \\ conformal':<26}" + "".join(f"{c[:14]:>16}" for c in cols))
-        for row in pivot.sort("bayesian_flag").to_dicts():
+        for counts in pivot.sort("bayesian_flag").to_dicts():
             print(
-                f"  {row['bayesian_flag']:<26}"
-                + "".join(f"{row[c]:>16,}" for c in cols)
+                f"  {counts['bayesian_flag']:<26}"
+                + "".join(f"{counts[c]:>16,}" for c in cols)
             )
     return 0
 
@@ -933,4 +933,5 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
-    return args.func(args)
+    exit_code: int = args.func(args)
+    return exit_code

@@ -34,6 +34,7 @@ import numpy as np
 import polars as pl
 
 from philly_assessments import config
+from philly_assessments.scalars import as_float
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +52,13 @@ COARSE_CATEGORICAL = [
 _GROUPS = ("White alone", "Black alone", "Hispanic/Latino, any race")
 
 
-def _by_race(df: pl.DataFrame, value: np.ndarray, price: np.ndarray) -> dict:
+def _by_race(
+    df: pl.DataFrame, value: np.ndarray, price: np.ndarray
+) -> dict[str, dict[str, float | int | None]]:
     from philly_assessments.models.metrics import evaluate_estimates
 
     maj = df["acs_majority_race"].fill_null("unmatched").to_numpy()
-    out = {}
+    out: dict[str, dict[str, float | int | None]] = {}
     for g in _GROUPS:
         m = (maj == g) & np.isfinite(value) & np.isfinite(price) & (value > 0) & (price > 0)
         if m.sum() >= 300:
@@ -120,9 +123,12 @@ def race_gap_cv(data_dir: Path | None = None, *, n_folds: int = 5) -> pl.DataFra
         model_stats = _by_race(tj, pred, price)
         opa_stats = _by_race(tj, opa, price)
 
-        def gap(stats):
+        def gap(stats: dict[str, dict[str, float | int | None]]) -> float | None:
             if "White alone" in stats and "Black alone" in stats:
-                return stats["Black alone"]["median_ratio"] - stats["White alone"]["median_ratio"]
+                black = stats["Black alone"]["median_ratio"]
+                white = stats["White alone"]["median_ratio"]
+                if isinstance(black, (int, float)) and isinstance(white, (int, float)):
+                    return black - white
             return None
 
         rows.append({
@@ -201,7 +207,9 @@ def vertical_regressivity_cv(
         quint = np.digitize(price, edges)  # 0..4
         retail = np.where(is_cash, price / (1.0 + disc[np.clip(quint, 0, 4)]), price)
 
-        def med(value, denom, q, quint=quint):
+        def med(
+            value: np.ndarray, denom: np.ndarray, q: int, quint: np.ndarray = quint
+        ) -> float:
             m = (quint == q) & np.isfinite(value) & (denom > 0)
             return float(np.median(value[m] / denom[m])) if m.sum() >= 50 else float("nan")
 
@@ -217,10 +225,10 @@ def vertical_regressivity_cv(
         })
     table = pl.DataFrame(rows)
     summary = {
-        "q1q5_retail_mean": float(table["q1q5_vs_retail"].mean()),
-        "q1q5_retail_min": float(table["q1q5_vs_retail"].min()),
-        "prd_retail_mean": float(table["prd_vs_retail"].mean()),
-        "prd_retail_min": float(table["prd_vs_retail"].min()),
+        "q1q5_retail_mean": as_float(table["q1q5_vs_retail"].mean()),
+        "q1q5_retail_min": as_float(table["q1q5_vs_retail"].min()),
+        "prd_retail_mean": as_float(table["prd_vs_retail"].mean()),
+        "prd_retail_min": as_float(table["prd_vs_retail"].min()),
     }
     return table, summary
 

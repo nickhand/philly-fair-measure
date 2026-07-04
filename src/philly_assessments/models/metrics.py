@@ -17,16 +17,21 @@ import math
 
 import assesspy
 import numpy as np
+import numpy.typing as npt
 
 
-def _clean(estimate, sale_price) -> tuple[np.ndarray, np.ndarray]:
+def _clean(
+    estimate: npt.ArrayLike, sale_price: npt.ArrayLike
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     est = np.asarray(estimate, dtype=np.float64)
     sale = np.asarray(sale_price, dtype=np.float64)
     mask = np.isfinite(est) & np.isfinite(sale) & (est > 0) & (sale > 0)
     return est[mask], sale[mask]
 
 
-def fit_metrics(estimate, sale_price) -> dict[str, float | int | None]:
+def fit_metrics(
+    estimate: npt.ArrayLike, sale_price: npt.ArrayLike
+) -> dict[str, float | int | None]:
     est, sale = _clean(estimate, sale_price)
     if len(est) == 0:
         return {"n": 0, "rmse_log": None, "mape": None, "r2_log": None}
@@ -40,7 +45,9 @@ def fit_metrics(estimate, sale_price) -> dict[str, float | int | None]:
     }
 
 
-def ratio_metrics(estimate, sale_price) -> dict[str, float | None]:
+def ratio_metrics(
+    estimate: npt.ArrayLike, sale_price: npt.ArrayLike
+) -> dict[str, float | None]:
     est, sale = _clean(estimate, sale_price)
     if len(est) < 3:
         return {"median_ratio": None, "cod": None, "prd": None, "prb": None, "mki": None}
@@ -60,5 +67,7 @@ def ratio_metrics(estimate, sale_price) -> dict[str, float | None]:
     return out
 
 
-def evaluate_estimates(estimate, sale_price) -> dict[str, float | int | None]:
+def evaluate_estimates(
+    estimate: npt.ArrayLike, sale_price: npt.ArrayLike
+) -> dict[str, float | int | None]:
     return {**fit_metrics(estimate, sale_price), **ratio_metrics(estimate, sale_price)}

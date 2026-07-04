@@ -16,9 +16,14 @@ valuation date uses a single tree over the trailing window.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
+from typing import TYPE_CHECKING
 
 import numpy as np
 import polars as pl
+
+if TYPE_CHECKING:
+    from scipy.spatial import cKDTree
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +34,7 @@ _EXTRA = 4  # over-query to survive same-parcel exclusion
 
 
 def _weighted_knn(
-    tree, tree_parcels: np.ndarray, tree_values: np.ndarray,
+    tree: cKDTree, tree_parcels: np.ndarray, tree_values: np.ndarray,
     xy: np.ndarray, parcels: np.ndarray, k: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """(weighted mean value, n used, mean distance) per query row."""
@@ -98,7 +103,7 @@ def knn_ppsf_for_sales(points: pl.DataFrame, *, k: int = KNN_K) -> pl.DataFrame:
 def knn_ppsf_at_date(
     points: pl.DataFrame,
     targets: pl.DataFrame,
-    valuation_date,
+    valuation_date: datetime,
     *,
     k: int = KNN_K,
     window_days: int = SCORE_WINDOW_DAYS,

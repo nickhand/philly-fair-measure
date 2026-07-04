@@ -131,11 +131,11 @@ def gather(parcel_id: str, data_dir: Path | None = None) -> ReportData:
     )
 
 
-def _fmt_money(v) -> str:
+def _fmt_money(v: float | int | None) -> str:
     return "—" if v is None else f"${v:,.0f}"
 
 
-def _fmt(v) -> str:
+def _fmt(v: object) -> str:
     if v is None:
         return "—"
     if isinstance(v, float):
@@ -387,6 +387,8 @@ def render_html(data: ReportData) -> str:
                 f"<td class='num'>{_fmt_money(row['opa_market_value'])}</td></tr>"
             )
         median = data.twins["opa_market_value"].median()
+        if not isinstance(median, (int, float)):
+            median = None
         parts.append(
             f"<tr><th>Set median</th><th class='num'>{_fmt_money(median)}</th></tr></table>"
         )

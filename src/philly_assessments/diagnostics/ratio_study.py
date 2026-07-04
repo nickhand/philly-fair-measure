@@ -50,7 +50,7 @@ def _iaao_outlier_mask(ratio: np.ndarray) -> np.ndarray:
     """True where the ratio is a 3x-IQR outlier (IAAO standard trim)."""
     import assesspy
 
-    return assesspy.is_outlier(ratio, method="iqr", mult=3.0).to_numpy()
+    return np.asarray(assesspy.is_outlier(ratio, method="iqr", mult=3.0).to_numpy(), dtype=bool)
 
 
 def _rows(

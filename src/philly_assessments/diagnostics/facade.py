@@ -22,6 +22,7 @@ import numpy as np
 import polars as pl
 
 from philly_assessments import config
+from philly_assessments.scalars import as_float
 
 logger = logging.getLogger(__name__)
 
@@ -166,15 +167,15 @@ def coverage_summary(table: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
         [
             {
                 "cut": "any usable image",
-                "coverage": float((ok["n_usable"] > 0).mean()),
+                "coverage": as_float((ok["n_usable"] > 0).mean()),
             },
             {
                 "cut": "usable, captured 2020+",
-                "coverage": float((ok["best_year"].fill_null(0) >= 2020).mean()),
+                "coverage": as_float((ok["best_year"].fill_null(0) >= 2020).mean()),
             },
             {
                 "cut": "usable, captured 2023+",
-                "coverage": float((ok["best_year"].fill_null(0) >= 2023).mean()),
+                "coverage": as_float((ok["best_year"].fill_null(0) >= 2023).mean()),
             },
         ]
     )

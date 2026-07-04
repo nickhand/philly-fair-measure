@@ -111,7 +111,7 @@ def frame_residuals(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
     if run_params(run_dir).get("time_adjusted"):
         # score_lightgbm already returns reference-frame estimates
         y = y + df["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy()
-    return y - pred_log
+    return np.asarray(y - pred_log, dtype=np.float64)
 
 
 def xy_district(df: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:

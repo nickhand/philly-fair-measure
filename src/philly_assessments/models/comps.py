@@ -50,10 +50,10 @@ def _leaf_matrix(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
     mappings = json.loads((run_dir / "categorical_mappings.json").read_text())
     params = run_params(run_dir)
     x = _encode(df, mappings, params["numeric_features"], params["categorical_features"])
-    return booster.predict(x, pred_leaf=True).astype(np.int32)
+    return np.asarray(booster.predict(x, pred_leaf=True)).astype(np.int32)
 
 
-def _distance_m(lon0, lat0, lon: pl.Expr, lat: pl.Expr) -> pl.Expr:
+def _distance_m(lon0: float | None, lat0: float | None, lon: pl.Expr, lat: pl.Expr) -> pl.Expr:
     m_per_deg_lon = 111_320.0 * math.cos(math.radians(lat0 or 39.95))
     return (
         ((lon - lon0) * m_per_deg_lon) ** 2 + ((lat - lat0) * 110_540.0) ** 2

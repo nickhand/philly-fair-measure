@@ -137,7 +137,7 @@ def train_condo(
         y = np.log(frame["sale_price"].to_numpy())
         if time_adjusted:
             y = y + frame["time_adj_log"].to_numpy()
-        return y
+        return np.asarray(y, dtype=np.float64)
 
     y = {name: target(frame) for name, frame in
          (("fit", fit_df), ("val", val_df), ("test", test_df))}

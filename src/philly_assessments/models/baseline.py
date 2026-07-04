@@ -32,13 +32,19 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING, TypedDict
 
 import lightgbm as lgb
 import numpy as np
+import numpy.typing as npt
 import polars as pl
+
+if TYPE_CHECKING:
+    from sklearn.pipeline import Pipeline
 
 from philly_assessments import __version__, config
 from philly_assessments.ingest.manifests import (
@@ -231,7 +237,9 @@ def _encode(
     return df.select(exprs).to_numpy()
 
 
-def _train_ridge(train_df: pl.DataFrame, y_train: np.ndarray, ridge_numeric: list[str]):
+def _train_ridge(
+    train_df: pl.DataFrame, y_train: np.ndarray, ridge_numeric: list[str]
+) -> tuple[Pipeline, Callable[[pl.DataFrame], np.ndarray]]:
     from sklearn.compose import ColumnTransformer
     from sklearn.impute import SimpleImputer
     from sklearn.linear_model import Ridge
@@ -278,7 +286,21 @@ def _train_ridge(train_df: pl.DataFrame, y_train: np.ndarray, ridge_numeric: lis
     return pipeline, matrix
 
 
-def fit_vertical_calibration(pred_log: np.ndarray, actual_log: np.ndarray) -> dict:
+class Calibration(TypedDict):
+    """Isotonic vertical-equity correction as monotone knot coordinates.
+
+    A plain dict at runtime (serialized verbatim to vertical_calibration.json and
+    reloaded via json.loads), so the shape is documented and key access is typed
+    without any bespoke (de)serialization.
+    """
+
+    x: list[float]
+    y: list[float]
+
+
+def fit_vertical_calibration(
+    pred_log: npt.ArrayLike, actual_log: npt.ArrayLike
+) -> Calibration:
     """Monotone correction of E[log price | predicted log price], fitted on the
     validation slice — the ML analog of assessors' vertical-equity adjustments.
 
@@ -290,17 +312,22 @@ def fit_vertical_calibration(pred_log: np.ndarray, actual_log: np.ndarray) -> di
     """
     from sklearn.isotonic import IsotonicRegression
 
+    pred = np.asarray(pred_log, dtype=np.float64)
+    actual = np.asarray(actual_log, dtype=np.float64)
     iso = IsotonicRegression(increasing=True, out_of_bounds="clip")
-    iso.fit(pred_log, actual_log - pred_log)
+    iso.fit(pred, actual - pred)
     return {
         "x": [float(v) for v in iso.X_thresholds_],
         "y": [float(v) for v in iso.y_thresholds_],
     }
 
 
-def apply_vertical_calibration(pred_log: np.ndarray, calibration: dict) -> np.ndarray:
-    correction = np.interp(pred_log, calibration["x"], calibration["y"])
-    return pred_log + correction
+def apply_vertical_calibration(
+    pred_log: npt.ArrayLike, calibration: Calibration
+) -> npt.NDArray[np.float64]:
+    pred = np.asarray(pred_log, dtype=np.float64)
+    correction = np.interp(pred, calibration["x"], calibration["y"])
+    return np.asarray(pred + correction, dtype=np.float64)
 
 
 def _segments(test_df: pl.DataFrame) -> list[tuple[str, str, pl.Series]]:
@@ -375,7 +402,7 @@ def train_baseline(
         y = np.log(frame["sale_price"].to_numpy())
         if time_adjusted:
             y = y + frame["time_adj_log"].to_numpy()
-        return y
+        return np.asarray(y, dtype=np.float64)
 
     y = {name: target(frame) for name, frame in
          (("fit", fit_df), ("val", val_df), ("test", test_df))}

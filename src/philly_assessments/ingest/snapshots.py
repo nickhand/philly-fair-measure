@@ -19,8 +19,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pyarrow.parquet as pq
+
+if TYPE_CHECKING:
+    from philly_assessments.sources.arcgis import ArcGISClient
 
 from philly_assessments import __version__, config
 from philly_assessments.ingest.manifests import (
@@ -168,7 +172,7 @@ def snapshot_arcgis_layer(
     dataset: str | None = None,
     data_dir: Path | None = None,
     limit: int | None = None,
-    client=None,
+    client: ArcGISClient | None = None,
     base_url: str | None = None,
 ) -> SnapshotResult:
     """Capture an ArcGIS FeatureServer layer as a raw snapshot (geometry kept

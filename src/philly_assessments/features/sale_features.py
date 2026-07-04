@@ -965,7 +965,7 @@ def build_sale_features(
                 f"{path} missing; run snapshots, `philly stage`, `philly validate-sales`, "
                 "`philly build-market-areas`, and `philly build-price-index` first"
             )
-    optional = {}
+    optional: dict[str, pl.LazyFrame | None] = {}
     for name in (
         "parcels",
         "demolitions",

@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 import polars as pl
 
 from philly_assessments import catalog, config
@@ -59,7 +60,7 @@ _EXPRESSWAY_CLASSES = (1,)
 _ARTERIAL_CLASSES = (2, 3)
 
 
-def _project_geoms(geojson: np.ndarray):
+def _project_geoms(geojson: np.ndarray) -> npt.NDArray[np.object_]:
     """Parse GeoJSON strings and project to the shared tangent plane (meters)."""
     import shapely
     from shapely import from_geojson
@@ -78,10 +79,10 @@ def _project_geoms(geojson: np.ndarray):
         return out
 
     projected = shapely.transform(geoms[valid], to_meters)
-    return projected
+    return np.asarray(projected, dtype=object)
 
 
-def _nearest_distance(target_xy: np.ndarray, geoms) -> np.ndarray:
+def _nearest_distance(target_xy: np.ndarray, geoms: npt.NDArray[np.object_]) -> np.ndarray:
     """Distance (m) from each target point to the nearest geometry (0 inside)."""
     from shapely import STRtree, points
 
@@ -150,7 +151,7 @@ def build_proximity(data_dir: Path | None = None) -> BuildResult:
     xy = parcels.select("x_m", "y_m").cast(pl.Float64).to_numpy()
     xy[parcels["lonlat_status"].fill_null("").to_numpy() != "ok"] = np.nan
 
-    def load_geoms(dataset: str, predicate: pl.Expr | None = None):
+    def load_geoms(dataset: str, predicate: pl.Expr | None = None) -> npt.NDArray[np.object_]:
         lf = pl.scan_parquet(latest[dataset].data_path)
         if predicate is not None:
             lf = lf.filter(predicate)

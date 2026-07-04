@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
@@ -92,4 +92,4 @@ class MapillaryClient:
         if response.status_code in _RETRYABLE_STATUS:
             response.raise_for_status()
         response.raise_for_status()
-        return response.json().get("data", [])
+        return cast(list[dict[str, Any]], response.json().get("data", []))

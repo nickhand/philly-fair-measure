@@ -34,7 +34,15 @@ from philly_assessments import config
 logger = logging.getLogger(__name__)
 
 
-def _fit_predict(fit_df, val_df, test_df, numeric, categorical, *, rounds=3000):
+def _fit_predict(
+    fit_df: pl.DataFrame,
+    val_df: pl.DataFrame,
+    test_df: pl.DataFrame,
+    numeric: list[str],
+    categorical: list[str],
+    *,
+    rounds: int = 3000,
+) -> np.ndarray:
     import lightgbm as lgb
 
     from philly_assessments.models.baseline import (
@@ -47,8 +55,9 @@ def _fit_predict(fit_df, val_df, test_df, numeric, categorical, *, rounds=3000):
 
     mappings = _fit_category_mappings(fit_df, categorical)
 
-    def y(frame):
-        return np.log(frame["sale_price"].to_numpy()) + frame["time_adj_log"].to_numpy()
+    def y(frame: pl.DataFrame) -> np.ndarray:
+        out = np.log(frame["sale_price"].to_numpy()) + frame["time_adj_log"].to_numpy()
+        return np.asarray(out, dtype=np.float64)
 
     x_fit = _encode(fit_df, mappings, numeric, categorical)
     x_val = _encode(val_df, mappings, numeric, categorical)
@@ -63,7 +72,7 @@ def _fit_predict(fit_df, val_df, test_df, numeric, categorical, *, rounds=3000):
     )
     cal = fit_vertical_calibration(booster.predict(x_val), y(val_df))
     pred_ref = apply_vertical_calibration(booster.predict(x_test), cal)
-    return np.exp(pred_ref - test_df["time_adj_log"].to_numpy())
+    return np.asarray(np.exp(pred_ref - test_df["time_adj_log"].to_numpy()), dtype=np.float64)
 
 
 def _summary(cods: list[float]) -> dict:
@@ -83,6 +92,7 @@ def temporal_cv(data_dir: Path | None = None, *, n_folds: int = 5) -> tuple[pl.D
     fold = n // (2 * n_folds)  # test folds tile the most recent half
 
     rows = []
+    cods: list[float] = []
     for i in range(n_folds):
         stop = n - (n_folds - 1 - i) * fold
         start = stop - fold
@@ -92,16 +102,20 @@ def temporal_cv(data_dir: Path | None = None, *, n_folds: int = 5) -> tuple[pl.D
         fit_df, val_df = train.head(train.height - n_val), train.tail(n_val)
         pred = _fit_predict(fit_df, val_df, test_df, numeric, categorical)
         m = evaluate_estimates(pred, test_df["sale_price"].to_numpy())
+        cod = m["cod"]
+        if not isinstance(cod, float):
+            raise ValueError(f"temporal fold {i + 1}: COD undefined (fold too small)")
+        cods.append(cod)
         rows.append({
             "fold": i + 1,
             "test_from": str(test_df["sale_date"].min())[:10],
             "n_train": fit_df.height,
             "n_test": test_df.height,
-            "cod": m["cod"],
+            "cod": cod,
             "median_ratio": m["median_ratio"],
         })
-        logger.info("temporal fold %d: COD %.1f", i + 1, m["cod"])
-    return pl.DataFrame(rows), _summary([r["cod"] for r in rows])
+        logger.info("temporal fold %d: COD %.1f", i + 1, cod)
+    return pl.DataFrame(rows), _summary(cods)
 
 
 def spatial_cv(

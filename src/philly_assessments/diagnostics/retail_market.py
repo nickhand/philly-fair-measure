@@ -44,7 +44,13 @@ class RetailResult:
     opa_convention_table: pl.DataFrame  # OPA ratio under cash vs retail convention
 
 
-def _train_predict(fit_df, val_df, test_df, numeric, categorical):
+def _train_predict(
+    fit_df: pl.DataFrame,
+    val_df: pl.DataFrame,
+    test_df: pl.DataFrame,
+    numeric: list[str],
+    categorical: list[str],
+) -> np.ndarray:
     import lightgbm as lgb
 
     from philly_assessments.models.baseline import (
@@ -57,8 +63,9 @@ def _train_predict(fit_df, val_df, test_df, numeric, categorical):
 
     mappings = _fit_category_mappings(fit_df, categorical)
 
-    def target(frame):
-        return np.log(frame["sale_price"].to_numpy()) + frame["time_adj_log"].to_numpy()
+    def target(frame: pl.DataFrame) -> np.ndarray:
+        y = np.log(frame["sale_price"].to_numpy()) + frame["time_adj_log"].to_numpy()
+        return np.asarray(y, dtype=np.float64)
 
     x_fit = _encode(fit_df, mappings, numeric, categorical)
     x_val = _encode(val_df, mappings, numeric, categorical)
@@ -78,7 +85,7 @@ def _train_predict(fit_df, val_df, test_df, numeric, categorical):
     pred_ref = apply_vertical_calibration(
         booster.predict(x_test, num_iteration=booster.best_iteration), calibration
     )
-    return np.exp(pred_ref - test_df["time_adj_log"].to_numpy())
+    return np.asarray(np.exp(pred_ref - test_df["time_adj_log"].to_numpy()), dtype=np.float64)
 
 
 def retail_vs_blend(data_dir: Path | None = None) -> RetailResult:

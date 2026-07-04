@@ -54,9 +54,13 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import polars as pl
+
+if TYPE_CHECKING:
+    from arviz import InferenceData
 
 from philly_assessments import __version__, config
 from philly_assessments.ingest.manifests import (
@@ -262,7 +266,7 @@ class RBFBasis:
 
     def transform(self, xy: np.ndarray) -> np.ndarray:
         d2 = ((xy[:, None, :] - self.centers[None, :, :]) ** 2).sum(axis=2)
-        return np.exp(-0.5 * d2 / self.bandwidth_m**2)
+        return np.asarray(np.exp(-0.5 * d2 / self.bandwidth_m**2), dtype=np.float64)
 
 
 def _xy(df: pl.DataFrame) -> np.ndarray:
@@ -272,7 +276,7 @@ def _xy(df: pl.DataFrame) -> np.ndarray:
         pl.col("loc_lon").alias("lon"), pl.col("loc_lat").alias("lat")
     ).with_columns(*project_xy(pl.col("lon"), pl.col("lat")))
     xy = out.select("x_m", "y_m").to_numpy()
-    return np.nan_to_num(xy, nan=0.0)
+    return np.asarray(np.nan_to_num(xy, nan=0.0), dtype=np.float64)
 
 
 SIGMA_TERM_NAMES = [
@@ -318,7 +322,7 @@ def _fit_posterior(
     nu_fixed: float | None,
     parcel_mapped: np.ndarray | None = None,
     n_parcels: int = 0,
-):
+) -> InferenceData:
     import pymc as pm
 
     coords = {
@@ -385,6 +389,7 @@ def _fit_posterior(
         # nutpie: Rust NUTS, several-fold faster than the default sampler and
         # runs parallel chains as in-process threads — which also sidesteps the
         # macOS fork/segfault issue that forced sequential chains previously
+        sampler_kwargs: dict[str, str | int]
         try:
             import nutpie  # noqa: F401
 
@@ -411,7 +416,7 @@ _DRAW_VARIABLES = (
 
 
 def _thin_draws(
-    idata, max_draws: int, seed: int, nu_fixed: float | None = None
+    idata: InferenceData, max_draws: int, seed: int, nu_fixed: float | None = None
 ) -> dict[str, np.ndarray]:
     """Flatten chains and keep one common random subset of joint posterior draws."""
     out: dict[str, np.ndarray] = {}
@@ -430,6 +435,8 @@ def _thin_draws(
             )
         out[name] = flat[subset]
     if "nu" not in out:
+        if nu_fixed is None:
+            raise ValueError("posterior has no 'nu' draws and no nu_fixed was given")
         out["nu"] = np.full(len(out["beta"]), float(nu_fixed))
     return out
 
@@ -495,7 +502,7 @@ def predict_price_draws(
     log_pred = mu + np.exp(log_sigma) * t_noise
     if time_adj_log is not None:
         log_pred = log_pred - time_adj_log[None, :]
-    return np.exp(log_pred)
+    return np.asarray(np.exp(log_pred), dtype=np.float64)
 
 
 def load_run(
@@ -579,7 +586,7 @@ def train_bayesian(
         y = np.log(frame["sale_price"].to_numpy())
         if time_adjusted:
             y = y + frame["time_adj_log"].to_numpy()
-        return y
+        return np.asarray(y, dtype=np.float64)
 
     x_train = encoder.transform(train_df)
     area_train, district_train = geo.indices(train_df)
@@ -728,7 +735,8 @@ def train_bayesian(
         pl.Series("covered_90", covered),
         pl.Series("opa_assessment", test_df["asmt_market_value_sale_year"].to_numpy()),
     ).write_parquet(run_dir / "predictions.parquet")
-    np.savez_compressed(run_dir / "posterior_draws.npz", **posterior_draws)
+    # cast: numpy's stubs match **kwds against the allow_pickle keyword
+    np.savez_compressed(run_dir / "posterior_draws.npz", **cast(dict[str, Any], posterior_draws))
     (run_dir / "covariates.json").write_text(
         json.dumps(
             {

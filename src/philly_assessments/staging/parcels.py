@@ -25,6 +25,7 @@ from __future__ import annotations
 import logging
 
 import numpy as np
+import numpy.typing as npt
 import polars as pl
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 _MIN_RING_POINTS = 4  # closed triangle
 
 
-def _tangent_project(geoms):
+def _tangent_project(geoms: npt.NDArray[np.object_]) -> npt.NDArray[np.object_]:
     """Project WGS84 geometries to meters on the shared local tangent plane."""
     import math
 
@@ -48,10 +49,10 @@ def _tangent_project(geoms):
         out[:, 1] = (coords[:, 1] - _LAT0) * _M_PER_DEG_LAT
         return out
 
-    return shapely.transform(geoms, to_meters)
+    return np.asarray(shapely.transform(geoms, to_meters), dtype=object)
 
 
-def _ring_stats(geoms) -> dict[str, np.ndarray]:
+def _ring_stats(geoms: npt.NDArray[np.object_]) -> dict[str, np.ndarray]:
     """Vectorized per-polygon exterior-ring statistics via reduceat on the
     flattened coordinate array."""
     import shapely
@@ -98,7 +99,7 @@ def _ring_stats(geoms) -> dict[str, np.ndarray]:
     }
 
 
-def _mrr_ratios(geoms) -> dict[str, np.ndarray]:
+def _mrr_ratios(geoms: npt.NDArray[np.object_]) -> dict[str, np.ndarray]:
     import shapely
 
     mrr = shapely.oriented_envelope(geoms)
@@ -160,7 +161,7 @@ MAX_OWNER_PARCELS = 20  # owners above this are institutional; not side-yard cas
 ADJACENCY_DISTANCE_M = 0.3
 
 
-def _owner_links(frame: pl.DataFrame, geoms) -> pl.DataFrame:
+def _owner_links(frame: pl.DataFrame, geoms: npt.NDArray[np.object_]) -> pl.DataFrame:
     """Per-parcel owner-linked adjacency: neighboring parcels (within
     ADJACENCY_DISTANCE_M) held by the same small (non-institutional) owner —
     the house + side-yard pattern. Adds shp_n_linked_parcels and

@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import pyarrow as pa
@@ -120,7 +120,7 @@ class CartoClient:
         if "error" in payload:
             raise CartoError(f"CARTO error for {sql!r}: {payload['error']}")
         response.raise_for_status()
-        return payload
+        return cast(dict[str, Any], payload)
 
     def get_columns(self, table: str) -> list[CartoColumn]:
         payload = self.query(f'SELECT * FROM "{table}" LIMIT 0')

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import polars as pl
@@ -376,7 +377,7 @@ def assemble_condo_features(
 def assemble_condo_assessment_features(
     opa: pl.LazyFrame,
     sales: pl.LazyFrame,
-    valuation_date,
+    valuation_date: datetime,
     market_areas: pl.LazyFrame | None = None,
     price_index: pl.DataFrame | None = None,
     proximity: pl.LazyFrame | None = None,

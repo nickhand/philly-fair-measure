@@ -65,7 +65,7 @@ def cash_market_value(retail_value: np.ndarray, edges: list[float]) -> np.ndarra
     published per-tier channel discount (tier assigned by the retail value)."""
     quintile = np.digitize(retail_value, edges)  # 0..4
     discount = np.array(CHANNEL_DISCOUNT_BY_QUINTILE)[np.clip(quintile, 0, 4)]
-    return retail_value * (1.0 + discount)
+    return np.asarray(retail_value * (1.0 + discount), dtype=np.float64)
 
 _HEDONIC_NUMERIC = [
     "char_livable_area",  # logged below
@@ -98,7 +98,7 @@ def _standardize(a: np.ndarray) -> np.ndarray:
     a = np.where(np.isnan(a), med, a)
     mean, std = a.mean(axis=0), a.std(axis=0)
     std[std == 0] = 1.0
-    return (a - mean) / std
+    return np.asarray((a - mean) / std, dtype=np.float64)
 
 
 def _design(df: pl.DataFrame, stage: str) -> tuple[np.ndarray, int]:
@@ -128,7 +128,7 @@ def _design(df: pl.DataFrame, stage: str) -> tuple[np.ndarray, int]:
 
 def _ols_coef(x: np.ndarray, y: np.ndarray, ix: int | list[int]) -> np.ndarray:
     beta, *_ = np.linalg.lstsq(x, y, rcond=None)
-    return beta[ix]
+    return np.asarray(beta[ix], dtype=np.float64)
 
 
 @dataclass(frozen=True)

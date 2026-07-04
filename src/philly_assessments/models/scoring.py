@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 import polars as pl
@@ -25,8 +26,8 @@ def latest_run_dir(kind: str, data_dir: Path | None = None) -> Path:
     return runs[-1]
 
 
-def run_params(run_dir: Path) -> dict:
-    return json.loads((run_dir / "params.json").read_text())
+def run_params(run_dir: Path) -> dict[str, Any]:
+    return cast(dict[str, Any], json.loads((run_dir / "params.json").read_text()))
 
 
 def score_lightgbm(run_dir: Path, df: pl.DataFrame) -> np.ndarray:

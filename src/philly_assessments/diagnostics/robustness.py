@@ -82,16 +82,22 @@ def char_leakage_bound(data_dir: Path | None = None) -> pl.DataFrame:
     ):
         m_model = evaluate_estimates(model[mask], price[mask])
         m_opa = evaluate_estimates(opa[mask], price[mask])
+        model_cod, opa_cod = m_model["cod"], m_opa["cod"]
+        edge = (
+            opa_cod - model_cod
+            if isinstance(model_cod, (int, float)) and isinstance(opa_cod, (int, float))
+            else None
+        )
         rows.append(
             {
                 "subset": name,
                 "n": int(mask.sum()),
                 "share": float(mask.mean()),
-                "model_cod": m_model["cod"],
+                "model_cod": model_cod,
                 "model_ratio": m_model["median_ratio"],
-                "opa_cod": m_opa["cod"],
+                "opa_cod": opa_cod,
                 "opa_ratio": m_opa["median_ratio"],
-                "model_cod_edge": m_opa["cod"] - m_model["cod"],
+                "model_cod_edge": edge,
             }
         )
     return pl.DataFrame(rows)

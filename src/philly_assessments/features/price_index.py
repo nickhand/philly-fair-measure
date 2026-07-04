@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import overload
 
 import polars as pl
 
@@ -139,6 +140,28 @@ def build_price_index(data_dir: Path | None = None) -> BuildResult:
     return BuildResult(path=path, manifest=manifest)
 
 
+@overload
+def with_time_adjustment(
+    lf: pl.DataFrame,
+    index: pl.DataFrame,
+    *,
+    district_col: str = ...,
+    date_col: str = ...,
+    out_col: str = ...,
+) -> pl.DataFrame: ...
+
+
+@overload
+def with_time_adjustment(
+    lf: pl.LazyFrame,
+    index: pl.DataFrame,
+    *,
+    district_col: str = ...,
+    date_col: str = ...,
+    out_col: str = ...,
+) -> pl.LazyFrame: ...
+
+
 def with_time_adjustment(
     lf: pl.LazyFrame | pl.DataFrame,
     index: pl.DataFrame,
@@ -148,7 +171,8 @@ def with_time_adjustment(
     out_col: str = "time_adj_log",
 ) -> pl.LazyFrame | pl.DataFrame:
     """Attach ``out_col`` = -log_index(district, month(date)), clamped to the
-    index's month range; falls back to the citywide index for unknown districts."""
+    index's month range; falls back to the citywide index for unknown districts.
+    A DataFrame in gives a DataFrame back; a LazyFrame stays lazy."""
     bounds = index.select(pl.col("month").min().alias("lo"), pl.col("month").max().alias("hi"))
     lo, hi = bounds.row(0)
     city = index.filter(pl.col("district") == CITYWIDE).select(
@@ -157,7 +181,8 @@ def with_time_adjustment(
     district_index = index.select("district", "month", pl.col("log_index").alias("_d_index"))
 
     out = (
-        lf.with_columns(
+        lf.lazy()
+        .with_columns(
             pl.col(date_col)
             .dt.truncate("1mo")
             .clip(pl.lit(lo), pl.lit(hi))
@@ -165,13 +190,13 @@ def with_time_adjustment(
             pl.col(district_col).fill_null(CITYWIDE).alias("_adj_district"),
         )
         .join(
-            district_index.lazy() if isinstance(lf, pl.LazyFrame) else district_index,
+            district_index.lazy(),
             left_on=["_adj_district", "_adj_month"],
             right_on=["district", "month"],
             how="left",
         )
         .join(
-            city.lazy() if isinstance(lf, pl.LazyFrame) else city,
+            city.lazy(),
             left_on="_adj_month",
             right_on="month",
             how="left",
@@ -181,4 +206,4 @@ def with_time_adjustment(
         )
         .drop("_adj_month", "_adj_district", "_d_index", "_city_index")
     )
-    return out
+    return out.collect() if isinstance(lf, pl.DataFrame) else out
