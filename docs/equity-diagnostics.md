@@ -152,6 +152,39 @@ the ratio against **both** cash-sale and retail-value conventions (as we
 report both out-of-time and TASP time conventions) is what makes the analysis
 un-dismissable. Artifact: `data/diagnostics/channel_decomposition.parquet`.
 
+### The retail model and the both-conventions ratio study (`philly retail-market`)
+
+We built the retail predictor (train the LightGBM on mortgage-financed sales
+only — the transactions that ARE the typical-financing standard) and verified
+it behaves: on financed test sales it matches the blend model (COD 21.4 vs
+21.1, median ratio 0.984 — near-unbiased on the retail market), and on cash
+sales it predicts **21% above the cash sale price** (ratio 1.213), correctly
+recovering retail value for houses that transacted wholesale. (Its "overall"
+COD looks worse only because half the test *actuals* are cash prices it
+intentionally does not target; the retail metric is the financed-sales one.)
+
+**The decisive equity result — OPA's regressivity survives the convention most
+favorable to it.** Median OPA value ÷ value, by price quintile:
+
+| quintile | % cash | vs cash sale price | vs retail value |
+|---|---|---|---|
+| q1 (cheapest) | 61% | **1.543** | **1.347** |
+| q2 | 35% | 1.080 | 1.024 |
+| q3 | 19% | 0.935 | 0.919 |
+| q4 | 13% | 0.912 | 0.907 |
+| q5 (priciest) | 17% | 0.882 | 0.878 |
+
+The retail convention (marking cash sales up to retail value — OPA's steelman)
+**shrinks the cheap-tail over-assessment but does not remove it**: q1 goes from
+1.543 to 1.347, still 35% above retail value while q5 sits at 0.88. The
+regressive gradient is present under *both* conventions; the q1/q5 ratio is
+1.75x against cash prices and still **1.53x against retail value**. So the
+"cheap homes just sell for less" rebuttal is only partly true and cannot
+rescue OPA: even valuing every cheap home at what a financed buyer would pay,
+they are over-assessed relative to expensive homes. This is the robust,
+pre-empted form of the regressivity finding. Artifacts:
+`data/diagnostics/retail_vs_blend.parquet`.
+
 ## Caveats
 
 - Ecological, tract-level; ACS 2022 composition; the city layer's own

@@ -284,6 +284,27 @@ def _cmd_acs_sensitivity(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_retail_market(args: argparse.Namespace) -> int:
+    from philly_assessments.diagnostics.retail_market import retail_vs_blend
+
+    result = retail_vs_blend(args.data_dir)
+    t = result.model_table
+    print("blend vs retail (financed-only) model — median ratio / COD by segment\n")
+    hdr = f"{'segment':<16}{'blend ratio':>13}{'blend COD':>11}"
+    print(hdr + f"{'retail ratio':>14}{'retail COD':>12}")
+    for seg in t["segment"].unique(maintain_order=True).to_list():
+        b = t.filter((t["segment"] == seg) & (t["model"] == "blend")).to_dicts()[0]
+        r = t.filter((t["segment"] == seg) & (t["model"] == "retail")).to_dicts()[0]
+        print(f"{seg:<16}{b['median_ratio']:>13.3f}{b['cod']:>11.1f}"
+              f"{r['median_ratio']:>14.3f}{r['cod']:>12.1f}")
+    print("\nOPA ratio under both value conventions (median OPA / value):\n")
+    print(f"{'quintile':<10}{'% cash':>9}{'vs sale price':>15}{'vs retail value':>17}")
+    for row in result.opa_convention_table.to_dicts():
+        print(f"{row['quintile']:<10}{row['pct_cash']:>9.0%}"
+              f"{row['opa_ratio_vs_sale_price']:>15.3f}{row['opa_ratio_vs_retail']:>17.3f}")
+    return 0
+
+
 def _cmd_channel_decomp(args: argparse.Namespace) -> int:
     from philly_assessments.diagnostics.channel import channel_decomposition
 
@@ -681,6 +702,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     channel.add_argument("--data-dir", type=Path)
     channel.set_defaults(func=_cmd_channel_decomp)
+
+    retail = subparsers.add_parser(
+        "retail-market",
+        help="blend vs financed-only retail model + OPA ratio under both "
+        "cash and retail value conventions",
+    )
+    retail.add_argument("--data-dir", type=Path)
+    retail.set_defaults(func=_cmd_retail_market)
 
     ratio_study = subparsers.add_parser(
         "ratio-study",
