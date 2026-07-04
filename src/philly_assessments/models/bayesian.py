@@ -31,6 +31,16 @@ Modern-practice choices and why (docs/research-notes.md):
   just overall (the spatially-weighted-conformal lesson: marginal coverage can
   hide local failure).
 
+Repeat sales enter as a covariate, not a random effect: mkt_parcel_prev_log_
+price_ref (the parcel's previous sale price in the reference frame) is a
+direct prior estimate of y for the 62% of sales that are repeats. A full
+per-parcel random effect was built and measured (--parcel-effect, ~29k
+repeat-parcel params) and adds ~nothing over the covariate (COD 30.43->30.37,
+width 1.324->1.340 at 150 draws) — only ~7% of test sales are train-repeat
+parcels and only 3,806 parcels have 3+ sales where a latent beats "last
+price"; it even widens intervals slightly by marginalizing unknown-house
+quality as noise over the non-repeat majority. Kept opt-in, off by default.
+
 Unseen geography degrades gracefully: unseen market area draws a fresh area
 effect around its district; unseen district falls back to the city level.
 Chains run sequentially by default (cores=1): parallel chains fork on macOS
@@ -77,6 +87,11 @@ _LINEAR_COVARIATES = [
     "mkt_knn_log_ppsf",
     "mkt_area_level_log_ppsf",
     "mkt_knn_mean_dist_m",
+    # repeat-sales carry-forward: the parcel's previous sale price in the
+    # index reference frame — a direct prior estimate of y for the 62% of
+    # sales that are repeats. Paired with a missing indicator so non-repeats
+    # aren't imputed to a misleading "average previous price".
+    "mkt_parcel_prev_log_price_ref",
 ]
 _ORDINAL_COVARIATES = ["char_exterior_condition", "char_interior_condition"]
 
@@ -93,7 +108,7 @@ class CovariateEncoder:
     @classmethod
     def fit(cls, df: pl.DataFrame) -> CovariateEncoder:
         raw = _raw_covariates(df)
-        names = [c for c in raw.columns if c != "block_roll_missing"]
+        names = [c for c in raw.columns if not c.endswith("_missing")]
         medians, means, stds = {}, {}, {}
         for name in names:
             values = raw[name].drop_nulls().to_numpy()
@@ -110,12 +125,19 @@ class CovariateEncoder:
             / self.stds[name]
             for name in self.names
         ]
-        columns.append(raw["block_roll_missing"].to_numpy().astype(np.float64))
+        columns += [
+            raw[name].to_numpy().astype(np.float64) for name in self._missing_names
+        ]
         return np.column_stack(columns)
 
     @property
+    def _missing_names(self) -> list[str]:
+        # stable order: derived from the covariate definitions, not the run
+        return ["block_roll_missing", "prev_price_missing"]
+
+    @property
     def feature_names(self) -> list[str]:
-        return [*self.names, "block_roll_missing"]
+        return [*self.names, *self._missing_names]
 
 
 def _raw_covariates(df: pl.DataFrame) -> pl.DataFrame:
@@ -131,6 +153,13 @@ def _raw_covariates(df: pl.DataFrame) -> pl.DataFrame:
         for c in _ORDINAL_COVARIATES
     ]
     exprs.append(pl.col("mkt_block_roll_mean_price").is_null().alias("block_roll_missing"))
+    exprs.append(
+        pl.col("mkt_parcel_prev_log_price_ref")
+        .cast(pl.Float64)
+        .fill_nan(None)
+        .is_null()
+        .alias("prev_price_missing")
+    )
     return df.select(exprs)
 
 
@@ -171,6 +200,43 @@ class GeoIndex:
         fine = np.array([fine_ix.get(str(v), -1) for v in df[fine_col].to_list()])
         coarse = np.array([coarse_ix.get(str(v), -1) for v in df[coarse_col].to_list()])
         return fine, coarse
+
+
+@dataclass
+class ParcelIndex:
+    """Parcel random-effect index, identified only by repeat sales.
+
+    A per-parcel latent quality term is unidentified for single-sale parcels
+    (confounded with the residual), so only parcels with >= `min_sales`
+    training sales get an effect; all others map to a fixed zero slot. This
+    keeps the parameter count to the repeat parcels and is the statistically
+    honest structure — the effect exists exactly where the data can estimate
+    it. Leakage discipline: fitted on TRAIN parcels only; at scoring a known
+    repeat parcel uses its posterior effect (its earlier sale genuinely
+    precedes the later one, like mkt_parcel_prev_price), while an unseen
+    parcel's effect is marginalized as tau_parcel noise."""
+
+    parcels: list[str]  # repeat parcels, in index order
+    min_sales: int = 2
+
+    @classmethod
+    def fit(cls, df: pl.DataFrame, min_sales: int = 2) -> ParcelIndex:
+        counts = df.group_by("parcel_id").len().filter(pl.col("len") >= min_sales)
+        return cls(parcels=sorted(counts["parcel_id"].to_list()), min_sales=min_sales)
+
+    @property
+    def n(self) -> int:
+        return len(self.parcels)
+
+    def mapped(self, df: pl.DataFrame) -> np.ndarray:
+        """Row -> parcel index, or n (the zero slot) for singleton/unseen."""
+        ix = {p: i for i, p in enumerate(self.parcels)}
+        return np.array([ix.get(p, self.n) for p in df["parcel_id"].to_list()])
+
+    def seen(self, df: pl.DataFrame) -> np.ndarray:
+        """Row -> parcel index or -1 (used by scoring to split known/unknown)."""
+        ix = {p: i for i, p in enumerate(self.parcels)}
+        return np.array([ix.get(p, -1) for p in df["parcel_id"].to_list()])
 
 
 @dataclass
@@ -250,6 +316,8 @@ def _fit_posterior(
     cores: int,
     seed: int,
     nu_fixed: float | None,
+    parcel_mapped: np.ndarray | None = None,
+    n_parcels: int = 0,
 ):
     import pymc as pm
 
@@ -261,6 +329,8 @@ def _fit_posterior(
     }
     if basis is not None:
         coords["basis"] = [f"b{i}" for i in range(basis.shape[1])]
+    if parcel_mapped is not None:
+        coords["parcel"] = [f"p{i}" for i in range(n_parcels)]
     with pm.Model(coords=coords):
         mu_city = pm.Normal("mu_city", 12.0, 2.0)
         tau_district = pm.HalfNormal("tau_district", 0.5)
@@ -276,6 +346,15 @@ def _fit_posterior(
 
         beta = pm.Normal("beta", 0.0, 1.0, dims="covariate")
         mu = alpha_area[area_idx] + x @ beta
+        if parcel_mapped is not None:
+            # per-parcel latent quality, identified by repeats (non-centered);
+            # a zero slot at index n absorbs singleton/unseen parcels so the
+            # effect is only estimated where the data can
+            tau_parcel = pm.HalfNormal("tau_parcel", 0.3)
+            z_parcel = pm.Normal("z_parcel", 0.0, 1.0, dims="parcel")
+            u_parcel = pm.Deterministic("u_parcel", tau_parcel * z_parcel, dims="parcel")
+            u_parcel_padded = pm.math.concatenate([u_parcel, [0.0]])
+            mu = mu + u_parcel_padded[parcel_mapped]
         if basis is not None:
             # measured 2026-07-03: the overlapping RBF columns are collinear and
             # multiply a shared tau_gp — sampling slows >15x. Off by default;
@@ -327,7 +406,7 @@ def _fit_posterior(
 _DRAW_VARIABLES = (
     "alpha_area", "alpha_district", "mu_city", "tau_area",
     "beta", "tau_gp", "w_spatial", "g0", "g", "u_sigma_district",
-    "tau_sigma_district", "nu",
+    "tau_sigma_district", "nu", "u_parcel", "tau_parcel",
 )
 
 
@@ -365,6 +444,7 @@ def predict_price_draws(
     *,
     seed: int,
     time_adj_log: np.ndarray | None = None,
+    parcel: np.ndarray | None = None,
 ) -> np.ndarray:
     """(n_draws, n_rows) posterior-predictive price draws at the sale/valuation
     date (levels): reference-month draws shifted back by `time_adj_log`."""
@@ -385,6 +465,19 @@ def predict_price_draws(
         alpha[:, unseen_all] = draws["mu_city"][:, None]
 
     mu = alpha + draws["beta"] @ x.T
+    if parcel is not None and "u_parcel" in draws:
+        # known repeat parcel: use its learned effect (the repeat-sales win);
+        # unseen/singleton parcel: marginalize the unknown house quality as
+        # tau_parcel noise, which honestly widens its interval
+        u = np.zeros((n_draws, n_rows))
+        known = parcel >= 0
+        u[:, known] = draws["u_parcel"][:, parcel[known]]
+        unknown = ~known
+        if unknown.any():
+            u[:, unknown] = draws["tau_parcel"][:, None] * rng.standard_normal(
+                (n_draws, int(unknown.sum()))
+            )
+        mu = mu + u
     if basis is not None and "w_spatial" in draws:
         mu = mu + (draws["tau_gp"][:, None] * draws["w_spatial"]) @ basis.T
     log_sigma = draws["g0"][:, None] + draws["g"] @ z_sigma.T
@@ -407,9 +500,11 @@ def predict_price_draws(
 
 def load_run(
     run_dir: Path,
-) -> tuple[dict[str, np.ndarray], CovariateEncoder, GeoIndex, RBFBasis | None]:
+) -> tuple[
+    dict[str, np.ndarray], CovariateEncoder, GeoIndex, RBFBasis | None, ParcelIndex | None
+]:
     """Load a trained run's posterior draws, encoder, geography, and (optional)
-    spatial basis."""
+    spatial basis and parcel index."""
     with np.load(run_dir / "posterior_draws.npz") as data:
         draws = {name: data[name] for name in data.files}
     cov = json.loads((run_dir / "covariates.json").read_text())
@@ -424,7 +519,11 @@ def load_run(
     if (run_dir / "rbf.json").exists():
         r = json.loads((run_dir / "rbf.json").read_text())
         basis = RBFBasis(centers=np.array(r["centers"]), bandwidth_m=r["bandwidth_m"])
-    return draws, encoder, geo, basis
+    parcels = None
+    if (run_dir / "parcels.json").exists():
+        p = json.loads((run_dir / "parcels.json").read_text())
+        parcels = ParcelIndex(parcels=p["parcels"], min_sales=p["min_sales"])
+    return draws, encoder, geo, basis, parcels
 
 
 @dataclass(frozen=True)
@@ -442,6 +541,7 @@ def train_bayesian(
     time_adjusted: bool = True,
     nu_fixed: float | None = 8.0,
     spatial_basis: bool = False,
+    parcel_effect: bool = False,
     draws: int = 800,
     tune: int = 800,
     chains: int = 2,
@@ -469,6 +569,11 @@ def train_bayesian(
     encoder = CovariateEncoder.fit(train_df)
     geo = GeoIndex.fit(train_df)
     rbf = RBFBasis.fit(_xy(train_df), seed=seed) if spatial_basis else None
+    # opt-in per-parcel latent quality. Measured 2026-07-04: adds ~nothing over
+    # the mkt_parcel_prev_log_price_ref covariate (COD 30.43->30.37, width
+    # 1.324->1.340) because only ~7% of test sales are train-repeat parcels and
+    # only 3,806 parcels have 3+ sales where the effect beats "last price".
+    parcels = ParcelIndex.fit(train_df) if parcel_effect else None
 
     def target(frame: pl.DataFrame) -> np.ndarray:
         y = np.log(frame["sale_price"].to_numpy())
@@ -492,6 +597,8 @@ def train_bayesian(
         cores=cores,
         seed=seed,
         nu_fixed=nu_fixed,
+        parcel_mapped=parcels.mapped(train_df) if parcels is not None else None,
+        n_parcels=parcels.n if parcels is not None else 0,
     )
 
     posterior_draws = _thin_draws(idata, max_prediction_draws, seed, nu_fixed=nu_fixed)
@@ -508,6 +615,7 @@ def train_bayesian(
         district_test,
         seed=seed,
         time_adj_log=test_adj,
+        parcel=parcels.seen(test_df) if parcels is not None else None,
     )
     point = np.median(price_draws, axis=0)
     pi_low = np.quantile(price_draws, PI_LOW, axis=0)
@@ -544,7 +652,7 @@ def train_bayesian(
     overall = evaluation.filter(pl.col("segment_type") == "overall").to_dicts()[0]
 
     hyper_summary = []
-    for name in ("mu_city", "tau_district", "tau_area", "tau_gp", "g0",
+    for name in ("mu_city", "tau_district", "tau_area", "tau_gp", "tau_parcel", "g0",
                  "tau_sigma_district", "nu"):
         if name not in idata.posterior:
             continue
@@ -595,6 +703,8 @@ def train_bayesian(
                 "time_adjusted": time_adjusted,
                 "nu_fixed": nu_fixed,
                 "spatial_basis": spatial_basis,
+                "parcel_effect": parcel_effect,
+                "n_parcel_effects": parcels.n if parcels is not None else 0,
                 "sigma_terms": SIGMA_TERM_NAMES,
                 "max_prediction_draws": max_prediction_draws,
                 "seed": seed,
@@ -648,6 +758,10 @@ def train_bayesian(
                 {"centers": rbf.centers.tolist(), "bandwidth_m": rbf.bandwidth_m}, indent=2
             )
             + "\n"
+        )
+    if parcels is not None:
+        (run_dir / "parcels.json").write_text(
+            json.dumps({"parcels": parcels.parcels, "min_sales": parcels.min_sales}) + "\n"
         )
 
     mart_manifest = read_derived_manifest(mart_path)

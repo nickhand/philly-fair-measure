@@ -231,6 +231,27 @@ an engineering one); and for individual appeals the owner can simply
 photograph their own facade — the systematic layer is what is gated, not the
 report packet. Token stays in the untracked .env for future rechecks.
 
+**Repeat-sales in the Bayesian model: covariate wins, parcel random effect
+measured useless (2026-07-04).** The Bayesian interval model had NO
+repeat-sales signal (only LightGBM carried the indexed prev price). Two
+designs, measured before shipping (beneficiary counts first, then a 150-draw
+timed ablation on real data): (1) add mkt_parcel_prev_log_price_ref as a
+covariate — 62% of test sales have it, near-zero cost; (2) a full per-parcel
+latent quality random effect identified by repeats (leakage-safe: train-only
+effect, unseen parcels marginalized as tau_parcel noise). Beneficiary
+measurement: 29,116 repeat parcels in train but only 1,374 test sales (7%)
+are train-repeat parcels, and only 3,806 parcels have 3+ sales where a latent
+beats "last price". Ablation: covariate-only COD 30.43 / width 1.324 vs
++parcel-RE COD 30.37 / width **1.340** (wider!) — the RE marginalizing
+unknown-house quality as noise costs more on the 93% non-repeat majority than
+its learned effect saves on the 7% repeat minority. nutpie handled 29k params
+fine (320s vs 327s), so this is an identifiability verdict, not a compute
+one. Shipped the covariate as default; kept the RE opt-in (--parcel-effect)
+with the finding documented — the same disciplined outcome as the RBF-basis
+and ACS nulls. This is also the clean statistical statement of the
+interior-condition limit: per-house unobserved quality is only learnable
+where the house sells repeatedly, which is too rare to move the aggregate.
+
 **Modern Bayesian practice applicable here**
 - **HSGP** (Hilbert-space GP approximation; Solin & Särkkä, and the practical
   probabilistic-programming variant) gives near-exact low-dimensional GPs at

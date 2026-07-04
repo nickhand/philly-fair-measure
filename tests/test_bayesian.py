@@ -26,6 +26,7 @@ def _frame():
             "mkt_knn_log_ppsf": [5.2, 5.6, None],
             "mkt_area_level_log_ppsf": [0.1, -0.2, 0.0],
             "mkt_knn_mean_dist_m": [40.0, 90.0, None],
+            "mkt_parcel_prev_log_price_ref": [12.1, None, 12.6],
             "char_exterior_condition": ["4", "3", None],
             "char_interior_condition": ["4", None, "5"],
             "loc_market_area": ["ma_001", "ma_001", "ma_002"],
@@ -40,8 +41,10 @@ def test_covariate_encoder_imputes_and_standardizes():
     x = encoder.transform(df)
     assert x.shape == (3, len(encoder.feature_names))
     assert np.isfinite(x).all()
-    assert encoder.feature_names[-1] == "block_roll_missing"
-    assert x[:, -1].tolist() == [0.0, 1.0, 0.0]
+    # two trailing missing indicators: block roll, then prev price
+    assert encoder.feature_names[-2:] == ["block_roll_missing", "prev_price_missing"]
+    assert x[:, encoder.feature_names.index("block_roll_missing")].tolist() == [0.0, 1.0, 0.0]
+    assert x[:, encoder.feature_names.index("prev_price_missing")].tolist() == [0.0, 1.0, 0.0]
     assert abs(x[:, 0].mean()) < 1e-9
 
 
@@ -54,6 +57,23 @@ def test_covariate_encoder_survives_float_nan():
     encoder = CovariateEncoder.fit(df)
     x = encoder.transform(df)
     assert np.isfinite(x).all()
+
+
+def test_parcel_index_repeats_only_and_leakage_safe():
+    from philly_assessments.models.bayesian import ParcelIndex
+
+    train = pl.DataFrame(
+        {"parcel_id": ["a", "a", "b", "b", "b", "c"]}  # a x2, b x3, c x1
+    )
+    pidx = ParcelIndex.fit(train, min_sales=2)
+    assert pidx.parcels == ["a", "b"]  # singleton c excluded (unidentified)
+    assert pidx.n == 2
+
+    # mapped: singleton/unseen -> the zero slot (n); test parcel 'd' never seen
+    test = pl.DataFrame({"parcel_id": ["a", "b", "c", "d"]})
+    assert pidx.mapped(test).tolist() == [0, 1, 2, 2]  # c,d -> zero slot (n=2)
+    # seen: known repeat -> index, else -1 (scoring marginalizes these)
+    assert pidx.seen(test).tolist() == [0, 1, -1, -1]
 
 
 def test_geo_index_maps_unseen_geography():

@@ -141,6 +141,7 @@ def _cmd_train_bayesian(args: argparse.Namespace) -> int:
         test_fraction=args.test_fraction,
         nu_fixed=None if args.learn_nu else args.nu,
         spatial_basis=args.spatial_basis,
+        parcel_effect=args.parcel_effect,
         draws=args.draws,
         tune=args.tune,
         chains=args.chains,
@@ -587,6 +588,12 @@ def main(argv: list[str] | None = None) -> int:
         "--spatial-basis",
         action="store_true",
         help="add the RBF spatial basis (measured >15x slower sampling)",
+    )
+    bayes.add_argument(
+        "--parcel-effect",
+        action="store_true",
+        help="add per-parcel latent quality (measured ~no gain over the "
+        "prev-price covariate; ~29k params)",
     )
     bayes.add_argument("--data-dir", type=Path)
     bayes.set_defaults(func=_cmd_train_bayesian)

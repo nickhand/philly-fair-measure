@@ -76,11 +76,12 @@ def score_bayesian_intervals(
     bound draw-matrix memory. Handles the run's time adjustment internally."""
     from philly_assessments.models.bayesian import _sigma_design, _xy
 
-    draws, encoder, geo, basis = load_run(run_dir)
+    draws, encoder, geo, basis, parcels = load_run(run_dir)
     x = encoder.transform(df)
     area, district = geo.indices(df)
     b = basis.transform(_xy(df)) if basis is not None else None
     z = _sigma_design(df)
+    parcel = parcels.seen(df) if parcels is not None else None
     if run_params(run_dir).get("time_adjusted") and "time_adj_log" in df.columns:
         adj = df["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy()
     else:
@@ -98,6 +99,7 @@ def score_bayesian_intervals(
             district[start:stop],
             seed=seed + start,
             time_adj_log=adj[start:stop],
+            parcel=parcel[start:stop] if parcel is not None else None,
         )
         medians.append(np.median(price_draws, axis=0))
         lows.append(np.quantile(price_draws, pi_low, axis=0))
