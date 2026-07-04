@@ -252,6 +252,34 @@ and ACS nulls. This is also the clean statistical statement of the
 interior-condition limit: per-house unobserved quality is only learnable
 where the house sells repeatedly, which is too rare to move the aggregate.
 
+**Stability audit — CV distribution + look-ahead bound (measured 2026-07-04,
+`philly stability-audit`).** Replaces "COD 26 is one split" with a
+distribution, and confronts the learned-geography look-ahead honestly.
+
+- **Temporal rolling-origin CV** (5 expanding-window out-of-time folds,
+  2020→2025): **COD 25.4 ± 0.6** (range 24.5–25.9), median ratio 0.956–0.990.
+  The headline accuracy is stable across time, not a lucky split.
+- **Spatial leave-one-district-out CV** (hold out a whole district, predict
+  it): **COD 28.1 ± 12.8** across 18 districts (11.7–53.6). Mean only ~2.5
+  points worse than the random split — the model generalizes to geography it
+  never trained on, leaning on transferable signal (characteristics, kNN
+  surface) not just memorized area levels. The wide range and worst cases
+  (d_09 54, d_06 45) are the *adversarial* cost of removing an entire
+  district; in production no Philadelphia geography is ever unseen, so this is
+  a deliberate lower bound, not the operating condition.
+- **Price-index look-ahead: disclosed, not dismissed.** The index and market
+  areas are fit on all sales including the test window. The time-adjustment
+  this actually applies to test sales averages **15%** (p95 39%) — material,
+  not negligible; the *leaky* fraction (the part unpredictable from the
+  certification date) is smaller but unquantified here. The key defense is
+  **OPA-parity**: OPA time-adjusts to its effective date with the full-window
+  compound index too, so the model-vs-OPA comparison is not unfairly inflated
+  by this — both sides use it. The honest caveat is on the *absolute*
+  out-of-time number: it is the OPA-comparable convention and mildly
+  optimistic versus a strict real-time deployment. Fully removing it needs a
+  train-only refit of the index + market areas + model (deferred, low
+  expected movement given the CV stability above).
+
 **Modern Bayesian practice applicable here**
 - **HSGP** (Hilbert-space GP approximation; Solin & Särkkä, and the practical
   probabilistic-programming variant) gives near-exact low-dimensional GPs at

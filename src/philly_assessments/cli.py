@@ -307,6 +307,39 @@ def _cmd_retail_market(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_stability_audit(args: argparse.Namespace) -> int:
+    from philly_assessments.diagnostics.stability import (
+        index_lookahead_bound,
+        spatial_cv,
+        temporal_cv,
+    )
+
+    temporal, t_sum = temporal_cv(args.data_dir)
+    print("1. temporal rolling-origin CV (expanding window, out-of-time folds)\n")
+    print(f"{'fold':<6}{'test from':<12}{'n_test':>8}{'COD':>8}{'ratio':>8}")
+    for r in temporal.to_dicts():
+        print(f"{r['fold']:<6}{r['test_from']:<12}{r['n_test']:>8,}{r['cod']:>8.1f}"
+              f"{r['median_ratio']:>8.3f}")
+    print(f"  -> COD {t_sum['cod_mean']:.1f} ± {t_sum['cod_sd']:.1f} "
+          f"(range {t_sum['cod_min']:.1f}-{t_sum['cod_max']:.1f})")
+
+    spatial, s_sum = spatial_cv(args.data_dir)
+    print("\n2. spatial leave-one-district-out CV (adversarial — unseen geography)\n")
+    print(f"  COD {s_sum['cod_mean']:.1f} ± {s_sum['cod_sd']:.1f} across "
+          f"{s_sum['folds']} districts (range {s_sum['cod_min']:.1f}-{s_sum['cod_max']:.1f})")
+    worst = spatial.head(3).to_dicts()
+    print("  worst held-out districts: " +
+          ", ".join(f"{r['held_out_district']} {r['cod']:.0f}" for r in worst))
+
+    la = index_lookahead_bound(args.data_dir)
+    print("\n3. price-index look-ahead bound (magnitude of test-set time adjustment)\n")
+    print(f"  mean |time adjustment| on test sales = {la['mean_abs_timeadj_pct']:.2%} "
+          f"(p95 {la['p95_abs_timeadj_pct']:.2%}); the leaky component is a fraction of this.")
+    print(f"  max index drift across the test window = "
+          f"{la['max_index_drift_over_window_pct']:.2%}")
+    return 0
+
+
 def _cmd_robustness_audit(args: argparse.Namespace) -> int:
     from philly_assessments.diagnostics.robustness import robustness_audit
 
@@ -718,6 +751,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     acs.add_argument("--data-dir", type=Path)
     acs.set_defaults(func=_cmd_acs_sensitivity)
+
+    stability = subparsers.add_parser(
+        "stability-audit",
+        help="temporal + spatial cross-validation and the price-index "
+        "look-ahead bound (accuracy is a distribution, not one split)",
+    )
+    stability.add_argument("--data-dir", type=Path)
+    stability.set_defaults(func=_cmd_stability_audit)
 
     robustness = subparsers.add_parser(
         "robustness-audit",
