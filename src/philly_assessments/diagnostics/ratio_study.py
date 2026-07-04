@@ -77,7 +77,7 @@ def _rows(
             "step": step,
             "segment": "overall",
             "n_trimmed": n_trimmed,
-            **evaluate_estimates(estimate, price),
+            **evaluate_estimates(estimate, price).as_row(),
         }
     ]
     if style is not None:
@@ -90,7 +90,7 @@ def _rows(
                         "step": step,
                         "segment": name,
                         "n_trimmed": n_trimmed,
-                        **evaluate_estimates(estimate[mask], price[mask]),
+                        **evaluate_estimates(estimate[mask], price[mask]).as_row(),
                     }
                 )
     return out
@@ -252,7 +252,7 @@ def sale_chasing_check(
                         k: v
                         for k, v in evaluate_estimates(
                             value[keep], price_tasp[keep]
-                        ).items()
+                        ).as_row().items()
                         if k in ("n", "median_ratio", "cod", "prd", "prb")
                     },
                     "pct_within_2pct_of_price": float(

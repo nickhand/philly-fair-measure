@@ -8,12 +8,18 @@ Ratio statistics come from assesspy (the CCAO's package; see docs/ccao-lessons.m
     PRB  price-related bias coefficient — target within [-0.05, 0.05]
 
 All functions take plain sequences/arrays of positive prices; rows where either
-value is missing or non-positive are dropped before computing.
+value is missing or non-positive are dropped before computing. Results are
+frozen dataclasses (Robust Python: typed attributes instead of stringly-keyed
+dicts); a statistic that is undefined on the cleaned input is ``None``, never
+a crash.
 """
 
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
+from typing import Any
 
 import assesspy
 import numpy as np
@@ -29,45 +35,77 @@ def _clean(
     return est[mask], sale[mask]
 
 
-def fit_metrics(
-    estimate: npt.ArrayLike, sale_price: npt.ArrayLike
-) -> dict[str, float | int | None]:
+@dataclass(frozen=True)
+class FitMetrics:
+    """Fit statistics on the cleaned pairs; ``None`` when the input is empty."""
+
+    n: int
+    rmse_log: float | None
+    mape: float | None
+    r2_log: float | None
+
+
+@dataclass(frozen=True)
+class RatioMetrics:
+    """IAAO ratio-study statistics; ``None`` when undefined (< 3 sales or
+    degenerate inputs)."""
+
+    median_ratio: float | None
+    cod: float | None
+    prd: float | None
+    prb: float | None
+    mki: float | None
+
+
+@dataclass(frozen=True)
+class Metrics(RatioMetrics, FitMetrics):
+    """One evaluation result: fit + ratio statistics.
+
+    ``as_row()`` flattens to the historical evaluation-table column set
+    (n, rmse_log, mape, r2_log, median_ratio, cod, prd, prb, mki) for
+    DataFrame row construction.
+    """
+
+    def as_row(self) -> dict[str, float | int | None]:
+        return asdict(self)
+
+
+def fit_metrics(estimate: npt.ArrayLike, sale_price: npt.ArrayLike) -> FitMetrics:
     est, sale = _clean(estimate, sale_price)
     if len(est) == 0:
-        return {"n": 0, "rmse_log": None, "mape": None, "r2_log": None}
+        return FitMetrics(n=0, rmse_log=None, mape=None, r2_log=None)
     log_err = np.log(est) - np.log(sale)
     ss_tot = float(np.sum((np.log(sale) - np.log(sale).mean()) ** 2))
-    return {
-        "n": int(len(est)),
-        "rmse_log": float(np.sqrt(np.mean(log_err**2))),
-        "mape": float(np.mean(np.abs(est - sale) / sale)),
-        "r2_log": (1.0 - float(np.sum(log_err**2)) / ss_tot) if ss_tot > 0 else None,
-    }
+    return FitMetrics(
+        n=int(len(est)),
+        rmse_log=float(np.sqrt(np.mean(log_err**2))),
+        mape=float(np.mean(np.abs(est - sale) / sale)),
+        r2_log=(1.0 - float(np.sum(log_err**2)) / ss_tot) if ss_tot > 0 else None,
+    )
 
 
-def ratio_metrics(
-    estimate: npt.ArrayLike, sale_price: npt.ArrayLike
-) -> dict[str, float | None]:
+def ratio_metrics(estimate: npt.ArrayLike, sale_price: npt.ArrayLike) -> RatioMetrics:
     est, sale = _clean(estimate, sale_price)
     if len(est) < 3:
-        return {"median_ratio": None, "cod": None, "prd": None, "prb": None, "mki": None}
-    ratio = est / sale
-    out: dict[str, float | None] = {"median_ratio": float(np.median(ratio))}
-    for name, fn in (
-        ("cod", assesspy.cod),
-        ("prd", assesspy.prd),
-        ("prb", assesspy.prb),
-        ("mki", assesspy.mki),
-    ):
+        return RatioMetrics(median_ratio=None, cod=None, prd=None, prb=None, mki=None)
+
+    def safe(fn: Callable[[np.ndarray, np.ndarray], Any]) -> float | None:
         try:
             value = float(fn(est, sale))
-            out[name] = value if math.isfinite(value) else None
         except Exception:  # degenerate inputs (e.g. zero variance) — report absence, not a crash
-            out[name] = None
-    return out
+            return None
+        return value if math.isfinite(value) else None
+
+    return RatioMetrics(
+        median_ratio=float(np.median(est / sale)),
+        cod=safe(assesspy.cod),
+        prd=safe(assesspy.prd),
+        prb=safe(assesspy.prb),
+        mki=safe(assesspy.mki),
+    )
 
 
-def evaluate_estimates(
-    estimate: npt.ArrayLike, sale_price: npt.ArrayLike
-) -> dict[str, float | int | None]:
-    return {**fit_metrics(estimate, sale_price), **ratio_metrics(estimate, sale_price)}
+def evaluate_estimates(estimate: npt.ArrayLike, sale_price: npt.ArrayLike) -> Metrics:
+    fit = fit_metrics(estimate, sale_price)
+    ratio = ratio_metrics(estimate, sale_price)
+    return Metrics(**asdict(fit), **asdict(ratio))

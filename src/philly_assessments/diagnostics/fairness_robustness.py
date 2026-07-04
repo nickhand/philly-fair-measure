@@ -29,12 +29,16 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import polars as pl
 
 from philly_assessments import config
 from philly_assessments.scalars import as_float
+
+if TYPE_CHECKING:
+    from philly_assessments.models.metrics import Metrics
 
 logger = logging.getLogger(__name__)
 
@@ -52,13 +56,11 @@ COARSE_CATEGORICAL = [
 _GROUPS = ("White alone", "Black alone", "Hispanic/Latino, any race")
 
 
-def _by_race(
-    df: pl.DataFrame, value: np.ndarray, price: np.ndarray
-) -> dict[str, dict[str, float | int | None]]:
+def _by_race(df: pl.DataFrame, value: np.ndarray, price: np.ndarray) -> dict[str, Metrics]:
     from philly_assessments.models.metrics import evaluate_estimates
 
     maj = df["acs_majority_race"].fill_null("unmatched").to_numpy()
-    out: dict[str, dict[str, float | int | None]] = {}
+    out: dict[str, Metrics] = {}
     for g in _GROUPS:
         m = (maj == g) & np.isfinite(value) & np.isfinite(price) & (value > 0) & (price > 0)
         if m.sum() >= 300:
@@ -93,7 +95,7 @@ def mechanism_demo(data_dir: Path | None = None) -> pl.DataFrame:
         stats = _by_race(test, value, price)
         for g, m in stats.items():
             rows.append({"model": model, "group": g,
-                         "median_ratio": m["median_ratio"], "cod": m["cod"]})
+                         "median_ratio": m.median_ratio, "cod": m.cod})
     return pl.DataFrame(rows)
 
 
@@ -123,11 +125,11 @@ def race_gap_cv(data_dir: Path | None = None, *, n_folds: int = 5) -> pl.DataFra
         model_stats = _by_race(tj, pred, price)
         opa_stats = _by_race(tj, opa, price)
 
-        def gap(stats: dict[str, dict[str, float | int | None]]) -> float | None:
+        def gap(stats: dict[str, Metrics]) -> float | None:
             if "White alone" in stats and "Black alone" in stats:
-                black = stats["Black alone"]["median_ratio"]
-                white = stats["White alone"]["median_ratio"]
-                if isinstance(black, (int, float)) and isinstance(white, (int, float)):
+                black = stats["Black alone"].median_ratio
+                white = stats["White alone"].median_ratio
+                if black is not None and white is not None:
                     return black - white
             return None
 
@@ -220,8 +222,8 @@ def vertical_regressivity_cv(
             "n": length,
             "q1q5_vs_sale": q1s / q5s,
             "q1q5_vs_retail": q1r / q5r,
-            "prd_vs_sale": evaluate_estimates(opa, price)["prd"],
-            "prd_vs_retail": evaluate_estimates(opa, retail)["prd"],
+            "prd_vs_sale": evaluate_estimates(opa, price).prd,
+            "prd_vs_retail": evaluate_estimates(opa, retail).prd,
         })
     table = pl.DataFrame(rows)
     summary = {

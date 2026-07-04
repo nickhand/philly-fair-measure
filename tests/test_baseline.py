@@ -34,19 +34,19 @@ def test_vertical_calibration_flattens_compression_gradient():
 
 def test_fit_metrics_known_values():
     out = fit_metrics([110_000.0, 90_000.0], [100_000.0, 100_000.0])
-    assert out["n"] == 2
-    assert out["mape"] == pytest.approx(0.1)
+    assert out.n == 2
+    assert out.mape == pytest.approx(0.1)
     expected_rmse = math.sqrt((math.log(1.1) ** 2 + math.log(0.9) ** 2) / 2)
-    assert out["rmse_log"] == pytest.approx(expected_rmse)
+    assert out.rmse_log == pytest.approx(expected_rmse)
 
 
 def test_ratio_metrics_known_cod_and_cleaning():
     out = ratio_metrics([90_000.0, 100_000.0, 110_000.0], [100_000.0] * 3)
-    assert out["median_ratio"] == pytest.approx(1.0)
-    assert out["cod"] == pytest.approx(6.6667, abs=0.01)
+    assert out.median_ratio == pytest.approx(1.0)
+    assert out.cod == pytest.approx(6.6667, abs=0.01)
 
     cleaned = fit_metrics([100.0, float("nan"), -5.0], [100.0, 100.0, 100.0])
-    assert cleaned["n"] == 1
+    assert cleaned.n == 1
 
 
 def _synthetic_mart(n=800, seed=42):

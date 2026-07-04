@@ -15,8 +15,8 @@ def test_by_race_median_ratio_and_min_group():
     value = np.where(groups == "Black alone", price * 1.1, price)
     out = _by_race(df, value, price)
     assert "White alone" in out and "Black alone" in out
-    assert out["White alone"]["median_ratio"] == pytest.approx(1.0, abs=0.01)
-    assert out["Black alone"]["median_ratio"] == pytest.approx(1.1, abs=0.01)
+    assert out["White alone"].median_ratio == pytest.approx(1.0, abs=0.01)
+    assert out["Black alone"].median_ratio == pytest.approx(1.1, abs=0.01)
     # groups below the 300-row floor are dropped ("tiny" has 400 -> kept;
     # make a truly tiny one)
     small = pl.DataFrame({"acs_majority_race": ["Hispanic/Latino, any race"] * 100})

@@ -648,7 +648,7 @@ def train_bayesian(
                 "model": "bayesian_hierarchical",
                 "segment_type": segment_type,
                 "segment": segment,
-                **evaluate_estimates(point[m], sale_price[m]),
+                **evaluate_estimates(point[m], sale_price[m]).as_row(),
                 "coverage_90": float(np.mean(covered[m])) if m.any() else None,
                 "mean_pi_width_rel": (
                     float(np.mean((pi_high[m] - pi_low[m]) / point[m])) if m.any() else None

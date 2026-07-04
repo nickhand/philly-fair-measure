@@ -192,7 +192,7 @@ def train_condo(
                     "model": model,
                     "segment_type": segment_type,
                     "segment": segment,
-                    **evaluate_estimates(estimate[m], sale_price[m]),
+                    **evaluate_estimates(estimate[m], sale_price[m]).as_row(),
                 }
             )
     evaluation = pl.DataFrame(rows)

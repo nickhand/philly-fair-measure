@@ -120,7 +120,7 @@ def retail_vs_blend(data_dir: Path | None = None) -> RetailResult:
     for name, mask in segments:
         for model, pred in (("blend", pred_blend), ("retail", pred_retail)):
             rows.append({"segment": name, "model": model,
-                         **evaluate_estimates(pred[mask], price[mask])})
+                         **evaluate_estimates(pred[mask], price[mask]).as_row()})
     model_table = pl.DataFrame(rows)
 
     # OPA ratio study under both value conventions: actual sale price vs

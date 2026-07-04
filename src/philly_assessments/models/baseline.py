@@ -450,7 +450,7 @@ def train_baseline(
                     "convention": "out_of_time",
                     "segment_type": segment_type,
                     "segment": segment,
-                    **evaluate_estimates(estimate[m], sale_price[m]),
+                    **evaluate_estimates(estimate[m], sale_price[m]).as_row(),
                 }
             )
     # IAAO/Keene convention: estimates vs time-adjusted sale prices, overall only
@@ -467,7 +467,7 @@ def train_baseline(
                 "convention": "time_adjusted",
                 "segment_type": "overall",
                 "segment": "overall",
-                **evaluate_estimates(estimate, price_tasp),
+                **evaluate_estimates(estimate, price_tasp).as_row(),
             }
         )
     evaluation = pl.DataFrame(rows)

@@ -102,19 +102,18 @@ def temporal_cv(data_dir: Path | None = None, *, n_folds: int = 5) -> tuple[pl.D
         fit_df, val_df = train.head(train.height - n_val), train.tail(n_val)
         pred = _fit_predict(fit_df, val_df, test_df, numeric, categorical)
         m = evaluate_estimates(pred, test_df["sale_price"].to_numpy())
-        cod = m["cod"]
-        if not isinstance(cod, float):
+        if m.cod is None:
             raise ValueError(f"temporal fold {i + 1}: COD undefined (fold too small)")
-        cods.append(cod)
+        cods.append(m.cod)
         rows.append({
             "fold": i + 1,
             "test_from": str(test_df["sale_date"].min())[:10],
             "n_train": fit_df.height,
             "n_test": test_df.height,
-            "cod": cod,
-            "median_ratio": m["median_ratio"],
+            "cod": m.cod,
+            "median_ratio": m.median_ratio,
         })
-        logger.info("temporal fold %d: COD %.1f", i + 1, cod)
+        logger.info("temporal fold %d: COD %.1f", i + 1, m.cod)
     return pl.DataFrame(rows), _summary(cods)
 
 
@@ -132,6 +131,7 @@ def spatial_cv(
         if d is not None and c >= min_district_n
     ]
     rows = []
+    cods: list[float] = []
     for d in sorted(districts):
         test_df = df.filter(pl.col("loc_district") == d)
         train = df.filter(pl.col("loc_district") != d)
@@ -139,10 +139,13 @@ def spatial_cv(
         fit_df, val_df = train.head(train.height - n_val), train.tail(n_val)
         pred = _fit_predict(fit_df, val_df, test_df, numeric, categorical)
         m = evaluate_estimates(pred, test_df["sale_price"].to_numpy())
+        if m.cod is None:
+            raise ValueError(f"spatial hold-out {d}: COD undefined (district too small)")
+        cods.append(m.cod)
         rows.append({"held_out_district": d, "n_test": test_df.height,
-                     "cod": m["cod"], "median_ratio": m["median_ratio"]})
-        logger.info("spatial hold-out %s: COD %.1f", d, m["cod"])
-    return pl.DataFrame(rows).sort("cod", descending=True), _summary([r["cod"] for r in rows])
+                     "cod": m.cod, "median_ratio": m.median_ratio})
+        logger.info("spatial hold-out %s: COD %.1f", d, m.cod)
+    return pl.DataFrame(rows).sort("cod", descending=True), _summary(cods)
 
 
 def index_lookahead_bound(data_dir: Path | None = None) -> dict:

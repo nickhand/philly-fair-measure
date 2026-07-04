@@ -206,7 +206,7 @@ def run_acs_sensitivity(
                     "model": model,
                     "segment_type": segment_type,
                     "segment": segment,
-                    **evaluate_estimates(estimate[mask], sale_price[mask]),
+                    **evaluate_estimates(estimate[mask], sale_price[mask]).as_row(),
                 }
             )
     table = pl.DataFrame(rows)
