@@ -36,7 +36,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Final, TypedDict
 
 import lightgbm as lgb
 import numpy as np
@@ -58,9 +58,9 @@ from philly_assessments.vocab import Market
 
 logger = logging.getLogger(__name__)
 
-RESIDENTIAL_CATEGORIES = ("SINGLE FAMILY", "MULTI FAMILY")
+RESIDENTIAL_CATEGORIES: Final = ("SINGLE FAMILY", "MULTI FAMILY")
 
-NUMERIC_FEATURES = [
+NUMERIC_FEATURES: Final = (
     "char_livable_area",
     "char_lot_area",
     "char_frontage",
@@ -143,9 +143,9 @@ NUMERIC_FEATURES = [
     "prox_dist_bike_network_m",
     "prox_parcel_density_400m",
     "prox_dist_vacant_land_m",
-]
-TIME_FEATURES = ["time_sale_epoch_days", "time_quarter", "time_month"]
-CATEGORICAL_FEATURES = [
+)
+TIME_FEATURES: Final = ("time_sale_epoch_days", "time_quarter", "time_month")
+CATEGORICAL_FEATURES: Final = (
     "char_category",
     "char_building_type",
     "char_style",
@@ -165,10 +165,10 @@ CATEGORICAL_FEATURES = [
     "loc_market_area",
     "loc_district",
     "loc_street_class",
-]
-STYLE_SEGMENTS = ("row", "twin", "detached")
+)
+STYLE_SEGMENTS: Final = ("row", "twin", "detached")
 
-DEFAULT_LGB_PARAMS = {
+DEFAULT_LGB_PARAMS: Final = {
     "objective": "regression",
     "metric": "rmse",
     "learning_rate": 0.05,
@@ -183,7 +183,7 @@ DEFAULT_LGB_PARAMS = {
     "seed": 42,
 }
 
-RIDGE_NUMERIC_BASE = [
+RIDGE_NUMERIC_BASE: Final = (
     "char_livable_area",
     "char_lot_area",
     "char_beds",
@@ -191,8 +191,8 @@ RIDGE_NUMERIC_BASE = [
     "char_year_built",
     "mkt_block_roll_mean_price",
     "mkt_knn_log_ppsf",
-]
-RIDGE_ONEHOT = ["char_category", "loc_zip5"]
+)
+RIDGE_ONEHOT: Final = ("char_category", "loc_zip5")
 
 
 def feature_lists(time_adjusted: bool) -> tuple[list[str], list[str]]:
@@ -431,7 +431,7 @@ def train_baseline(
         pred_lgb_ref = apply_vertical_calibration(pred_lgb_ref, calibration)
     pred_lgb = np.exp(pred_lgb_ref - test_adj)
 
-    ridge_numeric = RIDGE_NUMERIC_BASE + ([] if time_adjusted else ["time_sale_epoch_days"])
+    ridge_numeric = list(RIDGE_NUMERIC_BASE) + ([] if time_adjusted else ["time_sale_epoch_days"])
     ridge, ridge_matrix = _train_ridge(fit_df, y["fit"], ridge_numeric)
     pred_ridge_ref = ridge.predict(ridge_matrix(test_df))
     pred_ridge = np.exp(pred_ridge_ref - test_adj)

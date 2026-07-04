@@ -35,6 +35,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Final
 
 import numpy as np
 import polars as pl
@@ -48,7 +49,7 @@ logger = logging.getLogger(__name__)
 # a hidden propensity: cash-market value = retail value * (1 + discount). This
 # is the transparent way to express the cash convention — a documented number
 # an owner or a board can inspect, NOT a demographic proxy baked into a model.
-CHANNEL_DISCOUNT_BY_QUINTILE = [-0.216, -0.127, -0.088, -0.049, -0.027]
+CHANNEL_DISCOUNT_BY_QUINTILE: Final = (-0.216, -0.127, -0.088, -0.049, -0.027)
 
 
 def sale_price_quintile_edges(data_dir: Path | None = None) -> list[float]:
