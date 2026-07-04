@@ -289,6 +289,18 @@ same verdict as parcel shapes: the kNN sale surface + market areas already
 price location; kept because cheap, interpretable, and closing OPA variable
 parity.
 
+**Round two (2026-07-04, the CCAO "free quadrant"):** bus-stop count within
+800m (SEPTA stop summary, 18,063 stops), bike-network distance (city 2024
+layer, 5,193 segments), parcel density within 400m (median rowhome sits among
+1,619 parcels!), and vacant-land distance (semi-static caveat: vacancy
+persists but does change; median 57m — vacancy is ambient in much of the
+city). **Same verdict, now measured twice: COD 25.644 → 25.644, RMSE a hair
+worse.** CCAO ships these because Cook County's location signal is thinner
+per parcel; Philly's kNN sale surface saturates location. Kept for parity
+and screen context; the location-feature well is now declared DRY — future
+COD work goes through the target (financing channels), repeat-sales
+structure, and characteristics, not more geography.
+
 ## Provenance
 
 Informed by: `docs/ccao-lessons.md` (their production feature table, their

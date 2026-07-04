@@ -196,6 +196,36 @@ def _history_svg(history: pl.DataFrame) -> str:
     )
 
 
+def _viewer_links(s: dict, c: dict) -> list[tuple[str, str]]:
+    """Deep links to public property viewers — pointers, never scraped data.
+
+    The city Property Atlas is the legitimate public front door to the
+    licensed Cyclomedia/Pictometry street- and aerial-level imagery: the city
+    serves it there for interactive viewing, which is a very different thing
+    from bulk API extraction of the proprietary imagery."""
+    from urllib.parse import quote
+
+    links: list[tuple[str, str]] = []
+    address = s.get("address")
+    if address:
+        links.append(
+            ("City Property Atlas (imagery, deeds, L&I)",
+             f"https://atlas.phila.gov/{quote(str(address))}")
+        )
+    parcel_id = s.get("parcel_id", "")
+    links.append(
+        ("OPA property record", f"https://property.phila.gov/?p={quote(parcel_id)}")
+    )
+    lon = c.get("loc_lon") if c.get("loc_lon") is not None else s.get("loc_lon")
+    lat = c.get("loc_lat") if c.get("loc_lat") is not None else s.get("loc_lat")
+    if lon is not None and lat is not None:
+        links.append(
+            ("Google Street View",
+             f"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint={lat},{lon}")
+        )
+    return links
+
+
 def _evidence_rows(s: dict) -> list[tuple[str, str]]:
     rows: list[tuple[str, str]] = []
     if s.get("twin_n"):
@@ -301,6 +331,20 @@ def render_html(data: ReportData) -> str:
         "condition code matches the exterior code on 82% of residential parcels "
         "and rarely changes even after major renovation permits.</p>"
     )
+
+    links = _viewer_links({**s, "parcel_id": data.parcel_id}, c)
+    if links:
+        parts.append("<h2>View this property</h2><p class='note'>")
+        parts.append(
+            " · ".join(
+                f"<a href='{html.escape(url)}'>{html.escape(name)}</a>"
+                for name, url in links
+            )
+        )
+        parts.append(
+            "</p><p class='note'>The city serves Cyclomedia street-level and "
+            "aerial imagery through the Property Atlas for public viewing.</p>"
+        )
 
     evidence = _evidence_rows(s)
     if evidence:

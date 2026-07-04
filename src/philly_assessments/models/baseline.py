@@ -132,6 +132,10 @@ NUMERIC_FEATURES = [
     "prox_dist_park_m",
     "prox_dist_expressway_m",
     "prox_dist_arterial_m",
+    "prox_n_bus_stops_800m",
+    "prox_dist_bike_network_m",
+    "prox_parcel_density_400m",
+    "prox_dist_vacant_land_m",
 ]
 TIME_FEATURES = ["time_sale_epoch_days", "time_quarter", "time_month"]
 CATEGORICAL_FEATURES = [

@@ -47,6 +47,7 @@ def test_render_html_full_packet():
             "char_stories": 2.0, "char_year_built": 1755.0, "char_beds": 3.0,
             "char_baths": 1.0, "char_exterior_condition": "4",
             "char_interior_condition": "4", "char_quality_grade_raw": "C",
+            "loc_lon": -75.1425, "loc_lat": 39.9527,
         },
         comps=pl.DataFrame(
             [
@@ -74,8 +75,13 @@ def test_render_html_full_packet():
     )
     out = render_html(data)
     assert "<html>" in out and "</html>" in out
+    # deep-link section: pointers to public viewers, no scraped imagery
+    assert "atlas.phila.gov/108%20ELFRETHS%20ALY" in out
+    assert "property.phila.gov/?p=052174500" in out
+    assert "map_action=pano" in out
     for needle in (
         "108 ELFRETHS ALY",
+        "View this property",
         "Uniformity exhibit",
         "identical in every",
         "Comparable arms-length sales",

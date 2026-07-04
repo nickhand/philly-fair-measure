@@ -41,7 +41,18 @@ PROX_COLUMNS = [
     "prox_dist_park_m",
     "prox_dist_expressway_m",
     "prox_dist_arterial_m",
+    # CCAO free-quadrant round two (2026-07-04). prox_dist_vacant_land_m is
+    # semi-static (vacancy persists for years but does change) — the honest
+    # caveat class sits between quasi-static and current_only.
+    "prox_n_bus_stops_800m",
+    "prox_dist_bike_network_m",
+    "prox_parcel_density_400m",
+    "prox_dist_vacant_land_m",
 ]
+BUS_STOPS_DATASET = "septa_bus_stops"
+BIKE_NETWORK_DATASET = "bike_network"
+_BUS_RADIUS_M = 800.0
+_DENSITY_RADIUS_M = 400.0
 STREET_CLASS_COLUMN = "loc_street_class"
 
 _EXPRESSWAY_CLASSES = (1,)
@@ -110,7 +121,14 @@ class BuildResult:
 def build_proximity(data_dir: Path | None = None) -> BuildResult:
     root = data_dir if data_dir is not None else config.data_dir()
     latest = catalog.latest_snapshots(data_dir)
-    needed = [*RAPID_TRANSIT_DATASETS, REGIONAL_RAIL_DATASET, PARKS_DATASET, CENTERLINE_DATASET]
+    needed = [
+        *RAPID_TRANSIT_DATASETS,
+        REGIONAL_RAIL_DATASET,
+        PARKS_DATASET,
+        CENTERLINE_DATASET,
+        BUS_STOPS_DATASET,
+        BIKE_NETWORK_DATASET,
+    ]
     missing = [d for d in needed if d not in latest]
     if missing:
         raise FileNotFoundError(
@@ -122,7 +140,10 @@ def build_proximity(data_dir: Path | None = None) -> BuildResult:
 
     parcels = (
         pl.scan_parquet(root / "staged" / "opa_properties.parquet")
-        .select("parcel_number", "street_code", "lon", "lat", "lonlat_status")
+        .select(
+            "parcel_number", "street_code", "category_code_description",
+            "lon", "lat", "lonlat_status",
+        )
         .collect()
         .with_columns(*project_xy(pl.col("lon"), pl.col("lat")))
     )
@@ -149,6 +170,43 @@ def build_proximity(data_dir: Path | None = None) -> BuildResult:
         len(rapid), len(regional), len(parks), len(expressways), len(arterials),
     )
 
+    bus = load_geoms(BUS_STOPS_DATASET)
+    bike = load_geoms(BIKE_NETWORK_DATASET)
+    logger.info("round two: %d bus stops, %d bike segments", len(bus), len(bike))
+
+    from scipy.spatial import cKDTree
+
+    located = np.isfinite(xy).all(axis=1)
+    bus_counts = np.full(len(xy), np.nan)
+    density = np.full(len(xy), np.nan)
+    if len(bus):
+        import shapely
+
+        bus_xy = np.array([[g.x, g.y] for g in bus if isinstance(g, shapely.Point)])
+        bus_tree = cKDTree(bus_xy)
+        bus_counts[located] = [
+            float(len(ix)) for ix in bus_tree.query_ball_point(xy[located], _BUS_RADIUS_M)
+        ]
+    parcel_tree = cKDTree(xy[located])
+    density[located] = (
+        np.array(parcel_tree.query_ball_point(xy[located], _DENSITY_RADIUS_M,
+                                              return_length=True), dtype=float)
+        - 1.0
+    )
+
+    is_vacant = (
+        (parcels["category_code_description"].cast(pl.String) == "VACANT LAND")
+        .fill_null(False)
+        .to_numpy()
+    )
+    vacant_xy = xy[is_vacant & located]
+    dist_vacant = np.full(len(xy), np.nan)
+    if len(vacant_xy):
+        vtree = cKDTree(vacant_xy)
+        d, _ix = vtree.query(xy[located], k=1, workers=-1)
+        dist_vacant[located] = d
+    logger.info("vacant-land parcels located: %d", len(vacant_xy))
+
     frame = parcels.select(
         pl.col("parcel_number").alias("parcel_id"),
         pl.col("street_code").cast(pl.String).str.strip_chars_start("0").alias("_street_code"),
@@ -158,6 +216,10 @@ def build_proximity(data_dir: Path | None = None) -> BuildResult:
         pl.Series("prox_dist_park_m", _nearest_distance(xy, parks)).fill_nan(None),
         pl.Series("prox_dist_expressway_m", _nearest_distance(xy, expressways)).fill_nan(None),
         pl.Series("prox_dist_arterial_m", _nearest_distance(xy, arterials)).fill_nan(None),
+        pl.Series("prox_n_bus_stops_800m", bus_counts).fill_nan(None),
+        pl.Series("prox_dist_bike_network_m", _nearest_distance(xy, bike)).fill_nan(None),
+        pl.Series("prox_parcel_density_400m", density).fill_nan(None),
+        pl.Series("prox_dist_vacant_land_m", dist_vacant).fill_nan(None),
     )
     centerline = (
         pl.scan_parquet(latest[CENTERLINE_DATASET].data_path)
