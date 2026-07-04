@@ -66,6 +66,7 @@ uv run philly build-proximity      # after refreshing SEPTA/parks/centerline sna
 uv run philly build-features
 uv run philly build-condo-features
 uv run philly train-baseline
+uv run philly train-baseline --market retail   # financed-only retail-value model
 uv run philly train-bayesian       # ~5-10 min (nutpie)
 uv run philly train-condo
 uv run philly screen-assessments   # residential (Bayesian PI) + condo (conformal) rows

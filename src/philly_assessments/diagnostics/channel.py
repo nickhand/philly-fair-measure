@@ -43,6 +43,30 @@ from philly_assessments import config
 
 logger = logging.getLogger(__name__)
 
+# Pure within-tier cash-channel discounts by price quintile, measured via
+# `philly channel-decomp` (the "+distress" stage, 2026-07-04). Published, not
+# a hidden propensity: cash-market value = retail value * (1 + discount). This
+# is the transparent way to express the cash convention — a documented number
+# an owner or a board can inspect, NOT a demographic proxy baked into a model.
+CHANNEL_DISCOUNT_BY_QUINTILE = [-0.216, -0.127, -0.088, -0.049, -0.027]
+
+
+def sale_price_quintile_edges(data_dir: Path | None = None) -> list[float]:
+    """The 20/40/60/80 sale-price cut points the discounts are keyed to."""
+    root = data_dir if data_dir is not None else config.data_dir()
+    price = pl.scan_parquet(root / "marts" / "sale_features.parquet").select(
+        "sale_price"
+    ).collect()["sale_price"].to_numpy()
+    return [float(v) for v in np.quantile(price, [0.2, 0.4, 0.6, 0.8])]
+
+
+def cash_market_value(retail_value: np.ndarray, edges: list[float]) -> np.ndarray:
+    """Convert retail value to cash-market realizable value by applying the
+    published per-tier channel discount (tier assigned by the retail value)."""
+    quintile = np.digitize(retail_value, edges)  # 0..4
+    discount = np.array(CHANNEL_DISCOUNT_BY_QUINTILE)[np.clip(quintile, 0, 4)]
+    return retail_value * (1.0 + discount)
+
 _HEDONIC_NUMERIC = [
     "char_livable_area",  # logged below
     "char_beds",

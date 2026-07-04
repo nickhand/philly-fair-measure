@@ -114,7 +114,9 @@ def _cmd_train_condo(args: argparse.Namespace) -> int:
 def _cmd_train_baseline(args: argparse.Namespace) -> int:
     from philly_assessments.models import train_baseline
 
-    result = train_baseline(args.data_dir, test_fraction=args.test_fraction)
+    result = train_baseline(
+        args.data_dir, test_fraction=args.test_fraction, market=args.market
+    )
     print(f"run {result.run_id} -> {result.run_dir}\n")
     columns = ("n", "rmse_log", "mape", "r2_log", "median_ratio", "cod", "prd", "prb")
     print(f"{'model':<16}" + "".join(f"{c:>13}" for c in columns))
@@ -618,6 +620,10 @@ def main(argv: list[str] | None = None) -> int:
         "train-baseline", help="train LightGBM + Ridge baselines and benchmark against OPA"
     )
     train.add_argument("--test-fraction", type=float, default=0.1)
+    train.add_argument(
+        "--market", choices=("blend", "retail"), default="blend",
+        help="retail = train on mortgage-financed sales only (predicts retail value)",
+    )
     train.add_argument("--data-dir", type=Path)
     train.set_defaults(func=_cmd_train_baseline)
 

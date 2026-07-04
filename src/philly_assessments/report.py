@@ -308,6 +308,22 @@ def render_html(data: ReportData) -> str:
         f"<p class='note'>Interval: {interval_note}. The estimate comes from a "
         "public-data model trained on validated arms-length sales; it inherits "
         "the city roll's characteristic errors and cannot see interior condition.</p>",
+    ]
+    if s.get("retail_value") is not None:
+        parts += [
+            "<h2>Two value conventions</h2><div class='kv'>",
+            f"<div><b>Retail value</b>{_fmt_money(s.get('retail_value'))}</div>",
+            f"<div><b>Cash-market value</b>{_fmt_money(s.get('cash_market_value'))}</div>",
+            "</div>",
+            "<p class='note'>Assessment law targets <b>retail value</b> — what a "
+            "mortgage-financed buyer would pay (estimated from financed sales only). "
+            "<b>Cash-market value</b> is what the property realistically clears at in "
+            "the cash/investor market that dominates lower-value blocks, via a "
+            "published channel discount (see docs/equity-diagnostics.md). Where the "
+            "two diverge widely, the block is credit-starved and the owner may be "
+            "taxed above what they can realize.</p>",
+        ]
+    parts += [
         "<h2>Recorded characteristics (per the OPA roll)</h2><div class='kv'>",
     ]
     char_fields = [

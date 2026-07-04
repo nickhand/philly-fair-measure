@@ -277,6 +277,28 @@ def build_assessment_screen(
 
     residential = residential.join(twin_uniformity(features), on="parcel_id", how="left")
 
+    # both value conventions (docs/equity-diagnostics.md): retail value from a
+    # financed-only model, cash-market value via the published channel discount.
+    # Optional — added only when a retail run exists; no propensity proxy.
+    try:
+        retail_run = latest_run_dir("retail", data_dir)
+    except FileNotFoundError:
+        retail_run = None
+    if retail_run is not None:
+        from philly_assessments.diagnostics.channel import (
+            cash_market_value,
+            sale_price_quintile_edges,
+        )
+
+        retail = score_lightgbm(retail_run, features)
+        if run_params(retail_run).get("time_adjusted"):
+            retail = retail * np.exp(-features["time_adj_log"].to_numpy())
+        edges = sale_price_quintile_edges(data_dir)
+        residential = residential.with_columns(
+            pl.Series("retail_value", retail),
+            pl.Series("cash_market_value", cash_market_value(retail, edges)),
+        )
+
     # aerial change evidence (diagnostics/aerial_change.py, `philly
     # aerial-score`): joined when present; scores describe the parcel between
     # two flights, so they stay valid across screen rebuilds
