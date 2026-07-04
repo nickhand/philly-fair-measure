@@ -284,6 +284,34 @@ def _cmd_acs_sensitivity(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_channel_decomp(args: argparse.Namespace) -> int:
+    from philly_assessments.diagnostics.channel import channel_decomposition
+
+    result = channel_decomposition(args.data_dir)
+    t = result.table
+    print("cash discount by control stage (negative = cash sells below financed)\n")
+    print(f"{'segment':<10}{'raw':>10}{'+hedonic':>12}{'+distress':>12}{'  95% CI (pure)':>22}")
+    for seg in t["segment"].unique(maintain_order=True).to_list():
+        s = {r["stage"]: r for r in t.filter(t["segment"] == seg).to_dicts()}
+        ci = s["distress"]
+        ci_str = (
+            f"[{ci['ci_low']:+.1%}, {ci['ci_high']:+.1%}]"
+            if ci["ci_low"] is not None else ""
+        )
+        print(
+            f"{seg:<10}{s['raw']['cash_discount_pct']:>+10.1%}"
+            f"{s['hedonic']['cash_discount_pct']:>+12.1%}"
+            f"{s['distress']['cash_discount_pct']:>+12.1%}{ci_str:>22}"
+        )
+    i = result.interaction
+    print(
+        f"\npure channel discount, clean house:      {i['cash_discount_clean_pct']:+.1%}"
+        f"\npure channel discount, distressed house: {i['cash_discount_distressed_pct']:+.1%}"
+        f"  (distress attenuates by {i['cash_x_distress_pct_points']:+.1%} pts)"
+    )
+    return 0
+
+
 def _cmd_ratio_study(args: argparse.Namespace) -> int:
     import polars as pl
 
@@ -645,6 +673,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     acs.add_argument("--data-dir", type=Path)
     acs.set_defaults(func=_cmd_acs_sensitivity)
+
+    channel = subparsers.add_parser(
+        "channel-decomp",
+        help="decompose the cash-vs-financed sale gap into pure channel "
+        "discount vs distress-driven value (retail-value diagnostic)",
+    )
+    channel.add_argument("--data-dir", type=Path)
+    channel.set_defaults(func=_cmd_channel_decomp)
 
     ratio_study = subparsers.add_parser(
         "ratio-study",

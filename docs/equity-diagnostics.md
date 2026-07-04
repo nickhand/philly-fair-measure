@@ -106,6 +106,52 @@ parity are not in tension here, which strengthens the civic version of this
 argument: there is no accuracy excuse for demographic-correlated assessment
 error. (Artifact: `data/diagnostics/acs_sensitivity.parquet`.)
 
+## The cash/financed bifurcation — the rebuttal, pre-empted (2026-07-04)
+
+The sharpest attack on any "OPA over-assesses cheap homes" finding is: *cheap
+homes really do sell for less, so of course the ratio looks high.* We
+measured whether that rebuttal holds (`philly channel-decomp`, an OLS of
+reference-frame log price with sequential controls; diagnostic only).
+
+**~40% of Philadelphia arms-length sales are cash, and the discount survives
+every observable control.** The raw within-district cash discount is −43.6%;
+controlling for house composition (area, beds, condition, style, ...) takes
+it to −30.0%; adding the full distress stack (delinquency, vacancy,
+unpermitted work, severe violations) barely moves it to **−29.4%** (bootstrap
+95% CI [−29.7%, −29.1%]). Distress explains almost none of it. The cleaner
+within-price-tier estimates (which absorb residual value confounding the
+pooled model can't): pure channel discount **−21.6% in the cheapest quintile,
+falling to −2.7% in the most expensive** — the cash/wholesale market
+dominates exactly the cheap tail. Distress *amplifies* the discount rather
+than explaining it (clean house −27.6% vs distressed −36.4%): distressed +
+cash is the deep-discount investor-flip market, not merely "shells worth
+less."
+
+**What this does to the regressivity finding — the honest, nuanced version:**
+this cuts both ways, and the nuance is the contribution.
+
+- It **validates** a retail-value model (the channel discount is real, large,
+  and well-identified — adjusting cash sales up to typical-financing value is
+  warranted).
+- It **partially defends OPA** on the narrow point: measured against *cash
+  sale prices*, OPA's cheap-tail ratio looks regressive (~1.2), but a q1 house
+  selling $100k cash has a retail value nearer $128k, so OPA's ~$120k
+  assessment is *below* retail — not over-assessment against the legal
+  standard.
+- It **relocates the real regressivity** to a deeper place: low-income owners
+  in bifurcated neighborhoods are taxed on a retail value they often *cannot
+  realize*, because the only buyers for their block are cash investors. Taxing
+  a fictional retail value in a market where the owner is structurally stuck in
+  the cash tier is its own regressivity — and a policy-standard question (is
+  "typical-financing market value" even the right basis in a bifurcated
+  market?), not a modeling error.
+
+The Controller-era finding stands, but the mechanism is richer than "OPA is
+wrong": it is a bifurcated-market and assessment-standard problem. Reporting
+the ratio against **both** cash-sale and retail-value conventions (as we
+report both out-of-time and TASP time conventions) is what makes the analysis
+un-dismissable. Artifact: `data/diagnostics/channel_decomposition.parquet`.
+
 ## Caveats
 
 - Ecological, tract-level; ACS 2022 composition; the city layer's own
