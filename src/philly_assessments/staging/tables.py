@@ -443,6 +443,14 @@ def stg_deeds(raw: pl.LazyFrame, raw_opa: pl.LazyFrame | None = None) -> pl.Lazy
         "matched_regmap",
         "discrepancy",
     )
+    return _with_condo_recovered_links(lf, raw_opa)
+
+
+def _with_condo_recovered_links(
+    lf: pl.LazyFrame, raw_opa: pl.LazyFrame | None
+) -> pl.LazyFrame:
+    """Fill null opa_account_num on RTT rows by (address, unit) matching to
+    88-prefix accounts; shared by stg_deeds and stg_mortgages."""
     if raw_opa is None:
         return lf.with_columns(
             pl.when(pl.col("has_opa_link")).then(pl.lit("rtt")).alias("opa_link_source")
@@ -469,3 +477,73 @@ def stg_deeds(raw: pl.LazyFrame, raw_opa: pl.LazyFrame | None = None) -> pl.Lazy
         .alias("opa_link_source"),
         (pl.col("has_opa_link") | recovered).alias("has_opa_link"),
     ).drop("_match_base", "_match_unit", "recovered_opa_account")
+
+
+# Hard-money / fix-and-flip lender tokens, matched against the mortgage
+# grantee (lender) name. Curated from national flip lenders + measured hits
+# in the live RTT snapshot (2026-07-03: KIAVI 1,612, LIMA ONE 1,299,
+# RCN 812, DOMINION 485, LENDINGONE 473, CIVIC 443, TVC 323...). A mortgage
+# from one of these is a near-certain renovation-in-progress signal —
+# including work that never pulls an L&I permit.
+HARD_MONEY_TOKENS = [
+    "KIAVI",
+    "LENDINGHOME",  # Kiavi's former name
+    "LIMA ONE",
+    "RCN CAPITAL",
+    "CIVIC FINANCIAL",
+    "ANCHOR LOANS",
+    "DOMINION FINANCIAL",
+    "LENDINGONE",
+    "TVC FUNDING",
+    "TEMPLE VIEW CAPITAL",
+    "ROC CAPITAL",
+    "TOORAK",
+    "FUND THAT FLIP",
+    "SHERMAN BRIDGE",
+    "VISIO FINANCIAL",
+    "CONSTRUCTIVE LOANS",
+    "EASY STREET CAPITAL",
+]
+_HARD_MONEY_REGEX = "|".join(HARD_MONEY_TOKENS)
+
+
+def stg_mortgages(raw: pl.LazyFrame, raw_opa: pl.LazyFrame | None = None) -> pl.LazyFrame:
+    """MORTGAGE documents from RTT: financing events per parcel.
+
+    Loan amounts are NOT recorded (transfer tax doesn't apply to mortgages;
+    all consideration fields are ~empty — measured 2026-07-03), so the signal
+    is presence, timing, and lender identity: cash-vs-financed purchases,
+    refinances after purchase (capital injections), and hard-money lenders
+    (renovation nearly certain). 85% carry native OPA links; condo link
+    recovery fills unit-level gaps like stg_deeds."""
+    lf = raw.filter(pl.col("document_type").str.strip_chars() == "MORTGAGE")
+    for column in ("display_date", "recording_date", "document_date"):
+        lf = with_parsed_timestamp(lf, column)
+    lf = lf.with_columns(
+        pl.coalesce("display_date_parsed", "document_date_parsed", "recording_date_parsed").alias(
+            "mortgage_date"
+        ),
+        (
+            pl.col("opa_account_num").is_not_null()
+            & (pl.col("opa_account_num").str.strip_chars() != "")
+        ).alias("has_opa_link"),
+        pl.col("grantees")
+        .cast(pl.String)
+        .str.to_uppercase()
+        .str.contains(_HARD_MONEY_REGEX)
+        .fill_null(False)
+        .alias("is_hard_money"),
+    ).select(
+        "record_id",
+        "document_id",
+        "opa_account_num",
+        "has_opa_link",
+        "street_address",
+        "unit_num",
+        "mortgage_date",
+        "grantors",
+        "grantees",
+        "is_hard_money",
+        "property_count",
+    )
+    return _with_condo_recovered_links(lf, raw_opa)

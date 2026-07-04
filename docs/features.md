@@ -76,6 +76,35 @@ distress. Remaining paths are listings/imagery (see research notes). The
 vacancy, unpermitted-work, and tenure columns also feed the screen as
 evidence and the equity diagnostics.
 
+**Mortgage forensics + repeat-sales carry-forward (`fin_`,
+`mkt_parcel_prev_log_price_ref`, 2026-07-03) — THE q1 WALL DECOMPOSED.**
+New staged table `mortgages` (1.51M RTT MORTGAGE docs, 85% OPA-linked +
+condo recovery; amounts unrecorded — no transfer tax on mortgages — so the
+signal is presence/timing/lender). Model features (as-of): mortgage count &
+recency, `fin_refi_5y_before` (non-purchase mortgages = capital injections),
+`fin_hard_money_5y_before` (curated flip-lender tokens, measured live:
+Kiavi 1,612, Lima One 1,299...). Analysis-only transaction attributes
+(asmt_-style, never model features): `fin_cash_sale` (no mortgage within
+−75..+15d of the deed), `fin_hard_money_sale`. Plus the repeat-sales
+carry-forward: the previous sale price expressed in the index reference
+frame, so the model stops re-deriving the index from raw price + days.
+
+Results: **best model to date — RMSE(log) 0.3317, COD 25.64** (from
+0.3377/26.00); `fin_mtg_days_since` 2.3% of gain, indexed prev price 2.2%.
+**The finding that reframes q1: 40.2% of Philly arms-length sales are CASH,
+trading at a −39.7% median within-district gap, and q1 is 61% cash.** Test
+ratios: financed-only median 0.951 / **COD 21.0**; cash 1.080 / COD 33.1;
+q1-cash 1.24 vs q1-financed 1.12. The "interior-condition information limit"
+is therefore substantially a **market bifurcation** — wholesale-cash vs
+retail-financed channels clear at different prices for the same asset, and
+the model predicts the blend. Weights A/B (cash w=0.35): financed COD
+21.0→20.7 but overall worse — the model already learns the channel; the
+unweighted blend stays production. For IAAO-convention comparisons, the
+**financed-market COD of 21.0 (untrimmed, out-of-time) is the honest
+retail-market headline**; assessment practice arguably targets exactly that
+market (typical financing), which is a convention choice to surface in any
+public write-up, not to hide inside a weight.
+
 **Identical-twin uniformity (`twin_n`, `opa_vs_twin_median` on the screen,
 2026-07-03):** Philadelphia's blocks are runs of identical rowhomes, and
 Pennsylvania's constitutional **uniformity clause** makes

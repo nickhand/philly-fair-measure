@@ -75,6 +75,7 @@ NUMERIC_FEATURES = [
     "mkt_parcel_n_prior_sales",
     "mkt_parcel_days_since_prev",
     "mkt_parcel_prev_price",
+    "mkt_parcel_prev_log_price_ref",
     "evt_n_permits_5y_before",
     "evt_days_since_last_permit",
     "evt_n_violations_5y_before",
@@ -102,6 +103,14 @@ NUMERIC_FEATURES = [
     "ten_rental_license_at_sale",
     "ten_owner_occupied_rental",
     "ten_rental_units",
+    # mortgage forensics (RTT MORTGAGE docs; amounts unrecorded — presence,
+    # timing, lender identity only). fin_cash_sale/fin_hard_money_sale are
+    # transaction attributes and stay OUT of the model (asmt_-style analysis
+    # columns).
+    "fin_n_mortgages_5y_before",
+    "fin_mtg_days_since",
+    "fin_refi_5y_before",
+    "fin_hard_money_5y_before",
     "loc_lon",
     "loc_lat",
     # parcel geometry (PWD polygons via the brt_id bridge; plan v2 Tier 2.1)

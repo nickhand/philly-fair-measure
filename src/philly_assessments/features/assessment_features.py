@@ -42,6 +42,7 @@ from philly_assessments.features.sale_features import (
     _recency_weight,
     distress_tenure_features,
     era_expr,
+    financing_features,
     join_delinquencies,
     join_parcel_shapes,
     join_proximity,
@@ -80,6 +81,7 @@ def assemble_assessment_features(
     investigations: pl.LazyFrame | None = None,
     rental_licenses: pl.LazyFrame | None = None,
     appeals: pl.LazyFrame | None = None,
+    mortgages: pl.LazyFrame | None = None,
 ) -> pl.DataFrame:
     from philly_assessments.config import CONDO_ACCOUNT_PREFIX
 
@@ -190,6 +192,9 @@ def assemble_assessment_features(
             pl.len().alias("mkt_parcel_n_prior_sales"),
             pl.col("sale_date").last().alias("last_sale_date"),
             pl.col("sale_price").last().alias("mkt_parcel_prev_price"),
+            (pl.col("sale_price").log() + pl.col("time_adj_log"))
+            .last()
+            .alias("mkt_parcel_prev_log_price_ref"),
         )
         .with_columns(
             (pl.lit(valuation_date) - pl.col("last_sale_date"))
@@ -360,6 +365,19 @@ def assemble_assessment_features(
             on="parcel_id",
             how="left",
         )
+        .join(
+            financing_features(
+                base.select(
+                    pl.col("parcel_id").alias("sale_id"),
+                    "parcel_id",
+                    pl.lit(valuation_date).alias("sale_date"),
+                ),
+                mortgages,
+                pool.select("parcel_id", "sale_date"),
+            ).rename({"sale_id": "parcel_id"}),
+            on="parcel_id",
+            how="left",
+        )
         .rename({**_CHAR_RENAMES, **_LOC_RENAMES})
         .rename(
             {
@@ -380,6 +398,9 @@ def assemble_assessment_features(
             pl.col("evt_n_open_severe_at_sale").fill_null(0),
             pl.col("evt_n_demolitions_before").fill_null(0),
             *[pl.col(c).fill_null(0.0) for c in DISTRESS_TENURE_COUNTS],
+            pl.col("fin_n_mortgages_5y_before").fill_null(0.0),
+            pl.col("fin_refi_5y_before").fill_null(0.0),
+            pl.col("fin_hard_money_5y_before").fill_null(0.0),
             pl.lit(float(epoch_days)).alias("time_sale_epoch_days"),
             pl.lit((valuation_date.month - 1) // 3 + 1).alias("time_quarter"),
             pl.lit(valuation_date.month).alias("time_month"),

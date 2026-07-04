@@ -343,6 +343,121 @@ def distress_tenure_features(
     return out
 
 
+FIN_MODEL_COLUMNS = [
+    "fin_n_mortgages_5y_before",
+    "fin_mtg_days_since",
+    "fin_refi_5y_before",
+    "fin_hard_money_5y_before",
+]
+FIN_SALE_COLUMNS = ["fin_cash_sale", "fin_hard_money_sale"]
+_PURCHASE_MTG_WINDOW_DAYS = 75
+
+
+def financing_features(
+    targets: pl.DataFrame,
+    mortgages: pl.LazyFrame | None,
+    purchases: pl.DataFrame | None,
+    *,
+    sale_flags: bool = False,
+) -> pl.DataFrame:
+    """as_of financing history (fin_) from RTT mortgage documents.
+
+    Mortgage amounts aren't recorded, so the signal is presence, timing, and
+    lender: `fin_refi_5y_before` counts NON-purchase mortgages (recorded away
+    from any deed date — refis/HELOCs, i.e. capital injections that fund
+    renovations permits never see); `fin_hard_money_5y_before` counts flip-
+    lender mortgages (renovation nearly certain). With `sale_flags`, also
+    emits transaction attributes of the target sale itself (`fin_cash_sale`,
+    `fin_hard_money_sale`) — those describe the transaction, are undefined at
+    a valuation date, and are therefore ANALYSIS columns, never model
+    features (same discipline as asmt_*)."""
+    out = targets.select("sale_id")
+    if mortgages is None:
+        for column in FIN_MODEL_COLUMNS + (FIN_SALE_COLUMNS if sale_flags else []):
+            out = out.with_columns(pl.lit(None, dtype=pl.Float64).alias(column))
+        return out
+
+    events = (
+        mortgages.filter(
+            pl.col("opa_account_num").is_not_null() & pl.col("mortgage_date").is_not_null()
+        )
+        .select(
+            pl.col("opa_account_num").alias("parcel_id"),
+            pl.col("mortgage_date").alias("event_date"),
+            pl.col("is_hard_money").fill_null(False),
+        )
+        .collect()
+    )
+    if purchases is not None and purchases.height:
+        # a mortgage recorded near ANY deed date is a purchase mortgage; the
+        # rest are refis/HELOCs (capital injections)
+        near_purchase = (
+            events.with_row_index("_mtg_ix")
+            .join(
+                purchases.select("parcel_id", pl.col("sale_date").alias("purchase_date")),
+                on="parcel_id",
+            )
+            .filter(
+                (pl.col("event_date") - pl.col("purchase_date"))
+                .dt.total_days()
+                .abs()
+                <= _PURCHASE_MTG_WINDOW_DAYS
+            )
+            .select("_mtg_ix")
+            .unique()
+        )
+        events = (
+            events.with_row_index("_mtg_ix")
+            .join(near_purchase.with_columns(pl.lit(True).alias("is_purchase_mtg")),
+                  on="_mtg_ix", how="left")
+            .with_columns(pl.col("is_purchase_mtg").fill_null(False))
+            .drop("_mtg_ix")
+        )
+    else:
+        events = events.with_columns(pl.lit(False).alias("is_purchase_mtg"))
+
+    joined = targets.join(events, on="parcel_id").with_columns(
+        (pl.col("sale_date") - pl.col("event_date")).dt.total_days().alias("days_before")
+    )
+    before = joined.filter(pl.col("days_before") > 0).with_columns(
+        (pl.col("days_before") <= EVENT_WINDOW_DAYS).alias("in_window")
+    )
+    feats = before.group_by("sale_id").agg(
+        pl.col("in_window").sum().alias("fin_n_mortgages_5y_before"),
+        pl.col("days_before").min().alias("fin_mtg_days_since"),
+        (pl.col("in_window") & ~pl.col("is_purchase_mtg"))
+        .sum()
+        .alias("fin_refi_5y_before"),
+        (pl.col("in_window") & pl.col("is_hard_money"))
+        .sum()
+        .alias("fin_hard_money_5y_before"),
+    )
+    out = out.join(feats, on="sale_id", how="left")
+
+    if sale_flags:
+        at_sale = (
+            joined.filter(
+                pl.col("days_before").is_between(-_PURCHASE_MTG_WINDOW_DAYS, 15)
+            )
+            .group_by("sale_id")
+            .agg(
+                pl.lit(0.0).first().alias("fin_cash_sale"),  # financed
+                pl.col("is_hard_money").any().cast(pl.Float64).alias("fin_hard_money_sale"),
+            )
+        )
+        out = (
+            out.join(at_sale, on="sale_id", how="left")
+            .with_columns(
+                pl.col("fin_cash_sale").fill_null(1.0),  # no mortgage near sale = cash
+                pl.col("fin_hard_money_sale").fill_null(0.0),
+            )
+        )
+    for column in FIN_MODEL_COLUMNS:
+        if column not in out.columns:
+            out = out.with_columns(pl.lit(None, dtype=pl.Float64).alias(column))
+    return out
+
+
 def join_parcel_shapes(frame: pl.DataFrame, parcels: pl.LazyFrame | None) -> pl.DataFrame:
     """Attach shp_* columns by OPA account; null columns when parcels are absent
     so the model feature set is stable either way."""
@@ -472,7 +587,7 @@ def _block_rolling_features(pool: pl.DataFrame) -> pl.DataFrame:
 
 
 def _parcel_prior_sale_features(pool: pl.DataFrame) -> pl.DataFrame:
-    p = pool.select("sale_id", "parcel_id", "sale_date", "sale_price")
+    p = pool.select("sale_id", "parcel_id", "sale_date", "sale_price", "time_adj_log")
     pairs = p.join(p, on="parcel_id", suffix="_o").filter(
         pl.col("sale_date") > pl.col("sale_date_o")
     )
@@ -483,6 +598,13 @@ def _parcel_prior_sale_features(pool: pl.DataFrame) -> pl.DataFrame:
         .min()
         .alias("mkt_parcel_days_since_prev"),
         pl.col("sale_price_o").sort_by("sale_date_o").last().alias("mkt_parcel_prev_price"),
+        # repeat-sales carry-forward: the previous price expressed in the
+        # index reference frame (log price + its own date's adjustment) — the
+        # model no longer has to learn the index from raw prev_price + days
+        (pl.col("sale_price_o").log() + pl.col("time_adj_log_o"))
+        .sort_by(pl.col("sale_date_o"))
+        .last()
+        .alias("mkt_parcel_prev_log_price_ref"),
     )
 
 
@@ -533,6 +655,7 @@ def assemble_sale_features(
     investigations: pl.LazyFrame | None = None,
     rental_licenses: pl.LazyFrame | None = None,
     appeals: pl.LazyFrame | None = None,
+    mortgages: pl.LazyFrame | None = None,
     *,
     min_sale_year: int = DEFAULT_MIN_SALE_YEAR,
 ) -> pl.DataFrame:
@@ -759,6 +882,16 @@ def assemble_sale_features(
             how="left",
         )
         .join(
+            financing_features(
+                base.select("sale_id", "parcel_id", "sale_date"),
+                mortgages,
+                pool.select("parcel_id", "sale_date"),
+                sale_flags=True,
+            ),
+            on="sale_id",
+            how="left",
+        )
+        .join(
             current_asmt,
             left_on=["parcel_id", "sale_year"],
             right_on=["parcel_id", "asmt_year"],
@@ -789,6 +922,9 @@ def assemble_sale_features(
             pl.col("evt_n_open_severe_at_sale").fill_null(0),
             pl.col("evt_n_demolitions_before").fill_null(0),
             *[pl.col(c).fill_null(0.0) for c in DISTRESS_TENURE_COUNTS],
+            pl.col("fin_n_mortgages_5y_before").fill_null(0.0),
+            pl.col("fin_refi_5y_before").fill_null(0.0),
+            pl.col("fin_hard_money_5y_before").fill_null(0.0),
             pl.when(pl.col("asmt_market_value_prev_year") > 0)
             .then(
                 pl.col("asmt_market_value_sale_year") / pl.col("asmt_market_value_prev_year")
@@ -838,6 +974,7 @@ def build_sale_features(
         "case_investigations",
         "rental_licenses",
         "appeals",
+        "mortgages",
     ):
         path = root / "staged" / f"{name}.parquet"
         if path.exists():
@@ -870,6 +1007,7 @@ def build_sale_features(
         optional["case_investigations"],
         optional["rental_licenses"],
         optional["appeals"],
+        optional["mortgages"],
         min_sale_year=min_sale_year,
     )
     inputs = []

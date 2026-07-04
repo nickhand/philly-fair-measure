@@ -75,6 +75,47 @@ def test_rental_license_spans_at_sale_date():
     assert by["s2"]["ten_rental_license_at_sale"] is None  # lapsed -> no active license
 
 
+def test_financing_features_refi_hard_money_and_cash():
+    from philly_assessments.features.sale_features import financing_features
+
+    mortgages = pl.LazyFrame(
+        [
+            # purchase mortgage for p1's 2020 purchase (30d after deed)
+            {"opa_account_num": "p1", "mortgage_date": datetime(2020, 1, 31),
+             "is_hard_money": False},
+            # refi (far from any purchase) — capital injection
+            {"opa_account_num": "p1", "mortgage_date": datetime(2022, 6, 1),
+             "is_hard_money": False},
+            # hard-money loan on p2 (renovation nearly certain)
+            {"opa_account_num": "p2", "mortgage_date": datetime(2022, 1, 1),
+             "is_hard_money": True},
+            # p2's purchase mortgage AT the target sale (recorded 20d after)
+            {"opa_account_num": "p2", "mortgage_date": datetime(2023, 6, 21),
+             "is_hard_money": False},
+            # future mortgage must not count in as-of features
+            {"opa_account_num": "p1", "mortgage_date": datetime(2024, 1, 1),
+             "is_hard_money": False},
+        ]
+    )
+    purchases = pl.DataFrame(
+        [
+            {"parcel_id": "p1", "sale_date": datetime(2020, 1, 1)},
+            {"parcel_id": "p2", "sale_date": datetime(2023, 6, 1)},
+        ]
+    )
+    out = financing_features(_targets(), mortgages, purchases, sale_flags=True)
+    by = {r["sale_id"]: r for r in out.to_dicts()}
+    # p1 (sale 2023-06-01): both prior mortgages in window; one is a refi
+    assert by["s1"]["fin_n_mortgages_5y_before"] == 2
+    assert by["s1"]["fin_refi_5y_before"] == 1
+    assert by["s1"]["fin_hard_money_5y_before"] == 0
+    assert by["s1"]["fin_cash_sale"] == 1.0  # no mortgage near s1's sale date
+    # p2: hard-money prior loan; the sale itself is financed (mtg +20d)
+    assert by["s2"]["fin_hard_money_5y_before"] == 1
+    assert by["s2"]["fin_cash_sale"] == 0.0
+    assert by["s2"]["fin_hard_money_sale"] == 0.0
+
+
 def test_investigations_appeals_and_stable_schema():
     investigations = pl.LazyFrame(
         [

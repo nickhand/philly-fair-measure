@@ -185,6 +185,7 @@ def build_assessment_screen(
         "case_investigations",
         "rental_licenses",
         "appeals",
+        "mortgages",
     ):
         path = root / "staged" / f"{name}.parquet"
         optional[name] = pl.scan_parquet(path) if path.exists() else None
@@ -206,6 +207,7 @@ def build_assessment_screen(
         optional["case_investigations"],
         optional["rental_licenses"],
         optional["appeals"],
+        optional["mortgages"],
     )
     logger.info("scoring %s residential properties", f"{features.height:,}")
     # persist the full feature frame: the comps CLI prices arbitrary parcels
