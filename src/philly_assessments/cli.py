@@ -307,6 +307,24 @@ def _cmd_retail_market(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_robustness_audit(args: argparse.Namespace) -> int:
+    from philly_assessments.diagnostics.robustness import robustness_audit
+
+    result = robustness_audit(args.data_dir)
+    print("1. char-leakage bound — model vs OPA by post-sale-permit status\n")
+    cl = result.char_leakage
+    print(f"{'subset':<38}{'n':>7}{'model COD':>11}{'OPA COD':>9}{'edge':>7}{'model ratio':>13}")
+    for r in cl.to_dicts():
+        print(f"{r['subset']:<38}{r['n']:>7,}{r['model_cod']:>11.1f}{r['opa_cod']:>9.1f}"
+              f"{r['model_cod_edge']:>7.1f}{r['model_ratio']:>13.3f}")
+    print("\n2. racial gap under both value conventions (median OPA / value)\n")
+    print(f"{'group':<28}{'n':>8}{'% cash':>8}{'vs sale price':>15}{'vs retail':>11}")
+    for r in result.racial_conventions.to_dicts():
+        print(f"{r['group']:<28}{r['n']:>8,}{r['pct_cash']:>8.0%}"
+              f"{r['opa_ratio_vs_sale_price']:>15.3f}{r['opa_ratio_vs_retail']:>11.3f}")
+    return 0
+
+
 def _cmd_channel_decomp(args: argparse.Namespace) -> int:
     from philly_assessments.diagnostics.channel import channel_decomposition
 
@@ -700,6 +718,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     acs.add_argument("--data-dir", type=Path)
     acs.set_defaults(func=_cmd_acs_sensitivity)
+
+    robustness = subparsers.add_parser(
+        "robustness-audit",
+        help="char-leakage bound + racial gap under both value conventions "
+        "(the two measurements a hostile reviewer would demand)",
+    )
+    robustness.add_argument("--data-dir", type=Path)
+    robustness.set_defaults(func=_cmd_robustness_audit)
 
     channel = subparsers.add_parser(
         "channel-decomp",

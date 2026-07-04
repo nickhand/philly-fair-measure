@@ -189,6 +189,32 @@ they are over-assessed relative to expensive homes. This is the robust,
 pre-empted form of the regressivity finding. Artifacts:
 `data/diagnostics/retail_vs_blend.parquet`.
 
+## Robustness audit (`philly robustness-audit`, 2026-07-04)
+
+Two adversarial stress tests. **(1) Char-leakage bound.** The model uses
+today's characteristics for old sales; on the recent (2025–26) out-of-time
+test, splitting by post-sale-permit status, the model's uniformity edge over
+OPA is identical (8.2 COD points) on the leakage-safe 87% (no post-sale
+permit, model ratio 0.971) and the leakage-exposed 13% — so the advantage is
+not a hindsight artifact. **(2) Racial gap under the retail convention** —
+the key finding, and two-sided:
+
+| era | White | Black | Hispanic | Black−White |
+|---|---|---|---|---|
+| Controller (2016–19) vs sale price | 0.840 | 0.937 | 1.011 | +9.7 |
+| Controller vs retail value | 0.824 | 0.867 | 0.927 | **+4.3** |
+| Current (2023+) vs sale price | 0.886 | 0.937 | 0.942 | +5.1 |
+| Current vs retail value | 0.878 | 0.891 | 0.881 | **+1.3** |
+
+The historical racial gap **survives** the retail steelman (real bias, not
+just cash composition); the current-era racial *level* gap is **largely
+cash-composition-mediated** (minority tracts 36–59% cash vs 24% white),
+shrinking to ~1 point — OPA has largely closed the direct level bias, and the
+residual disparity now runs through the credit-access channel. Vertical
+regressivity (cheap vs expensive) survives under retail in every era (q1/q5
+1.53×). This nuance is reflected in
+[report-assessment-equity.md](report-assessment-equity.md).
+
 ## Caveats
 
 - Ecological, tract-level; ACS 2022 composition; the city layer's own

@@ -24,10 +24,13 @@ should conclude from it:
    median (1.10) while the whitest quartile sat 16% *below* (0.84) — with
    uniformity more than twice as poor (COD 61 vs 27).
 
-2. **Recent reassessments narrowed the gap but did not close it.** The
-   extreme-quartile gap fell from ~26 to ~9 ratio points, yet majority-Black
-   and Hispanic tracts remain assessed ~5–6 points higher relative to value, at
-   roughly double the dispersion.
+2. **Recent reassessments substantially closed the direct racial gap — but not
+   the deeper one.** The extreme-quartile gap fell from ~26 to ~9 ratio points,
+   and once cash-market composition is accounted for, the *current-era* racial
+   level gap nearly disappears (OPA largely fixed it). The historical
+   (2014–2019) racial gap, by contrast, survives that adjustment — it was real.
+   And the **vertical** regressivity (cheap over-assessed relative to
+   expensive) survives every adjustment in every era.
 
 3. **The gap is not inevitable — it is a modeling artifact.** A model built
    *only* from public data and containing *no* demographic information collapses
@@ -137,9 +140,13 @@ confirms the Controller's conclusions on both the economic and racial framings.
 | Majority-Hispanic tracts | 0.942 | 47.4 | 1.270 |
 
 The extreme-quartile gap fell from ~26 to ~9 ratio points — consistent with
-OPA's claimed year-over-year improvement — but majority-Black and Hispanic
-tracts remain assessed ~5–6 points higher relative to value, at roughly double
-the dispersion (COD ~46 vs ~24). Progress, not resolution.
+OPA's claimed year-over-year improvement. Majority-Black and Hispanic tracts
+remain assessed ~5 points higher relative to *actual sale prices*, at roughly
+double the dispersion (COD ~46 vs ~24) — but, as the robustness section below
+shows, most of that residual *level* gap is now cash-market composition rather
+than direct assessment bias. The persistent, convention-proof problem in the
+current era is **dispersion** (uniformity), not the racial level gap OPA has
+largely closed. Progress that is real, and incomplete in a specific way.
 
 ### 3. The gap is not inevitable — a demographic-free model nearly eliminates it
 
@@ -245,7 +252,62 @@ its accuracy is distributed along lines that track wealth and race.
 
 ---
 
-## What it means
+## Robustness: two stress tests a critic would demand
+
+We ran the two measurements a hostile reviewer would push on hardest, because
+"we acknowledged it" is a weaker answer than "we measured it."
+
+**Stress test 1 — does the comparison model cheat with post-sale
+characteristics?** The model uses *today's* property characteristics for every
+sale, so a home renovated between its sale and now could leak future
+information and inflate the model's apparent edge over OPA (which valued
+blind). Two facts bound this. First, the out-of-time test is recent (2025–2026
+sales), so little time has elapsed for renovation. Second, splitting the test
+by whether *any permit was issued after the sale* — the proxy for "the property
+changed" — the model's uniformity advantage over OPA is **identical on both
+sides**:
+
+| test subset | share | model COD | OPA COD | model's edge |
+|---|---|---|---|---|
+| No post-sale permit (leakage-safe) | 87% | 25.0 | 33.2 | **8.2** |
+| Post-sale permit (leakage-exposed) | 13% | 28.1 | 36.2 | **8.2** |
+
+If leakage drove the model's advantage, the edge would balloon on the
+renovated subset. It does not — the model beats OPA by the same 8.2 COD points
+where the property demonstrably did *not* change, with a near-unbiased ratio
+(0.971). The model's advantage is real, not an artifact of hindsight.
+
+**Stress test 2 — is the racial gap just cash-sale composition?** The rebuttal:
+minority tracts have more cash sales, so lower prices, so higher OPA ratios —
+adjust for that and the racial gap vanishes. We re-ran the tract-race study
+against **retail-equivalent** prices (cash sales marked up by the measured
+channel discount). The result is genuinely two-sided and worth stating plainly:
+
+| | White | Black | Hispanic | Black−White gap |
+|---|---|---|---|---|
+| **Controller era (2016–19), vs sale price** | 0.840 | 0.937 | 1.011 | +9.7 pts |
+| **Controller era, vs retail value** | 0.824 | 0.867 | 0.927 | **+4.3 pts** |
+| **Current era (2023+), vs sale price** | 0.886 | 0.937 | 0.942 | +5.1 pts |
+| **Current era, vs retail value** | 0.878 | 0.891 | 0.881 | **+1.3 pts** |
+
+Two honest conclusions:
+
+- **The historical (Controller-era) racial gap is robust** — it survives the
+  retail convention (Black +4.3, Hispanic +10.3 points over White). The
+  2014–2019 disparity was *not* merely cash composition; it was real assessment
+  bias on top of the bifurcated market. The Controller's finding stands.
+- **The current-era racial *level* gap is now largely cash-composition-
+  mediated** — it shrinks to ~1 point under the retail convention. This means
+  OPA's post-TY2023 reassessments have substantially closed the *direct* racial
+  level bias, and the residual racial disparity now operates through the
+  **credit-access channel**: minority tracts are cash-dominated (36–59% vs 24%
+  for white tracts), so their owners are taxed toward a retail value the thin
+  local market cannot deliver. Same harm, more precisely located — and it
+  points at the structural root (mortgage access), not at an assessor's thumb.
+
+Crucially, the **vertical** regressivity — cheap homes over-assessed relative
+to expensive ones — survives the retail convention in every era (q1 1.35 vs q5
+0.88; a 1.53× gap). That is the finding that does not move.
 
 Three conclusions follow from the evidence, in increasing order of ambition:
 
@@ -309,6 +371,7 @@ tool:
 | Banned-data sensitivity (F4) | `philly acs-sensitivity` |
 | Cash/financed channel decomposition (F5) | `philly channel-decomp` |
 | Retail vs cash convention (F5) | `philly retail-market` |
+| Char-leakage bound + racial gap under retail (Robustness) | `philly robustness-audit` |
 | Sales-chasing and convention bridge (F6) | `philly ratio-study` |
 | Per-property both-value report | `philly report <address>` |
 
