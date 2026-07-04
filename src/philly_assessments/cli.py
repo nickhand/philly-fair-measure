@@ -307,6 +307,36 @@ def _cmd_retail_market(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_fairness_robustness(args: argparse.Namespace) -> int:
+    from philly_assessments.diagnostics.fairness_robustness import fairness_robustness
+
+    r = fairness_robustness(args.data_dir)
+    print("1. mechanism: coarse (OPA-style) vs rich model, median ratio by race\n")
+    m = r.mechanism
+    print(f"{'group':<28}{'OPA':>8}{'coarse':>9}{'rich':>8}")
+    for g in m["group"].unique(maintain_order=True).to_list():
+        vals = {row["model"]: row["median_ratio"] for row in m.filter(m["group"] == g).to_dicts()}
+        print(f"{g:<28}{vals.get('opa', float('nan')):>8.3f}"
+              f"{vals.get('coarse_model', float('nan')):>9.3f}"
+              f"{vals.get('rich_model', float('nan')):>8.3f}")
+
+    print("\n2. Black-White median-ratio gap across temporal CV folds\n")
+    print(f"{'fold':<6}{'test from':<12}{'OPA gap':>10}{'model gap':>11}")
+    for row in r.cv.to_dicts():
+        og = row["opa_black_white_gap"]
+        mg = row["model_black_white_gap"]
+        print(f"{row['fold']:<6}{row['test_from']:<12}"
+              f"{(f'{og:+.3f}' if og is not None else '-'):>10}"
+              f"{(f'{mg:+.3f}' if mg is not None else '-'):>11}")
+
+    print("\n3. full residential roll (sold + unsold): OPA vs model value by race\n")
+    print(f"{'group':<28}{'n':>9}{'median OPA/model':>18}{'share OPA>110%':>16}")
+    for row in r.full_roll.to_dicts():
+        print(f"{row['group']:<28}{row['n_properties']:>9,}"
+              f"{row['median_opa_over_model']:>18.3f}{row['share_opa_over_110pct']:>16.1%}")
+    return 0
+
+
 def _cmd_stability_audit(args: argparse.Namespace) -> int:
     from philly_assessments.diagnostics.stability import (
         index_lookahead_bound,
@@ -751,6 +781,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     acs.add_argument("--data-dir", type=Path)
     acs.set_defaults(func=_cmd_acs_sensitivity)
+
+    fairness = subparsers.add_parser(
+        "fairness-robustness",
+        help="is the race-gap elimination real? coarse-vs-rich mechanism, "
+        "gap across CV folds, and full-roll (sold+unsold) check",
+    )
+    fairness.add_argument("--data-dir", type=Path)
+    fairness.set_defaults(func=_cmd_fairness_robustness)
 
     stability = subparsers.add_parser(
         "stability-audit",

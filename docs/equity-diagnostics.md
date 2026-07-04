@@ -189,6 +189,26 @@ they are over-assessed relative to expensive homes. This is the robust,
 pre-empted form of the regressivity finding. Artifacts:
 `data/diagnostics/retail_vs_blend.parquet`.
 
+## Fairness-robustness (`philly fairness-robustness`, 2026-07-04)
+
+Three checks on the "demographic-free model eliminates the race gap" claim.
+**(1) Mechanism** — a deliberately coarse model (hedonics + ward/ZIP dummies,
+NO learned market areas / kNN surface / block rolls) closes the Black–White
+level gap almost as well (−0.02) as the rich model (+0.01), while OPA sits at
++0.09. So the level correction is **sales-calibration, not rich spatial ML**;
+richness buys uniformity (COD 17.6 vs 32.9), not the level fix. **(2) CV
+folds** — the model's Black–White gap stays within ±0.03 across 5 temporal
+folds (stable), while OPA's swings −0.10 (2020) → +0.09 (2025): OPA's gap is
+time-varying and sign-changing (lag × differential appreciation), not a fixed
+penalty. **(3) Full roll (sold+unsold)** — OPA vs model by race is mixed
+(Hispanic 0.96 / 33% over 110%; Black 0.85, i.e. OPA *below* model), so the
+sold-sales fairness result does NOT cleanly extend to the unsold stock (and
+this compares OPA to our model, not ground truth). Net: the level gap is not
+intrinsic to the data (any sales-calibrated model avoids it), but "we
+eliminate the race gap" is overclaimed — the robust, convention-proof pieces
+are vertical regressivity and the persistent ~2× dispersion gap. Report
+Finding 3 rewritten to match.
+
 ## Robustness audit (`philly robustness-audit`, 2026-07-04)
 
 Two adversarial stress tests. **(1) Char-leakage bound.** The model uses

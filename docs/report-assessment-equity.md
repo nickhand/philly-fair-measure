@@ -32,10 +32,15 @@ should conclude from it:
    And the **vertical** regressivity (cheap over-assessed relative to
    expensive) survives every adjustment in every era.
 
-3. **The gap is not inevitable — it is a modeling artifact.** A model built
-   *only* from public data and containing *no* demographic information collapses
-   OPA's 8.7-point White/Black median-ratio gap to **0.4 points** on identical
-   sales, while improving uniformity in every group.
+3. **The level gap is not intrinsic to the data.** A model built *only* from
+   public data with *no* demographic information does not reproduce OPA's
+   White/Black median-ratio level gap (which reaches ~9 points) — and neither
+   does a deliberately simple hedonic model, so the fix is sales-calibration,
+   not sophistication. This holds across a 5-fold temporal cross-validation.
+   Two honest limits: OPA's gap is itself time-varying (it has flipped sign
+   since 2020), and the persistent, convention-proof racial disparity is
+   **dispersion** (minority tracts ~2× the scatter), which no model here
+   eliminates.
 
 4. **There is no accuracy excuse.** Adding the exact income/race/poverty data
    OPA is legally barred from using improves accuracy by essentially nothing
@@ -160,10 +165,42 @@ On identical out-of-time test sales (n = 19,464):
 
 OPA's **8.7-point** White/Black median-ratio gap collapses to **0.4 points**
 under the public-data model, which contains no demographic features — while
-uniformity improves in every group. The systematic *level* bias by racial
-composition is therefore a modeling artifact, not a fact of the housing market.
-(Dispersion remains higher in minority tracts for both OPA and the model —
-low-value sales are genuinely noisier, a point returned to in Finding 5.)
+uniformity improves in every group. But this single-window number needs three
+robustness checks before it can carry weight, and they qualify it in
+important ways (`philly fairness-robustness`):
+
+- **It is stable across time — the strong result.** Re-run per fold in a
+  5-fold temporal cross-validation, the *model's* Black–White level gap stays
+  within ±0.03 in every period (−0.026 to +0.015), while *OPA's* swings from
+  −0.10 (2020) to +0.09 (2025). So the model consistently does not reproduce a
+  racial level bias, whatever OPA's is in a given roll — but note OPA's gap is
+  itself **time-varying and sign-changing**, entangled with assessment lag and
+  differential neighborhood appreciation, not a fixed "race penalty."
+- **The mechanism is sales-calibration, not sophisticated modeling.** A
+  deliberately *coarse* model (basic hedonics + ward/ZIP dummies, none of our
+  learned market areas or nearest-sales price surface) *also* closes the level
+  gap (Black–White −0.02 vs OPA's +0.09). So the gap is not a hard problem
+  requiring rich spatial ML — *any* model calibrated to recent sales avoids it.
+  Richness buys **uniformity** (COD 17.6 vs 32.9), not the level correction.
+  The honest implication cuts toward OPA: you do not need fancy tools to be
+  fairer than the current roll on level bias.
+- **The full-roll (sold + unsold) evidence is mixed** — the appropriate
+  humility. Comparing OPA to the model across all 464k residential properties,
+  Hispanic tracts show more over-assessment (median OPA/model 0.96, 33% above
+  110%) but Black tracts show OPA *below* the model (0.85), the opposite of the
+  sold-sales story. This measurement compares OPA to *our model* rather than to
+  ground-truth sales, so it inherits the model's errors on never-sold homes; it
+  should be read as "the sold-sales fairness result does not cleanly extend to
+  the unsold stock," not as a second confirmation.
+
+So the defensible claim is narrower than "we eliminate the race gap": *the
+systematic level bias OPA exhibits in a given roll is not intrinsic to the data
+— any sales-calibrated model avoids it — but OPA's gap is time-varying, the
+fix is not exotic, and the full-roll picture is unresolved.* What is
+unambiguous and convention-proof is the **vertical** regressivity (Finding 5)
+and the persistent **dispersion** gap (minority-tract COD ~2× under both OPA
+and the model — low-value, thin-market homes are genuinely harder to value for
+anyone, and this we do *not* eliminate).
 
 ### 4. There is no accuracy excuse: the banned data would not help
 
@@ -372,6 +409,8 @@ tool:
 | Cash/financed channel decomposition (F5) | `philly channel-decomp` |
 | Retail vs cash convention (F5) | `philly retail-market` |
 | Char-leakage bound + racial gap under retail (Robustness) | `philly robustness-audit` |
+| Fairness robustness: mechanism, CV folds, full roll (F3) | `philly fairness-robustness` |
+| Temporal + spatial CV, look-ahead bound | `philly stability-audit` |
 | Sales-chasing and convention bridge (F6) | `philly ratio-study` |
 | Per-property both-value report | `philly report <address>` |
 
