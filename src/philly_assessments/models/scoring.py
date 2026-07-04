@@ -13,12 +13,13 @@ import polars as pl
 from philly_assessments import config
 from philly_assessments.models.baseline import _encode
 from philly_assessments.models.bayesian import load_run, predict_price_draws
+from philly_assessments.vocab import RunKind
 
 logger = logging.getLogger(__name__)
 
 
-def latest_run_dir(kind: str, data_dir: Path | None = None) -> Path:
-    """Newest run directory of a given kind ("baseline" or "bayesian")."""
+def latest_run_dir(kind: RunKind, data_dir: Path | None = None) -> Path:
+    """Newest run directory of a given kind."""
     root = data_dir if data_dir is not None else config.data_dir()
     runs = sorted((root / "models").glob(f"run_id=*-{kind}"))
     if not runs:

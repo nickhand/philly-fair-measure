@@ -9,6 +9,7 @@ from pathlib import Path
 from philly_assessments import catalog
 from philly_assessments.ingest.snapshots import snapshot_carto_table
 from philly_assessments.sources.carto import DEFAULT_PAGE_SIZE
+from philly_assessments.vocab import Market
 
 
 def _cmd_snapshot(args: argparse.Namespace) -> int:
@@ -719,7 +720,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     train.add_argument("--test-fraction", type=float, default=0.1)
     train.add_argument(
-        "--market", choices=("blend", "retail"), default="blend",
+        "--market", choices=tuple(Market), default=Market.BLEND,
         help="retail = train on mortgage-financed sales only (predicts retail value)",
     )
     train.add_argument("--data-dir", type=Path)

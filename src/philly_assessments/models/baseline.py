@@ -54,6 +54,7 @@ from philly_assessments.ingest.manifests import (
     write_derived_manifest,
 )
 from philly_assessments.models.metrics import evaluate_estimates
+from philly_assessments.vocab import Market
 
 logger = logging.getLogger(__name__)
 
@@ -360,21 +361,20 @@ def train_baseline(
     validation_fraction: float = 0.1,
     time_adjusted: bool = True,
     vertical_calibration: bool = True,
-    market: str = "blend",
+    market: Market | str = Market.BLEND,
     lgb_params: dict | None = None,
     num_boost_round: int = 5000,
     early_stopping_rounds: int = 100,
 ) -> BaselineRunResult:
-    """`market="retail"` trains only on mortgage-financed sales (the typical-
-    financing standard) — its predictions are retail value. The run is tagged
-    kind "retail" (not "baseline") so it never displaces the blend model the
-    screen scores by default."""
+    """`market=Market.RETAIL` trains only on mortgage-financed sales (the
+    typical-financing standard) — its predictions are retail value. The run is
+    tagged kind "retail" (not "baseline") so it never displaces the blend model
+    the screen scores by default."""
+    market = Market(market)
     root = data_dir if data_dir is not None else config.data_dir()
     mart_path = root / "marts" / "sale_features.parquet"
     if not mart_path.exists():
         raise FileNotFoundError(f"{mart_path} missing; run `philly build-features` first")
-    if market not in ("blend", "retail"):
-        raise ValueError(f"market must be 'blend' or 'retail', got {market!r}")
 
     df = _load_frame(mart_path)
     numeric, categorical = feature_lists(time_adjusted)
@@ -384,7 +384,7 @@ def train_baseline(
     train_df, test_df = df.head(df.height - n_test), df.tail(n_test)
     n_val = max(1, int(train_df.height * validation_fraction))
     fit_df, val_df = train_df.head(train_df.height - n_val), train_df.tail(n_val)
-    if market == "retail":
+    if market is Market.RETAIL:
         financed = pl.col("fin_cash_sale").fill_null(1.0) == 0.0
         fit_df, val_df = fit_df.filter(financed), val_df.filter(financed)
     logger.info(
@@ -478,7 +478,7 @@ def train_baseline(
         ).to_dicts()
     }
 
-    run_kind = "baseline" if market == "blend" else "retail"
+    run_kind = "baseline" if market is Market.BLEND else "retail"
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + run_kind
     run_dir = root / "models" / f"run_id={run_id}"
     run_dir.mkdir(parents=True, exist_ok=False)
