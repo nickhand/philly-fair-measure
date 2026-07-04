@@ -10,6 +10,7 @@ import polars as pl
 
 from philly_assessments.staging.geometry import with_point_lonlat
 from philly_assessments.staging.temporal import with_parsed_timestamp, with_parsed_year
+from philly_assessments.vocab import OpaLinkSource
 
 # Verified against the live rtt_summary table 2026-07-02 (docs/source_inventory.md).
 # Spelling varies by system era ("DEED SHERIFF" vs "SHERIFF'S DEED"); one type
@@ -453,7 +454,7 @@ def _with_condo_recovered_links(
     88-prefix accounts; shared by stg_deeds and stg_mortgages."""
     if raw_opa is None:
         return lf.with_columns(
-            pl.when(pl.col("has_opa_link")).then(pl.lit("rtt")).alias("opa_link_source")
+            pl.when(pl.col("has_opa_link")).then(pl.lit(OpaLinkSource.RTT)).alias("opa_link_source")
         )
     lf = lf.with_columns(
         _norm_address(pl.col("street_address").str.replace(_UNIT_SUFFIX_REGEX, "")).alias(
@@ -471,9 +472,9 @@ def _with_condo_recovered_links(
         .otherwise(pl.col("opa_account_num"))
         .alias("opa_account_num"),
         pl.when(pl.col("has_opa_link"))
-        .then(pl.lit("rtt"))
+        .then(pl.lit(OpaLinkSource.RTT))
         .when(recovered)
-        .then(pl.lit("address_unit"))
+        .then(pl.lit(OpaLinkSource.ADDRESS_UNIT))
         .alias("opa_link_source"),
         (pl.col("has_opa_link") | recovered).alias("has_opa_link"),
     ).drop("_match_base", "_match_unit", "recovered_opa_account")

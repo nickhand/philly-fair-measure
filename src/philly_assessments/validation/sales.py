@@ -39,6 +39,7 @@ from philly_assessments.ingest.manifests import (
     read_derived_manifest,
     write_derived_manifest,
 )
+from philly_assessments.vocab import ValidityStatus
 
 logger = logging.getLogger(__name__)
 
@@ -240,22 +241,22 @@ def classify_sales(deeds: pl.LazyFrame, opa: pl.LazyFrame) -> pl.LazyFrame:
     is_suspect = pl.col("is_low_price") | pl.col("is_price_outlier") | pl.col("rapid_price_swing")
     status = (
         pl.when(is_excluded)
-        .then(pl.lit("excluded"))
+        .then(pl.lit(ValidityStatus.EXCLUDED))
         .when(pl.col("is_distress_deed") | pl.col("is_non_market_deed"))
-        .then(pl.lit("not_arms_length"))
+        .then(pl.lit(ValidityStatus.NOT_ARMS_LENGTH))
         .when(pl.col("is_nominal"))
-        .then(pl.lit("nominal"))
+        .then(pl.lit(ValidityStatus.NOMINAL))
         .when(is_suspect)
-        .then(pl.lit("suspect"))
-        .otherwise(pl.lit("arms_length"))
+        .then(pl.lit(ValidityStatus.SUSPECT))
+        .otherwise(pl.lit(ValidityStatus.ARMS_LENGTH))
     )
     any_supplementary = (
         pl.col("non_person_seller") | pl.col("non_person_buyer") | pl.col("possible_related")
     )
     confidence = (
-        pl.when(status == "arms_length")
+        pl.when(status == ValidityStatus.ARMS_LENGTH)
         .then(pl.when(any_supplementary).then(0.75).otherwise(0.9))
-        .when(status == "suspect")
+        .when(status == ValidityStatus.SUSPECT)
         .then(0.5)
         .otherwise(0.95)
     )

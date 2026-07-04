@@ -53,6 +53,7 @@ from philly_assessments.models.scoring import (
     score_bayesian_intervals,
     score_lightgbm,
 )
+from philly_assessments.vocab import AssessmentFlag, IntervalMethod, ModelFamily
 
 logger = logging.getLogger(__name__)
 
@@ -66,12 +67,12 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     )
     flag = (
         pl.when(~has_assessment)
-        .then(pl.lit("no_assessment"))
+        .then(pl.lit(AssessmentFlag.NONE))
         .when(pl.col("opa_market_value") > pl.col("model_pi_high_90"))
-        .then(pl.lit("over_assessed_candidate"))
+        .then(pl.lit(AssessmentFlag.OVER))
         .when(pl.col("opa_market_value") < pl.col("model_pi_low_90"))
-        .then(pl.lit("under_assessed_candidate"))
-        .otherwise(pl.lit("within_range"))
+        .then(pl.lit(AssessmentFlag.UNDER))
+        .otherwise(pl.lit(AssessmentFlag.WITHIN))
     )
     screen_z = (
         pl.when(has_assessment)
@@ -270,8 +271,8 @@ def build_assessment_screen(
         pl.Series("model_median", median),
         pl.Series("model_pi_low_90", lo),
         pl.Series("model_pi_high_90", hi),
-        pl.lit("residential").alias("model_family"),
-        pl.lit("bayesian_posterior").alias("interval_method"),
+        pl.lit(ModelFamily.RESIDENTIAL).alias("model_family"),
+        pl.lit(IntervalMethod.BAYESIAN).alias("interval_method"),
         pl.lit(valuation_date).alias("valuation_date"),
     )
 
@@ -446,8 +447,8 @@ def _condo_screen_frame(
         pl.Series("model_median", pred),
         pl.Series("model_pi_low_90", pred * np.exp(lo_off)),
         pl.Series("model_pi_high_90", pred * np.exp(hi_off)),
-        pl.lit("condo").alias("model_family"),
-        pl.lit("conformal_knn").alias("interval_method"),
+        pl.lit(ModelFamily.CONDO).alias("model_family"),
+        pl.lit(IntervalMethod.CONFORMAL).alias("interval_method"),
         pl.lit(valuation_date).alias("valuation_date"),
     )
     return frame, condo_run

@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import polars as pl
 
+from philly_assessments.vocab import TemporalStatus
+
 CARTO_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 MIN_PLAUSIBLE_YEAR = 1650
 MAX_PLAUSIBLE_YEAR = 2035
@@ -38,12 +40,12 @@ def with_parsed_timestamp(
     plausible = parsed.dt.year().is_between(min_year, max_year)
     status = (
         pl.when(pl.col(column).is_null())
-        .then(pl.lit("missing"))
+        .then(pl.lit(TemporalStatus.MISSING))
         .when(parsed.is_null())
-        .then(pl.lit("invalid"))
+        .then(pl.lit(TemporalStatus.INVALID))
         .when(~plausible)
-        .then(pl.lit("implausible"))
-        .otherwise(pl.lit("ok"))
+        .then(pl.lit(TemporalStatus.IMPLAUSIBLE))
+        .otherwise(pl.lit(TemporalStatus.OK))
     )
     return lf.with_columns(
         pl.when(plausible).then(parsed).otherwise(None).alias(f"{column}_parsed"),
@@ -62,12 +64,12 @@ def with_parsed_year(
     plausible = parsed.is_between(min_year, max_year)
     status = (
         pl.when(pl.col(column).is_null())
-        .then(pl.lit("missing"))
+        .then(pl.lit(TemporalStatus.MISSING))
         .when(parsed.is_null())
-        .then(pl.lit("invalid"))
+        .then(pl.lit(TemporalStatus.INVALID))
         .when(~plausible)
-        .then(pl.lit("implausible"))
-        .otherwise(pl.lit("ok"))
+        .then(pl.lit(TemporalStatus.IMPLAUSIBLE))
+        .otherwise(pl.lit(TemporalStatus.OK))
     )
     return lf.with_columns(
         pl.when(plausible).then(parsed).otherwise(None).alias(f"{column}_parsed"),
