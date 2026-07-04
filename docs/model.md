@@ -1,0 +1,189 @@
+# The Model: Architecture, Methodology, Results
+
+A technical description of the Philadelphia residential AVM — the models, the
+training discipline, and how it is evaluated against OPA. For *why* the design
+choices are made (OPA's methodology, the 2026 AVM literature) see
+[research-notes.md](research-notes.md); for the full input catalog see
+[features.md](features.md); for the equity findings see
+[report-assessment-equity.md](report-assessment-equity.md) and
+[equity-diagnostics.md](equity-diagnostics.md).
+
+## Purpose
+
+An automated valuation model for Philadelphia residential property, built
+entirely on public data, designed as an **independent, less-regressive
+comparator to OPA's assessed values**. Three deliberate departures from OPA
+practice shape the whole system:
+
+1. **Independence.** No `asmt_*` field is a model input. A model that can see
+   OPA's number would trivially copy it and the comparison would be circular;
+   OPA's values enter only as the incumbent benchmark on the test set.
+2. **Out-of-time evaluation.** Every reported metric is on a held-out *future*
+   slice of sales, never a random split.
+3. **Calibrated uncertainty.** Disagreements with OPA are gated by predictive
+   intervals, so a flag reflects confidence rather than a bare point gap.
+
+Demographic data (ACS) is used only in diagnostics and is **never** a valuation
+feature.
+
+## Scope and data
+
+- **Universe:** ~465k residential parcels (`SINGLE FAMILY` + `MULTI FAMILY`);
+  condominiums (OPA `88`-prefixed accounts) are modeled separately (§5.5).
+  ~205k arm's-length sales form the training/evaluation base.
+- **Sources:** OPA characteristics, DOR Realty Transfer Tax (sales + mortgage
+  documents), L&I (permits/violations/complaints/investigations/licenses), PWD
+  parcel geometry, SEPTA/PPR/streets for proximity, ACS (diagnostics only). See
+  [source_inventory.md](source_inventory.md).
+- **Target:** `log(sale_price)` in reference-month dollars via the district
+  price index (§4), so the model predicts a time-neutral level and is moved to
+  any date by the same additive adjustment.
+
+## Split discipline
+
+Out-of-time, per CCAO practice ([ccao-lessons.md](ccao-lessons.md)). Sales sort
+by date; the most recent 10% is the **test set**, the most recent 10% of the
+remainder is the **validation slice**. The validation slice does triple duty:
+LightGBM early stopping, isotonic-calibration fitting (§5.2), and conformal
+residual calibration (§5.6). The split is deterministic (sort by `sale_date`,
+`sale_id`, then head/tail), so every artifact is reproducible from the mart plus
+the persisted split fractions.
+
+## 4. Feature set (92 features)
+
+73 numeric + 19 categorical, no `asmt_*`. The full column-by-column registry is
+[features.md](features.md); the families and their rationale:
+
+| Family | Carries |
+|---|---|
+| Hedonic (`char_`) | area, beds/baths, year built, style, era, construction |
+| Learned market areas (`loc_`) | k-means sale-price geography replacing OPA's hand-drawn zones |
+| District price index (`time_adj_log`) | compound monthly log-$/sqft level, shrunk to citywide where thin |
+| As-of kNN surface (`mkt_knn_`) | distance-weighted mean of the *k* nearest **strictly earlier** sales — the between-block gradient trees can't interpolate; quarter-blocked against look-ahead |
+| Rolling means (`mkt_*_roll_`) | block/building leave-one-out $/sqft level (the CCAO workhorse) |
+| Parcel geometry (`shp_`) | area, perimeter, vertex/angle SDs, min-rotated-rect ratios from PWD polygons |
+| Distress & tenure (`dist_`, `evt_`, `ten_`) | delinquency, severe violations, vacancy complaints, rental licenses (the q1 tail signal) |
+| Mortgage forensics (`fin_`) | prior-mortgage count/recency, hard-money; `fin_cash_sale` is a *diagnostic* attribute, kept out of the model |
+| Proximity (`prox_`) | rapid transit, rail, parks, expressway/arterial, bus density |
+
+## 5. Models
+
+### 5.1 LightGBM — primary point estimate
+Gradient-boosted trees on the 92-feature encoding. `learning_rate=0.05`,
+`num_leaves=255`, `min_data_in_leaf=40`, `feature_fraction=0.8`,
+`bagging_fraction=0.8`, `lambda_l1=0.1`, `lambda_l2=1.0`, ≤5000 rounds with
+100-round early stopping on the validation slice; categoricals passed natively.
+
+### 5.2 Isotonic vertical calibration — the regressivity corrector
+GBDTs compress toward segment means at the tails (over-valuing cheap homes,
+under-valuing expensive ones — exactly PRD > 1). An isotonic regression of the
+residual on the prediction, fit on the validation slice, removes that gradient
+while remaining **monotone in the raw prediction** (it never reorders homes).
+Serialized as knot coordinates to `vertical_calibration.json`.
+
+### 5.3 Ridge — benchmark
+A regularized linear pipeline (median-impute → standardize → one-hot) as a
+transparent floor: if the GBDT can't beat a linear model, something is wrong.
+
+### 5.4 Bayesian hierarchical model — uncertainty + the screen
+A PyMC model sampled with nutpie (Rust NUTS) providing the posterior predictive
+intervals the screen consumes:
+
+- **Nested spatial intercepts** city → district → market-area, non-centered
+  (`mu_city ~ N(12, 2)`, `tau_district ~ HalfNormal(0.5)`, `tau_area ~
+  HalfNormal(0.3)`).
+- **Hedonic effects** `beta ~ N(0, 1)` per standardized covariate.
+- **Optional per-parcel latent quality**, identified by repeat sales,
+  non-centered, with a zero slot absorbing singletons (off by default — adds
+  ~nothing over the prior-price covariate; measured 2026-07-04).
+- **Optional RBF spatial basis** (off by default — overlapping bumps are
+  collinear, sample >15× slower, and the kNN covariate already carries the
+  surface; measured 2026-07-03).
+- **Heteroscedastic noise** `log σ = g₀ + z·g + district effect`, widening
+  where evidence is thin (missing block roll, sparse kNN, atypical style).
+- **Student-t likelihood** with fixed moderate ν (a learned ν couples every
+  observation through one global parameter and samples for hours; fixed keeps
+  the fat-tail robustness cheaply).
+
+### 5.5 Condo model
+Separate, per CCAO practice. Same discipline (out-of-time, time-adjusted,
+isotonic-calibrated) with condo features: unit characteristics,
+`unit_area_share` (the public-data stand-in for declared % ownership), and
+building-level leave-one-out rolling means. `building_id` itself is not a
+feature (~9k mostly-singleton levels would overfit); the rolling mean carries
+the building signal. Intervals come from the conformal engine (§5.6), not a
+Bayesian arm.
+
+### 5.6 Conformal intervals — frequentist cross-check
+Split-conformal intervals around the LightGBM point model, sharing **nothing**
+with the Bayesian arm except the feature mart — different model, different
+uncertainty mechanism. Offsets are asymmetric (the cheap-tail residual
+distribution is left-skewed), in global / Mondrian-by-district / kNN-locally-
+weighted variants. Where **both** the Bayesian posterior and the conformal band
+put OPA's value outside their 90% interval, the flag is robust to either
+method's assumptions.
+
+## 6. Results
+
+Out-of-time test set, n≈19.5k, run `20260704T005329Z-baseline`. Identical test
+set and treatment; OPA's own values as the incumbent:
+
+| Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
+|---|---|---|---|---|---|---|---|
+| **LightGBM** | **0.333** | **25.2%** | 0.981 | **25.6** | **1.082** | **−0.073** | 0.915 |
+| Ridge | 0.425 | 35.5% | 0.989 | 35.9 | 1.041 | −0.078 | 1.022 |
+| **OPA (incumbent)** | 0.449 | 34.0% | 0.983 | 34.5 | 1.190 | −0.234 | 0.787 |
+
+The model is **more accurate** (RMSE 0.333 vs 0.449), **more uniform**
+(COD 25.6 vs 34.5), and **markedly less regressive** (PRD 1.08 vs 1.19; PRB
+−0.07 vs −0.23) than OPA on the same homes. IAAO ratio statistics (COD, PRD,
+PRB, MKI) come from assesspy; definitions in [ccao-lessons.md](ccao-lessons.md).
+
+Honest caveats:
+
+- The full-sample **COD 25.6 is above the IAAO ≤15 target** — it includes the
+  cash/distressed tail. On an IAAO-standard trimmed arm's-length sample both
+  figures fall substantially (the `philly iaao-bridge` ratio-study ladder
+  documents this); the model's *edge over OPA* holds throughout.
+- **Condos are the exception:** the condo LightGBM roughly *ties* OPA
+  (RMSE 0.280 vs 0.278, COD 22.4 vs 18.8; 2026-07-04). Condos are homogeneous
+  and sell frequently — where OPA's mass appraisal already does well.
+- **Interval undercoverage in the cheap tail:** at nominal 90%, realized
+  coverage is ~89% overall but only **~76–79% in the cheapest quintile** for
+  both interval methods. Q1 dispersion is partly irreducible; both machines
+  report the shortfall rather than hide it.
+
+Stability is checked by temporal cross-validation (rolling out-of-time folds)
+and spatial cross-validation (leave-one-district-out); see the `philly
+temporal-cv` / `spatial-cv` commands and [equity-diagnostics.md](equity-diagnostics.md).
+
+## 7. Application: the assessment screen
+
+Scoring the full roll yields, per parcel: the point value, a 90% predictive
+interval, and an `over_assessed_candidate` / `under_assessed_candidate` /
+`within_range` flag driven by whether OPA's value falls outside the interval —
+gated on **dual-model agreement** (Bayesian ∩ conformal). Two value conventions
+are surfaced explicitly:
+
+- **Blend** — predicts the actual (cash-and-financed) market; matches realized
+  sale prices.
+- **Retail** — trained on financed sales only (the legal "typical-financing
+  market value" standard); for cash-market homes it applies a **published
+  per-quintile channel discount**, not a hidden propensity score, so an owner
+  or a board can inspect the exact number. The bifurcation is quantified in
+  [report-assessment-equity.md](report-assessment-equity.md).
+
+## 8. What makes it defensible
+
+Independence from OPA (no `asmt_*` inputs) · no demographic valuation features ·
+strict out-of-time evaluation · uncertainty-gated flags requiring two
+independent interval methods to agree · published channel discounts rather than
+opaque adjustments · deterministic, reproducible pipeline · a full model-vs-OPA
+benchmark on every run.
+
+## 9. Known limitations
+
+Cash-market dispersion is partly irreducible; condo parity with OPA; interval
+undercoverage in q1; OPA's interior-condition fields are stale and unavailable
+to verify (the model routes around them via distress/permit signals); single
+metro, no cross-city validation.

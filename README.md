@@ -60,6 +60,8 @@ src/philly_assessments/
   catalog.py           # DuckDB views over raw snapshots + staged/mart tables
   cli.py               # `philly` command-line entry point
 docs/
+  model.md             # model architecture, methodology, and results
+  features.md          # input feature registry
   source_inventory.md  # verified dataset inventory (Milestone 1)
   ccao-lessons.md      # patterns adopted from ccao-data
   operations.md        # recurring snapshot schedule + freshness heartbeat
