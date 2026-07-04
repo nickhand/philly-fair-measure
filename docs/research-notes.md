@@ -215,6 +215,22 @@ flagged/candidate set first, and be polite (the pilot ran 6-way concurrent,
 data/diagnostics/aerial_pilot_examples/ — the first demolition example shows
 a structure present in 2020 and a parking lot in 2023.
 
+**Mapillary facade-condition layer verdict: NO-GO (measured 2026-07-03,
+`philly facade-coverage`, diagnostics/facade.py).** The stage-1 coverage gate
+failed decisively: of 1,998 residential parcels stratified across all 18
+districts, only **11.1% have a usable facade image** (4-45m away, camera
+facing the parcel or a pano), **3.7% captured 2020+, 0.5% captured 2023+**.
+Coverage concentrates in Center City-adjacent districts (best: 41% any-image)
+but collapses everywhere on recency — Philadelphia's Mapillary corpus is
+mostly 2018-era arterial sequences. A facade-condition model trained on 2018
+imagery cannot audit a 2026 roll, so stage 2 (embedding + OPA-label probe)
+was not built and no vision dependency was added. Standing options: rerun the
+cheap coverage gate periodically (crowdsourced coverage grows); Cyclomedia is
+the imagery OPA itself uses (city contract — a records-request question, not
+an engineering one); and for individual appeals the owner can simply
+photograph their own facade — the systematic layer is what is gated, not the
+report packet. Token stays in the untracked .env for future rechecks.
+
 **Modern Bayesian practice applicable here**
 - **HSGP** (Hilbert-space GP approximation; Solin & Särkkä, and the practical
   probabilistic-programming variant) gives near-exact low-dimensional GPs at

@@ -360,6 +360,23 @@ def _cmd_aerial_score(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_facade_coverage(args: argparse.Namespace) -> int:
+    from philly_assessments.diagnostics.facade import coverage_summary, facade_coverage
+
+    table = facade_coverage(args.data_dir, n_sample=args.n_sample)
+    overall, by_district = coverage_summary(table)
+    print(f"\nmapillary facade coverage ({table.height:,} sampled parcels)\n")
+    for row in overall.to_dicts():
+        print(f"  {row['cut']:<28} {row['coverage']:.1%}")
+    print(f"\n{'district':<12}{'any usable':>12}{'2020+':>10}{'n':>7}")
+    for row in by_district.to_dicts():
+        print(
+            f"{row['loc_district']:<12}{row['any_usable']:>12.1%}"
+            f"{row['usable_2020plus']:>10.1%}{row['n']:>7,}"
+        )
+    return 0
+
+
 def _cmd_report(args: argparse.Namespace) -> int:
     from philly_assessments.report import build_property_report
 
@@ -654,6 +671,15 @@ def main(argv: list[str] | None = None) -> int:
     aerial_score.add_argument("--limit", type=int)
     aerial_score.add_argument("--data-dir", type=Path)
     aerial_score.set_defaults(func=_cmd_aerial_score)
+
+    facade = subparsers.add_parser(
+        "facade-coverage",
+        help="Mapillary usable-facade coverage check (stage-1 gate for the "
+        "facade-condition layer; needs MAPILLARY_TOKEN)",
+    )
+    facade.add_argument("--n-sample", type=int, default=2000)
+    facade.add_argument("--data-dir", type=Path)
+    facade.set_defaults(func=_cmd_facade_coverage)
 
     report = subparsers.add_parser(
         "report",
