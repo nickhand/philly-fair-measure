@@ -26,6 +26,7 @@ philly = "philly_assessments.cli:main"
 
 [dependency-groups]
 dev = [
+    "mypy>=2.1.0",
     "pytest>=8.2",
     "respx>=0.21",
     "ruff>=0.5",
@@ -41,6 +42,68 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+# NumPy generic typing (bare np.ndarray) is chased at boundaries via NDArray,
+# not enforced everywhere — low bug-yield in a numerics codebase.
+disallow_any_generics = false
+# Third-party scientific libs ship no type stubs; calling into them under strict
+# would flood real findings with "untyped call" noise. Keep the rest of strict.
+disallow_untyped_calls = false
+
+# Libraries without type stubs — legitimately uncheckable; don't error on import.
+[[tool.mypy.overrides]]
+module = [
+    "assesspy.*", "lightgbm.*", "pymc.*", "nutpie.*", "arviz.*",
+    "sklearn.*", "scipy.*", "shapely.*", "skimage.*", "duckdb.*",
+]
+ignore_missing_imports = true
+
+# The ratchet: modules not yet migrated to strict (mostly polars/numpy stub
+# imprecision + annotation gaps). They stay partially checked (names, imports,
+# undefined vars); the listed error codes are relaxed until each module is
+# cleaned. Delete entries as they migrate — "done" = this list is empty.
+[[tool.mypy.overrides]]
+module = [
+    "philly_assessments.cli",
+    "philly_assessments.report",
+    "philly_assessments.ingest.snapshots",
+    "philly_assessments.sources.carto",
+    "philly_assessments.sources.arcgis",
+    "philly_assessments.sources.mapillary",
+    "philly_assessments.staging.parcels",
+    "philly_assessments.features.sale_features",
+    "philly_assessments.features.assessment_features",
+    "philly_assessments.features.condo_features",
+    "philly_assessments.features.price_index",
+    "philly_assessments.features.proximity",
+    "philly_assessments.features.spatial",
+    "philly_assessments.models.baseline",
+    "philly_assessments.models.bayesian",
+    "philly_assessments.models.condo",
+    "philly_assessments.models.comps",
+    "philly_assessments.models.conformal",
+    "philly_assessments.models.scoring",
+    "philly_assessments.models.metrics",
+    "philly_assessments.diagnostics.acs_sensitivity",
+    "philly_assessments.diagnostics.channel",
+    "philly_assessments.diagnostics.retail_market",
+    "philly_assessments.diagnostics.robustness",
+    "philly_assessments.diagnostics.fairness_robustness",
+    "philly_assessments.diagnostics.stability",
+    "philly_assessments.diagnostics.ratio_study",
+    "philly_assessments.diagnostics.facade",
+    "philly_assessments.diagnostics.aerial_change",
+]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+warn_return_any = false
+disable_error_code = [
+    "arg-type", "no-any-return", "assignment", "operator",
+    "attr-defined", "union-attr", "misc", "dict-item",
+]
 
 [tool.pytest.ini_options]
 addopts = "-ra -m 'not live and not slow'"
