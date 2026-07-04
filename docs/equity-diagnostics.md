@@ -1,5 +1,9 @@
 # Equity Diagnostics: Assessment Ratios by Tract Racial Composition
 
+*Working notes. The polished, externally-oriented synthesis of these findings
+is [report-assessment-equity.md](report-assessment-equity.md) — the version to
+share with the Controller's office, Council, or press.*
+
 Run 2026-07-03, prompted by the City Controller's
 [property assessment review](https://controller.phila.gov/philadelphia-reports/property-assessment-review/)
 (which found OPA's 2014–2019 assessments regressive and least uniform in
