@@ -337,6 +337,23 @@ def _cmd_fairness_robustness(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_regressivity_cv(args: argparse.Namespace) -> int:
+    from philly_assessments.diagnostics.fairness_robustness import vertical_regressivity_cv
+
+    table, summary = vertical_regressivity_cv(args.data_dir)
+    print("vertical regressivity (OPA q1/q5 ratio and PRD) across time periods\n")
+    print(f"{'period from':<13}{'n':>8}{'q1/q5 sale':>12}{'q1/q5 retail':>14}"
+          f"{'PRD sale':>10}{'PRD retail':>12}")
+    for r in table.to_dicts():
+        print(f"{r['period_from']:<13}{r['n']:>8,}{r['q1q5_vs_sale']:>12.2f}"
+              f"{r['q1q5_vs_retail']:>14.2f}{r['prd_vs_sale']:>10.3f}{r['prd_vs_retail']:>12.3f}")
+    print(f"\n  q1/q5 vs retail: mean {summary['q1q5_retail_mean']:.2f}, "
+          f"min {summary['q1q5_retail_min']:.2f}  (>1 = regressive in every period)")
+    print(f"  PRD vs retail:   mean {summary['prd_retail_mean']:.3f}, "
+          f"min {summary['prd_retail_min']:.3f}  (>1.03 = regressive)")
+    return 0
+
+
 def _cmd_stability_audit(args: argparse.Namespace) -> int:
     from philly_assessments.diagnostics.stability import (
         index_lookahead_bound,
@@ -781,6 +798,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     acs.add_argument("--data-dir", type=Path)
     acs.set_defaults(func=_cmd_acs_sensitivity)
+
+    regressivity = subparsers.add_parser(
+        "regressivity-cv",
+        help="vertical regressivity (q1/q5 ratio, PRD) across time periods and "
+        "both value conventions — the claim that survives everything",
+    )
+    regressivity.add_argument("--data-dir", type=Path)
+    regressivity.set_defaults(func=_cmd_regressivity_cv)
 
     fairness = subparsers.add_parser(
         "fairness-robustness",

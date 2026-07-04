@@ -168,6 +168,63 @@ def full_roll_fairness(data_dir: Path | None = None) -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
+def vertical_regressivity_cv(
+    data_dir: Path | None = None, *, n_folds: int = 5
+) -> tuple[pl.DataFrame, dict]:
+    """The vertical-regressivity claim (cheap over-assessed vs expensive)
+    across consecutive time periods, under both value conventions — turning
+    the single-split q1/q5 gap into a distribution. No model training: this is
+    OPA vs sales by price quintile per period."""
+    from philly_assessments.diagnostics.channel import (
+        CHANNEL_DISCOUNT_BY_QUINTILE,
+        sale_price_quintile_edges,
+    )
+    from philly_assessments.models.baseline import _load_frame
+    from philly_assessments.models.metrics import evaluate_estimates
+
+    root = data_dir if data_dir is not None else config.data_dir()
+    df = _load_frame(root / "marts" / "sale_features.parquet").filter(
+        (pl.col("sale_price") > 0) & (pl.col("asmt_market_value_sale_year").fill_null(0) > 0)
+    )
+    edges = np.array(sale_price_quintile_edges(data_dir))
+    disc = np.array(CHANNEL_DISCOUNT_BY_QUINTILE)
+    n = df.height
+    chunk = n // n_folds
+
+    rows = []
+    for i in range(n_folds):
+        length = chunk if i < n_folds - 1 else n - i * chunk
+        w = df.slice(i * chunk, length)
+        price = w["sale_price"].to_numpy()
+        opa = w["asmt_market_value_sale_year"].to_numpy()
+        is_cash = (w["fin_cash_sale"].fill_null(1.0) == 1.0).to_numpy()
+        quint = np.digitize(price, edges)  # 0..4
+        retail = np.where(is_cash, price / (1.0 + disc[np.clip(quint, 0, 4)]), price)
+
+        def med(value, denom, q, quint=quint):
+            m = (quint == q) & np.isfinite(value) & (denom > 0)
+            return float(np.median(value[m] / denom[m])) if m.sum() >= 50 else float("nan")
+
+        q1s, q5s = med(opa, price, 0), med(opa, price, 4)
+        q1r, q5r = med(opa, retail, 0), med(opa, retail, 4)
+        rows.append({
+            "period_from": str(w["sale_date"].min())[:10],
+            "n": length,
+            "q1q5_vs_sale": q1s / q5s,
+            "q1q5_vs_retail": q1r / q5r,
+            "prd_vs_sale": evaluate_estimates(opa, price)["prd"],
+            "prd_vs_retail": evaluate_estimates(opa, retail)["prd"],
+        })
+    table = pl.DataFrame(rows)
+    summary = {
+        "q1q5_retail_mean": float(table["q1q5_vs_retail"].mean()),
+        "q1q5_retail_min": float(table["q1q5_vs_retail"].min()),
+        "prd_retail_mean": float(table["prd_vs_retail"].mean()),
+        "prd_retail_min": float(table["prd_vs_retail"].min()),
+    }
+    return table, summary
+
+
 @dataclass(frozen=True)
 class FairnessRobustnessResult:
     mechanism: pl.DataFrame

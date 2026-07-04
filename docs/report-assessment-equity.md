@@ -51,8 +51,10 @@ should conclude from it:
    subtler.** About 40% of Philadelphia's arms-length sales are cash, at a
    deep discount that survives every control. Even valuing every home at what a
    *mortgage-financed* buyer would pay — the standard most favorable to OPA —
-   cheap homes are still assessed 1.53× higher, relative to value, than
-   expensive homes. The residual regressivity is a **bifurcated-market and
+   cheap homes are still assessed ~1.5× higher, relative to value, than
+   expensive homes, and this holds in **every** period from 2016 to 2025 under
+   both conventions (the one finding that is convention-proof, era-proof, and
+   cross-validated). The residual regressivity is a **bifurcated-market and
    assessment-standard problem**, not merely an assessor error.
 
 The through-line: Philadelphia can assess fairly with the data it already has.
@@ -343,8 +345,19 @@ Two honest conclusions:
   points at the structural root (mortgage access), not at an assessor's thumb.
 
 Crucially, the **vertical** regressivity — cheap homes over-assessed relative
-to expensive ones — survives the retail convention in every era (q1 1.35 vs q5
-0.88; a 1.53× gap). That is the finding that does not move.
+to expensive ones — is the finding that does not move, and we verified it the
+same way we verified everything else: across five consecutive time periods
+(2016→2025) *and* both value conventions. In **every** period the cheapest
+quintile is assessed at a higher fraction of value than the priciest (q1/q5
+ratio vs retail value: mean 1.53, minimum 1.21 — never below regressive), and
+the canonical IAAO Price-Related Differential exceeds its 1.03 regressivity
+threshold in every period under both conventions (PRD vs retail: mean 1.152,
+minimum 1.075). It was worst in 2016 (q1/q5 = 1.9 vs retail), reached a low
+around 2019–2021, and has **rebounded** in the post-TY2023 rolls (back to
+1.6) — the same reassessments that closed the racial *level* gap did not fix,
+and recently worsened, the vertical regressivity. This is the anchor of the
+analysis: convention-proof, era-proof, and measured as a distribution, not a
+single split.
 
 Three conclusions follow from the evidence, in increasing order of ambition:
 
@@ -410,6 +423,7 @@ tool:
 | Retail vs cash convention (F5) | `philly retail-market` |
 | Char-leakage bound + racial gap under retail (Robustness) | `philly robustness-audit` |
 | Fairness robustness: mechanism, CV folds, full roll (F3) | `philly fairness-robustness` |
+| Vertical regressivity across periods + conventions (Robustness) | `philly regressivity-cv` |
 | Temporal + spatial CV, look-ahead bound | `philly stability-audit` |
 | Sales-chasing and convention bridge (F6) | `philly ratio-study` |
 | Per-property both-value report | `philly report <address>` |
