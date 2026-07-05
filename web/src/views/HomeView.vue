@@ -31,7 +31,11 @@ const counters = computed(() => [
   { value: stats.value ? num(stats.value.properties) : '—', label: 'homes checked citywide' },
   {
     value: stats.value ? num(stats.value.over + stats.value.under) : '—',
-    label: 'flagged for a closer look',
+    label: 'flagged outside our range',
+  },
+  {
+    value: stats.value ? num(stats.value.watch) : '—',
+    label: 'more worth a closer look',
   },
   { value: '$0', label: 'to check or appeal' },
 ])
@@ -73,7 +77,7 @@ const promises = [
     <!-- citywide counters: the front-page numbers, prominent and always present -->
     <div class="mx-auto mt-4 max-w-5xl px-4 sm:mt-6">
       <dl
-        class="grid grid-cols-1 gap-4 rounded-lg border border-line-soft bg-white px-4 py-5 text-center sm:grid-cols-3 sm:px-6"
+        class="grid grid-cols-2 gap-4 rounded-lg border border-line-soft bg-white px-4 py-5 text-center sm:grid-cols-4 sm:px-6"
       >
         <div v-for="c in counters" :key="c.label">
           <dd class="money text-3xl font-extrabold tracking-tight text-brand-600">{{ c.value }}</dd>

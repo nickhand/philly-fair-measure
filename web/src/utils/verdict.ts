@@ -89,7 +89,9 @@ export const WATCH_VERDICTS: Record<'high' | 'low', Verdict> = {
       'Check the facts the city has on file below, and see how your assessment compares with similar homes. If a recorded fact is wrong, the fix is free.',
     textClass: 'text-over',
     badgeClass: 'bg-over-soft text-over',
-    hex: '#d78361',
+    // deliberately much lighter than the flag hex — on the map the tiers must
+    // separate at dot size (strong flags also render larger, with a stroke)
+    hex: '#f5a869',
   },
   low: {
     flag: 'within_range',
@@ -99,7 +101,7 @@ export const WATCH_VERDICTS: Record<'high' | 'low', Verdict> = {
     nextStep: 'Most owners do not need to do anything with this information.',
     textClass: 'text-under',
     badgeClass: 'bg-under-soft text-under',
-    hex: '#5b9dc2',
+    hex: '#7ec3e8',
   },
 }
 

@@ -62,6 +62,15 @@ export const flagColor = [
   VERDICTS.no_assessment.hex,
 ] as const
 
+/** Strong flags are the headline claim: they render larger and with a white
+ * stroke, so the size/pop channel separates the tiers even where the tint
+ * hues alone would blur at dot scale. */
+const strongFlag = [
+  'in',
+  ['get', 'flag'],
+  ['literal', ['over_assessed_candidate', 'under_assessed_candidate']],
+]
+
 /** Dot layers: base dots + a white-ring highlight for the selected parcel. */
 export function dotLayers(sourceId: string, sourceLayer?: string): LayerSpecification[] {
   const common = sourceLayer ? { source: sourceId, 'source-layer': sourceLayer } : { source: sourceId }
@@ -72,8 +81,15 @@ export function dotLayers(sourceId: string, sourceLayer?: string): LayerSpecific
       ...common,
       paint: {
         'circle-color': flagColor as unknown as string,
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 2.5, 15, 4.5, 17, 6],
+        'circle-radius': [
+          'interpolate', ['linear'], ['zoom'],
+          13, ['case', strongFlag, 3.5, 2.5],
+          15, ['case', strongFlag, 6.5, 4.5],
+          17, ['case', strongFlag, 8.5, 6],
+        ],
         'circle-opacity': 0.92,
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': ['case', strongFlag, 1.5, 0],
       },
     },
     {

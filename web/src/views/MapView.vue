@@ -229,15 +229,16 @@ onBeforeUnmount(() => {
       <AddressSearch compact @select="onSearchSelect" />
     </div>
 
-    <!-- legend chips double as show/hide toggles for each dot type -->
+    <!-- legend chips double as show/hide toggles; a vertical column ordered
+         high → low so it reads like the scale it encodes -->
     <div
-      class="absolute left-3 top-[66px] z-10 flex max-w-[320px] flex-wrap items-center gap-1.5"
+      class="absolute left-3 top-[66px] z-10 flex w-fit flex-col items-stretch gap-1.5"
       role="group"
       aria-label="Show or hide homes by result"
     >
       <span
         aria-hidden="true"
-        class="rounded-full bg-[rgba(22,36,58,0.72)] px-2 py-0.5 text-caption font-bold text-white"
+        class="w-fit rounded-full bg-[rgba(22,36,58,0.72)] px-2 py-0.5 text-caption font-bold text-white"
         >Show:</span
       >
       <button

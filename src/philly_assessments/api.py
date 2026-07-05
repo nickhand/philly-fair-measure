@@ -177,6 +177,9 @@ class Stats(BaseModel):
     within: int
     over: int
     under: int
+    # within-range homes near the interval edge (attention tier) — the
+    # "worth a closer look" count, weaker evidence than over/under
+    watch: int
     median_ratio: float | None
     screen_built: str | None
 
@@ -425,6 +428,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
             within=int((flags == AssessmentFlag.WITHIN).sum()),
             over=int((flags == AssessmentFlag.OVER).sum()),
             under=int((flags == AssessmentFlag.UNDER).sum()),
+            watch=int(frame["attention"].is_not_null().sum()),
             median_ratio=_f(frame["opa_vs_model_ratio"].median()),
             screen_built=screen_built,
         )

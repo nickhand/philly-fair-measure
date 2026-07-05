@@ -127,6 +127,8 @@ export interface Stats {
   within: number
   over: number
   under: number
+  /** Within-range homes near the interval edge — "worth a closer look". */
+  watch: number
   median_ratio: number | null
   screen_built: string | null
 }
