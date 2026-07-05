@@ -126,6 +126,26 @@ def test_render_html_includes_driver_panel():
     assert "not whether the assessment is fair" in out  # honesty caveat kept
 
 
+def test_render_html_includes_equity_panel():
+    from philly_assessments.equity_context import EquityContext
+
+    ctx = EquityContext(
+        ratio=1.18, peer_median_ratio=0.95, peer_n=1240, percentile=88.0,
+        peer_label="ZIP 19146, similar value", verdict="over",
+    )
+    data = ReportData(
+        parcel_id="052174500", screen=_screen_row(), characteristics={},
+        equity=ctx, provenance={"generated": "2026-07-03"},
+    )
+    out = render_html(data)
+    assert "How your assessment compares" in out
+    assert "118% of estimated market value" in out
+    assert "95% (median of 1,240; ZIP 19146, similar value)" in out
+    assert "assessed above 88% of them" in out
+    assert "possible over-assessment" in out  # over verdict
+    assert "does not prove the assessment unfair" in out  # honesty caveat
+
+
 def test_render_html_minimal_condo():
     data = ReportData(
         parcel_id="888080493",

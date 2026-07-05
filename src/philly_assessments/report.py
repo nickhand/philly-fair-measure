@@ -28,6 +28,7 @@ from philly_assessments import config
 from philly_assessments.ingest.manifests import read_derived_manifest
 
 if TYPE_CHECKING:
+    from philly_assessments.equity_context import EquityContext
     from philly_assessments.models.explain import Explanation
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,7 @@ class ReportData:
     sale_history: pl.DataFrame | None = None
     provenance: dict = field(default_factory=dict)
     explanation: Explanation | None = None
+    equity: EquityContext | None = None
 
 
 def gather(parcel_id: str, data_dir: Path | None = None) -> ReportData:
@@ -103,6 +105,15 @@ def gather(parcel_id: str, data_dir: Path | None = None) -> ReportData:
         except Exception:  # noqa: BLE001 — the driver panel is optional evidence
             logger.warning("explanation unavailable for %s", parcel_id, exc_info=True)
 
+    equity = None
+    if not is_condo:
+        try:
+            from philly_assessments.equity_context import equity_context
+
+            equity = equity_context(screen, data_dir)
+        except Exception:  # noqa: BLE001 — the equity panel is optional evidence
+            logger.warning("equity context unavailable for %s", parcel_id, exc_info=True)
+
     assessments_path = root / "staged" / "assessments.parquet"
     assessment_history = None
     if assessments_path.exists():
@@ -148,6 +159,7 @@ def gather(parcel_id: str, data_dir: Path | None = None) -> ReportData:
         sale_history=sale_history,
         provenance=provenance,
         explanation=explanation,
+        equity=equity,
     )
 
 
@@ -325,6 +337,29 @@ def _render_explanation(exp: Explanation) -> list[str]:
     return out
 
 
+def _render_equity(ctx: EquityContext) -> list[str]:
+    """The peer-relative equity panel — the regressivity finding made personal:
+    this home's assessment ratio against genuinely comparable homes."""
+    verdict_note = {
+        "over": "Your home is assessed <b>higher</b> than comparable homes — a "
+        "possible over-assessment, and grounds worth examining for an appeal.",
+        "under": "Your home is assessed <b>lower</b> than comparable homes.",
+        "in line": "Your home is assessed <b>in line with</b> comparable homes.",
+    }[ctx.verdict]
+    return [
+        "<h2>How your assessment compares</h2><div class='kv'>",
+        f"<div><b>Your assessment</b>{ctx.ratio * 100:.0f}% of estimated market value</div>",
+        f"<div><b>Homes like yours</b>{ctx.peer_median_ratio * 100:.0f}% "
+        f"(median of {ctx.peer_n:,}; {html.escape(ctx.peer_label)})</div>",
+        f"<div><b>Where you stand</b>assessed above {ctx.percentile:.0f}% of them</div>",
+        "</div>",
+        f"<p class='note'>{verdict_note} This is a <b>relative</b> comparison of your "
+        "OPA value to the model's estimated market value among comparable homes; a "
+        "uniform model error cancels, but the ratio alone does not prove the "
+        "assessment unfair.</p>",
+    ]
+
+
 def render_html(data: ReportData) -> str:
     s = data.screen
     c = data.characteristics
@@ -357,6 +392,8 @@ def render_html(data: ReportData) -> str:
     ]
     if data.explanation is not None:
         parts += _render_explanation(data.explanation)
+    if data.equity is not None:
+        parts += _render_equity(data.equity)
     if s.get("retail_value") is not None:
         parts += [
             "<h2>Two value conventions</h2><div class='kv'>",
