@@ -139,9 +139,13 @@ onBeforeUnmount(() => {
   <div class="relative h-[calc(100dvh-118px)] min-h-[420px]">
     <h1 class="sr-only">Assessment map of Philadelphia</h1>
 
+    <!-- Sized explicitly (h-full, not absolute inset-0): maplibre-gl.css loads
+         after Tailwind in the lazy map chunk and its .maplibregl-map rule sets
+         position: relative, which beats the .absolute utility and collapses an
+         inset-positioned container to zero height. -->
     <div
       ref="container"
-      class="absolute inset-0"
+      class="h-full w-full"
       role="region"
       aria-label="Map of Philadelphia homes colored by assessment check result. Use the address search above the map if you prefer not to use the map."
     ></div>
