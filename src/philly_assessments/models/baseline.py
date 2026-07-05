@@ -354,6 +354,9 @@ class BaselineRunResult:
     evaluation: pl.DataFrame
 
 
+_MIN_CALIBRATION_ROWS: Final = 200  # below this, financed-only calibration is too thin
+
+
 def train_baseline(
     data_dir: Path | None = None,
     *,
@@ -361,6 +364,7 @@ def train_baseline(
     validation_fraction: float = 0.1,
     time_adjusted: bool = True,
     vertical_calibration: bool = True,
+    calibrate_on_financed: bool = True,
     market: Market | str = Market.BLEND,
     lgb_params: dict | None = None,
     num_boost_round: int = 5000,
@@ -427,7 +431,17 @@ def train_baseline(
     calibration = None
     if vertical_calibration:
         val_pred_ref = booster.predict(x["val"], num_iteration=booster.best_iteration)
-        calibration = fit_vertical_calibration(val_pred_ref, y["val"])
+        # Center the isotonic on the market-value (typical-financing) standard by
+        # fitting it on financed val only: predictions land at market value, not
+        # the cash-blended sale level. Measured 2026-07-05 — financed median ratio
+        # 0.95 -> 1.00 with COD/PRD/PRB unchanged. Falls back to all val where the
+        # financed subset is thin or absent (e.g. synthetic marts).
+        cal_mask = np.ones(val_df.height, dtype=bool)
+        if calibrate_on_financed and "fin_cash_sale" in val_df.columns:
+            fin_rows = (val_df["fin_cash_sale"].fill_null(1.0) == 0.0).to_numpy()
+            if int(fin_rows.sum()) >= _MIN_CALIBRATION_ROWS:
+                cal_mask = fin_rows
+        calibration = fit_vertical_calibration(val_pred_ref[cal_mask], y["val"][cal_mask])
         pred_lgb_ref = apply_vertical_calibration(pred_lgb_ref, calibration)
     pred_lgb = np.exp(pred_lgb_ref - test_adj)
 
@@ -493,6 +507,7 @@ def train_baseline(
                 "validation_fraction": validation_fraction,
                 "time_adjusted": time_adjusted,
                 "vertical_calibration": vertical_calibration,
+                "calibrate_on_financed": calibrate_on_financed,
                 "market": market,
                 "features": features,
                 "numeric_features": numeric,

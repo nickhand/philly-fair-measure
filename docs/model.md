@@ -81,6 +81,16 @@ residual on the prediction, fit on the validation slice, removes that gradient
 while remaining **monotone in the raw prediction** (it never reorders homes).
 Serialized as knot coordinates to `vertical_calibration.json`.
 
+The isotonic is fit on the **financed** validation slice (`calibrate_on_financed`,
+default on), so predictions land on the *typical-financing market-value* standard
+rather than the cash-blended sale level. Measured 2026-07-05: this moves the
+financed-sample median ratio 0.95 → 1.00 with COD/PRD/PRB unchanged — a pure
+centering gain that keeps the full training set (cash sales carry location signal;
+see [research-notes.md](research-notes.md)). It falls back to the whole slice when
+the financed subset is thin. Consequence: ratios against *cash* sale prices then
+sit above 1.0 by design (cash homes transact below market value — the channel gap
+the retail convention prices explicitly, §7). The §6 table predates this default.
+
 ### 5.3 Ridge — benchmark
 A regularized linear pipeline (median-impute → standardize → one-hot) as a
 transparent floor: if the GBDT can't beat a linear model, something is wrong.

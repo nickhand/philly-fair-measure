@@ -252,6 +252,30 @@ and ACS nulls. This is also the clean statistical statement of the
 interior-condition limit: per-house unobserved quality is only learnable
 where the house sells repeatedly, which is too rare to move the aggregate.
 
+**Permit scope-of-work renovation signal: NULL as a valuation feature, and
+the LLM upgrade won't rescue it (measured 2026-07-04).** The intended attack on
+the interior-condition ceiling: L&I permits carry free-text `approvedscopeofwork`
+at **99% coverage** (median 123 chars, real prose spanning 2014-2026), and
+renovation intensity reads cleanly — gut / new-construction / addition / systems
+/ minor separate by keyword, and **11.6%** of the 205k sale base carries a prior
+renovation-class permit with substantive text (a *bigger* beneficiary base than
+repeat-sales' 7%). A deterministic ordinal intensity scorer (0-4, gated to
+building/alteration permits so an electrical "wire throughout" can't masquerade
+as a gut), aggregated per sale over the 5y pre-sale window (max / sum /
+count-major) and added to LightGBM: **overall COD 25.88 → 25.96 (marginally
+worse), MAPE flat at 0.254; on the reno-beneficiary subset itself (n=1,033) COD
+24.98 → 24.96 — dead flat.** Robust across a noisy first scorer and a cleaned,
+building-gated second. Mechanism, and the reason a better (LLM) extractor
+cannot help: **a renovated home sells at its renovated price**, so the reno value
+already enters through the comp/kNN surface, block rolling means, and year-built
+— the scope text is redundant with the sale itself. The limit is *redundancy*,
+not extraction quality; cleaning the labels (the LLM's only edge over keywords)
+moved nothing. This is the repeat-sales verdict again. The scope text's only
+plausible home is the **screen/appeal layer as an OPA-staleness flag** (a
+gut/new-construction permit postdating OPA's assessment vintage → likely
+under-assessed), the aerial-change pattern — and that flag needs no LLM. The
+scorer lives in scratchpad, unshipped.
+
 **Stability audit — CV distribution + look-ahead bound (measured 2026-07-04,
 `philly stability-audit`).** Replaces "COD 26 is one split" with a
 distribution, and confronts the learned-geography look-ahead honestly.
@@ -279,6 +303,53 @@ distribution, and confronts the learned-geography look-ahead honestly.
   optimistic versus a strict real-time deployment. Fully removing it needs a
   train-only refit of the index + market areas + model (deferred, low
   expected movement given the CV stability above).
+
+**Model-improvement sweep — three nulls, two wins, ceiling named (2026-07-05).**
+Prompted by "the model could perform better," a feature-importance read of the
+shipped LightGBM was the key finding: **~75% of gain is location/comps**
+(block-roll mean alone **35%**, census tract 12%, ward 8%, kNN 8%, area-level 6%,
+market-area 5%) and only **~10% is the house itself** (living area 6%, interior
+condition 1.5%, everything else <0.5%). The model is a neighborhood-average
+machine that has structurally learned to ignore the individual property — which
+explains the q1 failure (heterogeneous cheap blocks, block-mean a poor predictor,
+house features starved), the permit-reno null above, and why "interior condition"
+reads as the ceiling.
+
+Two structural bets against that diagnosis, both **NULL** (scratchpad ablations,
+same out-of-time split, scored on the financed = market-value cut):
+- *Financed target as primary* — does the cash-blended target pollute the model?
+  Blend vs financed-only training; financed-only is marginally **worse** (financed
+  COD 21.57 → 21.81, PRB +0.003 → −0.080). Cash sales aren't pollution, they're
+  **location signal** — dropping 40% of rows starved the surfaces more than target
+  purity helped. The only real blend distortion is a ~5% level shift (financed
+  median 0.947), a *centering* issue, not model quality.
+- *Characteristic-aware comps* — appraiser-style spatial pool → K most similar by
+  size/type/age, leakage-safe quarter-blocking, 98% coverage: **null** (financed
+  COD 21.57 → 21.43, q1 *worse*). LightGBM already interacts the block mean with
+  size/type via tree splits; the pre-computed interaction is redundant.
+
+The consistent nulls (with permit-reno, GP field, parcel RE, imagery) **are** the
+answer: no big accuracy miss remains — the model is at the **public-data
+information ceiling**. On clean financed sales it is already IAAO-uniform
+(PRD 1.03, PRB +0.003, COD 21.6); the headline COD 25.9 is cash-market inflation,
+and the 21.6 → 15 gap is unobservable interior condition (proven twice).
+
+Two modest wins did land:
+- **Financed calibration — SHIPPED** (`calibrate_on_financed`, default on): fit the
+  isotonic on the financed val slice → financed median 0.947 → **1.00**, COD/PRD/PRB
+  unchanged, no retrain, no data lost. Market-value-centered assessments for free
+  (model.md §5.2; propagate to the screen/reports on next full retrain+rescore).
+- **CatBoost ensemble — DECIDED, not built**: 0.5·LGBM + 0.5·CatBoost gives a
+  consistent **−2.5–3% COD** everywhere incl. q1 (financed 21.6 → 21.1; financed-q1
+  32.2 → 31.2, PRB 0.146 → 0.127). Notably **CatBoost alone beats the hand-tuned
+  LightGBM** (val RMSE 0.319 vs 0.327; val-optimal blend 75% CatBoost) — its ordered
+  target-encoding handles the high-cardinality geography (tract/ward/market-area,
+  25% of the model) better than LGBM's native categorical splits. Deferred: costs a
+  `catboost` dep + an ensemble scoring path (condo, Bayesian/conformal intervals,
+  and the screen all assume the single booster). Scorers in scratchpad. *(A TabPFN-v2
+  bake-off on condos/q1 was attempted and abandoned — the pre-gate 2.0.9 weights are
+  CPU-only here and OOM at useful context, and the current package gates weights
+  behind a license token: a standing blocker for a commercial product.)*
 
 **Modern Bayesian practice applicable here**
 - **HSGP** (Hilbert-space GP approximation; Solin & Särkkä, and the practical

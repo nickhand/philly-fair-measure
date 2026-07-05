@@ -49,7 +49,7 @@ def test_ratio_metrics_known_cod_and_cleaning():
     assert cleaned.n == 1
 
 
-def _synthetic_mart(n=800, seed=42):
+def _synthetic_mart(n=800, seed=42, cash_fraction=0.0, cash_discount=0.30):
     rng = np.random.default_rng(seed)
     start = datetime(2016, 1, 1)
     area = rng.uniform(800, 2400, n)
@@ -57,7 +57,9 @@ def _synthetic_mart(n=800, seed=42):
     zip_factor = np.select(
         [zips == "19106", zips == "19147"], [1.4, 1.1], default=0.9
     )
-    price = 150.0 * area * zip_factor * np.exp(rng.normal(0, 0.12, n))
+    price = 150.0 * area * zip_factor * np.exp(rng.normal(0, 0.12, n))  # market value
+    is_cash = rng.random(n) < cash_fraction
+    sale_price = np.where(is_cash, price * (1.0 - cash_discount), price)  # cash sells low
     block_roll = price * np.exp(rng.normal(0, 0.08, n))
     asmt = price * rng.uniform(0.75, 1.15, n)
 
@@ -71,7 +73,8 @@ def _synthetic_mart(n=800, seed=42):
                 "sale_id": f"s{i}",
                 "parcel_id": f"p{i}",
                 "sale_date": start + timedelta(days=3 * i),
-                "sale_price": float(price[i]),
+                "sale_price": float(sale_price[i]),
+                "fin_cash_sale": float(is_cash[i]),
                 "time_adj_log": 0.0,
                 "asmt_market_value_sale_year": float(asmt[i]),
                 "char_livable_area": float(area[i]),
@@ -167,3 +170,25 @@ def test_train_baseline_end_to_end(tmp_path):
     )
     scored = score_lightgbm(result.run_dir, frame_scored)
     np.testing.assert_allclose(scored, predictions["pred_lightgbm"].to_numpy(), rtol=1e-6)
+
+
+def test_calibrate_on_financed_shifts_toward_market_value(tmp_path):
+    import time as _time
+
+    # 40% cash sales at a 30% discount; enough rows that the financed val slice
+    # (~0.6 * 0.1 * 0.85 * n) clears _MIN_CALIBRATION_ROWS so the path engages.
+    frame = _synthetic_mart(n=6000, cash_fraction=0.4, cash_discount=0.30)
+    write_derived_table(
+        frame, tmp_path, "marts", "sale_features", [InputRef(dataset="test", fetched_at="t")]
+    )
+    params = dict(test_fraction=0.15,
+                  lgb_params={"num_leaves": 15, "min_data_in_leaf": 5, "learning_rate": 0.1},
+                  num_boost_round=300, early_stopping_rounds=30)
+    res_all = train_baseline(tmp_path, calibrate_on_financed=False, **params)
+    _time.sleep(1.1)  # second-resolution run_id must differ
+    res_fin = train_baseline(tmp_path, calibrate_on_financed=True, **params)
+
+    # centering on financed lifts predictions to market value, so ratios vs the
+    # cash-blended sale prices rise (cash homes now assessed above their low price)
+    assert (res_fin.overall["lightgbm"]["median_ratio"]
+            > res_all.overall["lightgbm"]["median_ratio"] + 0.02)
