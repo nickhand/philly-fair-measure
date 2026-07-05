@@ -115,9 +115,7 @@ def _cmd_train_condo(args: argparse.Namespace) -> int:
 def _cmd_train_baseline(args: argparse.Namespace) -> int:
     from philly_assessments.models import train_baseline
 
-    result = train_baseline(
-        args.data_dir, test_fraction=args.test_fraction, market=args.market
-    )
+    result = train_baseline(args.data_dir, test_fraction=args.test_fraction, market=args.market)
     print(f"run {result.run_id} -> {result.run_dir}\n")
     columns = ("n", "rmse_log", "mape", "r2_log", "median_ratio", "cod", "prd", "prb")
     print(f"{'model':<16}" + "".join(f"{c:>13}" for c in columns))
@@ -217,9 +215,7 @@ def _cmd_conformal_check(args: argparse.Namespace) -> int:
     header = f"{'segment':<16}{'n':>9}" + "".join(f"{label:>16}" for label in labels)
     print(header)
     print("-" * len(header))
-    segments = result.table.select("segment_type", "segment", "n").unique(
-        maintain_order=True
-    )
+    segments = result.table.select("segment_type", "segment", "n").unique(maintain_order=True)
     for seg in segments.to_dicts():
         cells = []
         for method in methods:
@@ -229,9 +225,7 @@ def _cmd_conformal_check(args: argparse.Namespace) -> int:
                 & (pl.col("segment") == seg["segment"])
             )
             if row.height:
-                cells.append(
-                    f"{row['coverage'][0]:>8.3f}/{row['median_width_log'][0]:<7.2f}"
-                )
+                cells.append(f"{row['coverage'][0]:>8.3f}/{row['median_width_log'][0]:<7.2f}")
             else:
                 cells.append(f"{'-':>16}")
         print(f"{seg['segment']:<16}{seg['n']:>9,}" + "".join(cells))
@@ -256,10 +250,7 @@ def _cmd_conformal_check(args: argparse.Namespace) -> int:
         cols = [c for c in pivot.columns if c != "bayesian_flag"]
         print(f"  {'bayesian \\ conformal':<26}" + "".join(f"{c[:14]:>16}" for c in cols))
         for counts in pivot.sort("bayesian_flag").to_dicts():
-            print(
-                f"  {counts['bayesian_flag']:<26}"
-                + "".join(f"{counts[c]:>16,}" for c in cols)
-            )
+            print(f"  {counts['bayesian_flag']:<26}" + "".join(f"{counts[c]:>16,}" for c in cols))
     return 0
 
 
@@ -299,13 +290,17 @@ def _cmd_retail_market(args: argparse.Namespace) -> int:
     for seg in t["segment"].unique(maintain_order=True).to_list():
         b = t.filter((t["segment"] == seg) & (t["model"] == "blend")).to_dicts()[0]
         r = t.filter((t["segment"] == seg) & (t["model"] == "retail")).to_dicts()[0]
-        print(f"{seg:<16}{b['median_ratio']:>13.3f}{b['cod']:>11.1f}"
-              f"{r['median_ratio']:>14.3f}{r['cod']:>12.1f}")
+        print(
+            f"{seg:<16}{b['median_ratio']:>13.3f}{b['cod']:>11.1f}"
+            f"{r['median_ratio']:>14.3f}{r['cod']:>12.1f}"
+        )
     print("\nOPA ratio under both value conventions (median OPA / value):\n")
     print(f"{'quintile':<10}{'% cash':>9}{'vs sale price':>15}{'vs retail value':>17}")
     for row in result.opa_convention_table.to_dicts():
-        print(f"{row['quintile']:<10}{row['pct_cash']:>9.0%}"
-              f"{row['opa_ratio_vs_sale_price']:>15.3f}{row['opa_ratio_vs_retail']:>17.3f}")
+        print(
+            f"{row['quintile']:<10}{row['pct_cash']:>9.0%}"
+            f"{row['opa_ratio_vs_sale_price']:>15.3f}{row['opa_ratio_vs_retail']:>17.3f}"
+        )
     return 0
 
 
@@ -318,24 +313,30 @@ def _cmd_fairness_robustness(args: argparse.Namespace) -> int:
     print(f"{'group':<28}{'OPA':>8}{'coarse':>9}{'rich':>8}")
     for g in m["group"].unique(maintain_order=True).to_list():
         vals = {row["model"]: row["median_ratio"] for row in m.filter(m["group"] == g).to_dicts()}
-        print(f"{g:<28}{vals.get('opa', float('nan')):>8.3f}"
-              f"{vals.get('coarse_model', float('nan')):>9.3f}"
-              f"{vals.get('rich_model', float('nan')):>8.3f}")
+        print(
+            f"{g:<28}{vals.get('opa', float('nan')):>8.3f}"
+            f"{vals.get('coarse_model', float('nan')):>9.3f}"
+            f"{vals.get('rich_model', float('nan')):>8.3f}"
+        )
 
     print("\n2. Black-White median-ratio gap across temporal CV folds\n")
     print(f"{'fold':<6}{'test from':<12}{'OPA gap':>10}{'model gap':>11}")
     for row in r.cv.to_dicts():
         og = row["opa_black_white_gap"]
         mg = row["model_black_white_gap"]
-        print(f"{row['fold']:<6}{row['test_from']:<12}"
-              f"{(f'{og:+.3f}' if og is not None else '-'):>10}"
-              f"{(f'{mg:+.3f}' if mg is not None else '-'):>11}")
+        print(
+            f"{row['fold']:<6}{row['test_from']:<12}"
+            f"{(f'{og:+.3f}' if og is not None else '-'):>10}"
+            f"{(f'{mg:+.3f}' if mg is not None else '-'):>11}"
+        )
 
     print("\n3. full residential roll (sold + unsold): OPA vs model value by race\n")
     print(f"{'group':<28}{'n':>9}{'median OPA/model':>18}{'share OPA>110%':>16}")
     for row in r.full_roll.to_dicts():
-        print(f"{row['group']:<28}{row['n_properties']:>9,}"
-              f"{row['median_opa_over_model']:>18.3f}{row['share_opa_over_110pct']:>16.1%}")
+        print(
+            f"{row['group']:<28}{row['n_properties']:>9,}"
+            f"{row['median_opa_over_model']:>18.3f}{row['share_opa_over_110pct']:>16.1%}"
+        )
     return 0
 
 
@@ -344,15 +345,23 @@ def _cmd_regressivity_cv(args: argparse.Namespace) -> int:
 
     table, summary = vertical_regressivity_cv(args.data_dir)
     print("vertical regressivity (OPA q1/q5 ratio and PRD) across time periods\n")
-    print(f"{'period from':<13}{'n':>8}{'q1/q5 sale':>12}{'q1/q5 retail':>14}"
-          f"{'PRD sale':>10}{'PRD retail':>12}")
+    print(
+        f"{'period from':<13}{'n':>8}{'q1/q5 sale':>12}{'q1/q5 retail':>14}"
+        f"{'PRD sale':>10}{'PRD retail':>12}"
+    )
     for r in table.to_dicts():
-        print(f"{r['period_from']:<13}{r['n']:>8,}{r['q1q5_vs_sale']:>12.2f}"
-              f"{r['q1q5_vs_retail']:>14.2f}{r['prd_vs_sale']:>10.3f}{r['prd_vs_retail']:>12.3f}")
-    print(f"\n  q1/q5 vs retail: mean {summary['q1q5_retail_mean']:.2f}, "
-          f"min {summary['q1q5_retail_min']:.2f}  (>1 = regressive in every period)")
-    print(f"  PRD vs retail:   mean {summary['prd_retail_mean']:.3f}, "
-          f"min {summary['prd_retail_min']:.3f}  (>1.03 = regressive)")
+        print(
+            f"{r['period_from']:<13}{r['n']:>8,}{r['q1q5_vs_sale']:>12.2f}"
+            f"{r['q1q5_vs_retail']:>14.2f}{r['prd_vs_sale']:>10.3f}{r['prd_vs_retail']:>12.3f}"
+        )
+    print(
+        f"\n  q1/q5 vs retail: mean {summary['q1q5_retail_mean']:.2f}, "
+        f"min {summary['q1q5_retail_min']:.2f}  (>1 = regressive in every period)"
+    )
+    print(
+        f"  PRD vs retail:   mean {summary['prd_retail_mean']:.3f}, "
+        f"min {summary['prd_retail_min']:.3f}  (>1.03 = regressive)"
+    )
     return 0
 
 
@@ -367,25 +376,34 @@ def _cmd_stability_audit(args: argparse.Namespace) -> int:
     print("1. temporal rolling-origin CV (expanding window, out-of-time folds)\n")
     print(f"{'fold':<6}{'test from':<12}{'n_test':>8}{'COD':>8}{'ratio':>8}")
     for r in temporal.to_dicts():
-        print(f"{r['fold']:<6}{r['test_from']:<12}{r['n_test']:>8,}{r['cod']:>8.1f}"
-              f"{r['median_ratio']:>8.3f}")
-    print(f"  -> COD {t_sum['cod_mean']:.1f} ± {t_sum['cod_sd']:.1f} "
-          f"(range {t_sum['cod_min']:.1f}-{t_sum['cod_max']:.1f})")
+        print(
+            f"{r['fold']:<6}{r['test_from']:<12}{r['n_test']:>8,}{r['cod']:>8.1f}"
+            f"{r['median_ratio']:>8.3f}"
+        )
+    print(
+        f"  -> COD {t_sum['cod_mean']:.1f} ± {t_sum['cod_sd']:.1f} "
+        f"(range {t_sum['cod_min']:.1f}-{t_sum['cod_max']:.1f})"
+    )
 
     spatial, s_sum = spatial_cv(args.data_dir)
     print("\n2. spatial leave-one-district-out CV (adversarial — unseen geography)\n")
-    print(f"  COD {s_sum['cod_mean']:.1f} ± {s_sum['cod_sd']:.1f} across "
-          f"{s_sum['folds']} districts (range {s_sum['cod_min']:.1f}-{s_sum['cod_max']:.1f})")
+    print(
+        f"  COD {s_sum['cod_mean']:.1f} ± {s_sum['cod_sd']:.1f} across "
+        f"{s_sum['folds']} districts (range {s_sum['cod_min']:.1f}-{s_sum['cod_max']:.1f})"
+    )
     worst = spatial.head(3).to_dicts()
-    print("  worst held-out districts: " +
-          ", ".join(f"{r['held_out_district']} {r['cod']:.0f}" for r in worst))
+    print(
+        "  worst held-out districts: "
+        + ", ".join(f"{r['held_out_district']} {r['cod']:.0f}" for r in worst)
+    )
 
     la = index_lookahead_bound(args.data_dir)
     print("\n3. price-index look-ahead bound (magnitude of test-set time adjustment)\n")
-    print(f"  mean |time adjustment| on test sales = {la['mean_abs_timeadj_pct']:.2%} "
-          f"(p95 {la['p95_abs_timeadj_pct']:.2%}); the leaky component is a fraction of this.")
-    print(f"  max index drift across the test window = "
-          f"{la['max_index_drift_over_window_pct']:.2%}")
+    print(
+        f"  mean |time adjustment| on test sales = {la['mean_abs_timeadj_pct']:.2%} "
+        f"(p95 {la['p95_abs_timeadj_pct']:.2%}); the leaky component is a fraction of this."
+    )
+    print(f"  max index drift across the test window = {la['max_index_drift_over_window_pct']:.2%}")
     return 0
 
 
@@ -397,13 +415,17 @@ def _cmd_robustness_audit(args: argparse.Namespace) -> int:
     cl = result.char_leakage
     print(f"{'subset':<38}{'n':>7}{'model COD':>11}{'OPA COD':>9}{'edge':>7}{'model ratio':>13}")
     for r in cl.to_dicts():
-        print(f"{r['subset']:<38}{r['n']:>7,}{r['model_cod']:>11.1f}{r['opa_cod']:>9.1f}"
-              f"{r['model_cod_edge']:>7.1f}{r['model_ratio']:>13.3f}")
+        print(
+            f"{r['subset']:<38}{r['n']:>7,}{r['model_cod']:>11.1f}{r['opa_cod']:>9.1f}"
+            f"{r['model_cod_edge']:>7.1f}{r['model_ratio']:>13.3f}"
+        )
     print("\n2. racial gap under both value conventions (median OPA / value)\n")
     print(f"{'group':<28}{'n':>8}{'% cash':>8}{'vs sale price':>15}{'vs retail':>11}")
     for r in result.racial_conventions.to_dicts():
-        print(f"{r['group']:<28}{r['n']:>8,}{r['pct_cash']:>8.0%}"
-              f"{r['opa_ratio_vs_sale_price']:>15.3f}{r['opa_ratio_vs_retail']:>11.3f}")
+        print(
+            f"{r['group']:<28}{r['n']:>8,}{r['pct_cash']:>8.0%}"
+            f"{r['opa_ratio_vs_sale_price']:>15.3f}{r['opa_ratio_vs_retail']:>11.3f}"
+        )
     return 0
 
 
@@ -417,10 +439,7 @@ def _cmd_channel_decomp(args: argparse.Namespace) -> int:
     for seg in t["segment"].unique(maintain_order=True).to_list():
         s = {r["stage"]: r for r in t.filter(t["segment"] == seg).to_dicts()}
         ci = s["distress"]
-        ci_str = (
-            f"[{ci['ci_low']:+.1%}, {ci['ci_high']:+.1%}]"
-            if ci["ci_low"] is not None else ""
-        )
+        ci_str = f"[{ci['ci_low']:+.1%}, {ci['ci_high']:+.1%}]" if ci["ci_low"] is not None else ""
         print(
             f"{seg:<10}{s['raw']['cash_discount_pct']:>+10.1%}"
             f"{s['hedonic']['cash_discount_pct']:>+12.1%}"
@@ -476,10 +495,14 @@ def _cmd_aerial_pilot(args: argparse.Namespace) -> int:
         n_control=args.n_control,
     )
     summary = pilot_summary(table)
-    print(f"\naerial change pilot: {args.early} vs {args.late} flights, "
-          f"{table.height} parcels scored\n")
-    header = (f"{'group':<18}{'metric':<12}{'n_event':>8}{'n_ctrl':>8}"
-              f"{'AUC':>8}{'med_event':>11}{'med_ctrl':>10}")
+    print(
+        f"\naerial change pilot: {args.early} vs {args.late} flights, "
+        f"{table.height} parcels scored\n"
+    )
+    header = (
+        f"{'group':<18}{'metric':<12}{'n_event':>8}{'n_ctrl':>8}"
+        f"{'AUC':>8}{'med_event':>11}{'med_ctrl':>10}"
+    )
     print(header)
     print("-" * len(header))
     for row in summary.to_dicts():
@@ -585,12 +608,16 @@ def _cmd_leaderboard(args: argparse.Namespace) -> int:
             addr = str(r["address"] or "")[:34]
             if key == "non_uniform_block":
                 gap = (r["opa_vs_twin_median"] - 1) * 100
-                print(f"  {r['parcel_id']}  {addr:<34} ${r['opa_market_value']:>10,.0f}  "
-                      f"{gap:+.0f}% vs {int(r['twin_n'])} identical twins")
+                print(
+                    f"  {r['parcel_id']}  {addr:<34} ${r['opa_market_value']:>10,.0f}  "
+                    f"{gap:+.0f}% vs {int(r['twin_n'])} identical twins"
+                )
             else:
-                print(f"  {r['parcel_id']}  {addr:<34} OPA ${r['opa_market_value']:>10,.0f}  "
-                      f"model ${r['model_median']:>10,.0f}  {r['opa_vs_model_ratio']:.1f}x  "
-                      f"z {r['screen_z']:+.1f}")
+                print(
+                    f"  {r['parcel_id']}  {addr:<34} OPA ${r['opa_market_value']:>10,.0f}  "
+                    f"model ${r['model_median']:>10,.0f}  {r['opa_vs_model_ratio']:.1f}x  "
+                    f"z {r['screen_z']:+.1f}"
+                )
 
     if args.reports:
         made = 0
@@ -633,11 +660,7 @@ def _cmd_comps(args: argparse.Namespace) -> int:
     data_root = args.data_dir if args.data_dir is not None else config.data_dir()
     screen_path = data_root / "marts" / "assessment_screen.parquet"
     if screen_path.exists():
-        row = (
-            pl.scan_parquet(screen_path)
-            .filter(pl.col("parcel_id") == parcel_id)
-            .collect()
-        )
+        row = pl.scan_parquet(screen_path).filter(pl.col("parcel_id") == parcel_id).collect()
         if row.height:
             r = row.to_dicts()[0]
             print(
@@ -745,9 +768,7 @@ def main(argv: list[str] | None = None) -> int:
     catalog_cmd.add_argument("--data-dir", type=Path)
     catalog_cmd.set_defaults(func=_cmd_catalog)
 
-    stage = subparsers.add_parser(
-        "stage", help="build staged tables from the latest raw snapshots"
-    )
+    stage = subparsers.add_parser("stage", help="build staged tables from the latest raw snapshots")
     stage.add_argument(
         "--tables", nargs="*", help="staged tables to build (default: all)", default=None
     )
@@ -784,7 +805,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     train.add_argument("--test-fraction", type=float, default=0.1)
     train.add_argument(
-        "--market", choices=tuple(Market), default=Market.BLEND,
+        "--market",
+        choices=tuple(Market),
+        default=Market.BLEND,
         help="retail = train on mortgage-financed sales only (predicts retail value)",
     )
     train.add_argument("--data-dir", type=Path)
@@ -805,9 +828,7 @@ def main(argv: list[str] | None = None) -> int:
     bayes.add_argument("--chains", type=int, default=2)
     bayes.add_argument("--cores", type=int, default=1)
     bayes.add_argument("--nu", type=float, default=8.0, help="fixed Student-t dof")
-    bayes.add_argument(
-        "--learn-nu", action="store_true", help="learn nu (much slower sampling)"
-    )
+    bayes.add_argument("--learn-nu", action="store_true", help="learn nu (much slower sampling)")
     bayes.add_argument(
         "--spatial-basis",
         action="store_true",
@@ -920,8 +941,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ratio_study = subparsers.add_parser(
         "ratio-study",
-        help="IAAO convention bridge (our metrics vs OPA's reported ones) + "
-        "sale-chasing checks",
+        help="IAAO convention bridge (our metrics vs OPA's reported ones) + sale-chasing checks",
     )
     ratio_study.add_argument("--data-dir", type=Path)
     ratio_study.set_defaults(func=_cmd_ratio_study)
@@ -1001,9 +1021,7 @@ def main(argv: list[str] | None = None) -> int:
         "export-web-stats",
         help="recompute the dashboard's headline stats into web/src/data/siteStats.json",
     )
-    web_stats.add_argument(
-        "--out", type=Path, default=Path("web/src/data/siteStats.json")
-    )
+    web_stats.add_argument("--out", type=Path, default=Path("web/src/data/siteStats.json"))
     web_stats.add_argument("--data-dir", type=Path)
     web_stats.set_defaults(func=_cmd_export_web_stats)
 

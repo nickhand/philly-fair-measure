@@ -54,9 +54,7 @@ def building_id_expr() -> pl.Expr:
     return (
         pl.when(pl.col("lonlat_status") == "ok")
         .then(
-            pl.format(
-                "geo_{}_{}", (pl.col("lon") * 1e4).round(0), (pl.col("lat") * 1e4).round(0)
-            )
+            pl.format("geo_{}_{}", (pl.col("lon") * 1e4).round(0), (pl.col("lat") * 1e4).round(0))
         )
         .when(pl.col("street_code").is_not_null() & pl.col("house_number_parsed").is_not_null())
         .then(
@@ -206,9 +204,7 @@ def condo_units(opa: pl.LazyFrame) -> pl.DataFrame:
             # deliberately assessed nominally — screening them as
             # "under-assessed" would be wrong on the merits, measured
             # 2026-07-03: unit-less res-88s median 2,550 sqft vs 1,063)
-            & pl.col("building_code_description")
-            .cast(pl.String)
-            .str.starts_with("RES CONDO")
+            & pl.col("building_code_description").cast(pl.String).str.starts_with("RES CONDO")
         )
         .select(
             pl.col("parcel_number").alias("parcel_id"),
@@ -420,7 +416,12 @@ def assemble_condo_assessment_features(
         .collect()
         .join(
             units.select(
-                "parcel_id", "building_id", "unit_area", "loc_district", "lon", "lat",
+                "parcel_id",
+                "building_id",
+                "unit_area",
+                "loc_district",
+                "lon",
+                "lat",
                 "lonlat_status",
             ),
             on="parcel_id",
@@ -505,8 +506,14 @@ def assemble_condo_assessment_features(
             *[
                 pl.col(c).fill_null(0.0)
                 for c in (
-                    "own_w", "own_wp", "own_wppsf", "own_w_ppsf",
-                    "bldg_w", "bldg_wp", "bldg_wppsf", "bldg_w_ppsf",
+                    "own_w",
+                    "own_wp",
+                    "own_wppsf",
+                    "own_w_ppsf",
+                    "bldg_w",
+                    "bldg_wp",
+                    "bldg_wppsf",
+                    "bldg_w_ppsf",
                 )
             ],
             pl.col("own_n").fill_null(0),
@@ -525,8 +532,16 @@ def assemble_condo_assessment_features(
             (pl.col("bldg_n") - pl.col("own_n")).alias("mkt_bldg_roll_n"),
         )
         .drop(
-            "bldg_w", "bldg_wp", "bldg_wppsf", "bldg_w_ppsf", "bldg_n",
-            "own_w", "own_wp", "own_wppsf", "own_w_ppsf", "own_n",
+            "bldg_w",
+            "bldg_wp",
+            "bldg_wppsf",
+            "bldg_w_ppsf",
+            "bldg_n",
+            "own_w",
+            "own_wp",
+            "own_wppsf",
+            "own_w_ppsf",
+            "own_n",
         )
         .join(knn, on="parcel_id", how="left")
         .rename(

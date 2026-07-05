@@ -43,9 +43,7 @@ def _weight(days):
 
 
 def _assemble(opa_rows, sale_rows, permits=None, violations=None):
-    permits = permits or [
-        {"opa_account_num": "zz", "permitissuedate_parsed": datetime(2020, 1, 1)}
-    ]
+    permits = permits or [{"opa_account_num": "zz", "permitissuedate_parsed": datetime(2020, 1, 1)}]
     violations = violations or [
         {
             "opa_account_num": "zz",
@@ -66,13 +64,16 @@ def _assemble(opa_rows, sale_rows, permits=None, violations=None):
 
 
 def test_block_roll_excludes_own_sales_at_valuation_date():
-    opa = [_opa_row("p1", house_number=101), _opa_row("p2", house_number=103),
-           _opa_row("p3", house_number=105)]
+    opa = [
+        _opa_row("p1", house_number=101),
+        _opa_row("p2", house_number=103),
+        _opa_row("p3", house_number=105),
+    ]
     sales = [
-        _sale("p1", 200_000.0, datetime(2025, 7, 1)),   # 365d before valuation
-        _sale("p2", 300_000.0, datetime(2024, 7, 1)),   # 730d before
+        _sale("p1", 200_000.0, datetime(2025, 7, 1)),  # 365d before valuation
+        _sale("p2", 300_000.0, datetime(2024, 7, 1)),  # 730d before
         _sale("p2", 900_000.0, datetime(2024, 8, 1), status="suspect"),  # never counts
-        _sale("p1", 111_000.0, datetime(2019, 1, 1)),   # outside 5y window
+        _sale("p1", 111_000.0, datetime(2019, 1, 1)),  # outside 5y window
     ]
     by_id = _assemble(opa, sales)
 
@@ -120,16 +121,24 @@ def test_twin_uniformity_strict_key():
 
     def _parcel(pid, value, area=1000.0, cond="4"):
         return {
-            "parcel_id": pid, "opa_market_value": value, "loc_block_id": "b1",
-            "char_livable_area": area, "char_lot_area": 800.0, "char_style": "row",
-            "char_stories": 2.0, "char_year_built": 1925.0,
-            "char_exterior_condition": cond, "char_interior_condition": "4",
-            "char_quality_grade_raw": "C", "char_basement": "D",
-            "char_garage_spaces": 0.0, "char_central_air": "N",
+            "parcel_id": pid,
+            "opa_market_value": value,
+            "loc_block_id": "b1",
+            "char_livable_area": area,
+            "char_lot_area": 800.0,
+            "char_style": "row",
+            "char_stories": 2.0,
+            "char_year_built": 1925.0,
+            "char_exterior_condition": cond,
+            "char_interior_condition": "4",
+            "char_quality_grade_raw": "C",
+            "char_basement": "D",
+            "char_garage_spaces": 0.0,
+            "char_central_air": "N",
         }
 
     rows = [_parcel(f"p{i}", 100_000.0) for i in range(5)]
-    rows.append(_parcel("high", 150_000.0))          # identical but assessed 1.5x
+    rows.append(_parcel("high", 150_000.0))  # identical but assessed 1.5x
     rows.append(_parcel("diff_cond", 150_000.0, cond="7"))  # condition differs -> own set
     rows.append(_parcel("diff_area", 100_000.0, area=1400.0))
     out = twin_uniformity(pl.DataFrame(rows))

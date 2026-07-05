@@ -64,8 +64,12 @@ def _fit_predict(
     x_test = _encode(test_df, mappings, numeric, categorical)
     booster = lgb.train(
         DEFAULT_LGB_PARAMS,
-        lgb.Dataset(x_fit, label=y(fit_df), feature_name=numeric + categorical,
-                    categorical_feature=categorical),
+        lgb.Dataset(
+            x_fit,
+            label=y(fit_df),
+            feature_name=numeric + categorical,
+            categorical_feature=categorical,
+        ),
         num_boost_round=rounds,
         valid_sets=[lgb.Dataset(x_val, label=y(val_df), reference=None)],
         callbacks=[lgb.early_stopping(80, verbose=False)],
@@ -77,8 +81,13 @@ def _fit_predict(
 
 def _summary(cods: list[float]) -> dict:
     a = np.array(cods)
-    return {"folds": len(a), "cod_mean": float(a.mean()), "cod_sd": float(a.std()),
-            "cod_min": float(a.min()), "cod_max": float(a.max())}
+    return {
+        "folds": len(a),
+        "cod_mean": float(a.mean()),
+        "cod_sd": float(a.std()),
+        "cod_min": float(a.min()),
+        "cod_max": float(a.max()),
+    }
 
 
 def temporal_cv(data_dir: Path | None = None, *, n_folds: int = 5) -> tuple[pl.DataFrame, dict]:
@@ -105,14 +114,16 @@ def temporal_cv(data_dir: Path | None = None, *, n_folds: int = 5) -> tuple[pl.D
         if m.cod is None:
             raise ValueError(f"temporal fold {i + 1}: COD undefined (fold too small)")
         cods.append(m.cod)
-        rows.append({
-            "fold": i + 1,
-            "test_from": str(test_df["sale_date"].min())[:10],
-            "n_train": fit_df.height,
-            "n_test": test_df.height,
-            "cod": m.cod,
-            "median_ratio": m.median_ratio,
-        })
+        rows.append(
+            {
+                "fold": i + 1,
+                "test_from": str(test_df["sale_date"].min())[:10],
+                "n_train": fit_df.height,
+                "n_test": test_df.height,
+                "cod": m.cod,
+                "median_ratio": m.median_ratio,
+            }
+        )
         logger.info("temporal fold %d: COD %.1f", i + 1, m.cod)
     return pl.DataFrame(rows), _summary(cods)
 
@@ -127,7 +138,8 @@ def spatial_cv(
     df = _load_frame(root / "marts" / "sale_features.parquet")
     numeric, categorical = feature_lists(time_adjusted=True)
     districts = [
-        d for d, c in df.group_by("loc_district").len().iter_rows()
+        d
+        for d, c in df.group_by("loc_district").len().iter_rows()
         if d is not None and c >= min_district_n
     ]
     rows = []
@@ -142,8 +154,14 @@ def spatial_cv(
         if m.cod is None:
             raise ValueError(f"spatial hold-out {d}: COD undefined (district too small)")
         cods.append(m.cod)
-        rows.append({"held_out_district": d, "n_test": test_df.height,
-                     "cod": m.cod, "median_ratio": m.median_ratio})
+        rows.append(
+            {
+                "held_out_district": d,
+                "n_test": test_df.height,
+                "cod": m.cod,
+                "median_ratio": m.median_ratio,
+            }
+        )
         logger.info("spatial hold-out %s: COD %.1f", d, m.cod)
     return pl.DataFrame(rows).sort("cod", descending=True), _summary(cods)
 
@@ -174,9 +192,9 @@ def index_lookahead_bound(data_dir: Path | None = None) -> dict:
         .to_numpy()
     )
     index = pl.read_parquet(root / "marts" / "price_index.parquet")
-    test_months = index.filter(
-        pl.col("month") >= pl.lit(cutoff).str.to_datetime()
-    )["log_index"].to_numpy()
+    test_months = index.filter(pl.col("month") >= pl.lit(cutoff).str.to_datetime())[
+        "log_index"
+    ].to_numpy()
     return {
         "test_cutoff": cutoff,
         "n_test_sales": int(len(test)),

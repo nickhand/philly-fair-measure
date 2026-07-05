@@ -34,8 +34,12 @@ _EXTRA = 4  # over-query to survive same-parcel exclusion
 
 
 def _weighted_knn(
-    tree: cKDTree, tree_parcels: np.ndarray, tree_values: np.ndarray,
-    xy: np.ndarray, parcels: np.ndarray, k: int,
+    tree: cKDTree,
+    tree_parcels: np.ndarray,
+    tree_values: np.ndarray,
+    xy: np.ndarray,
+    parcels: np.ndarray,
+    k: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """(weighted mean value, n used, mean distance) per query row."""
     n_query = len(xy)

@@ -147,9 +147,7 @@ def test_iter_pages_respects_limit():
     def handler(request: httpx.Request) -> httpx.Response:
         sql = request.url.params["q"]
         if "LIMIT 2" in sql:
-            return httpx.Response(
-                200, json=_payload([{"cartodb_id": 1}, {"cartodb_id": 2}])
-            )
+            return httpx.Response(200, json=_payload([{"cartodb_id": 1}, {"cartodb_id": 2}]))
         if "LIMIT 1" in sql:
             return httpx.Response(200, json=_payload([{"cartodb_id": 3}]))
         raise AssertionError(f"unexpected query: {sql}")

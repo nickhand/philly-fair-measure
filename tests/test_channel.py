@@ -19,8 +19,8 @@ def test_design_recovers_planted_channel_discount():
         11.0
         + 0.0004 * area
         + district.astype(float) * 0.1
-        - 0.20 * distressed        # distress lowers true value
-        - 0.12 * is_cash           # pure channel discount
+        - 0.20 * distressed  # distress lowers true value
+        - 0.12 * is_cash  # pure channel discount
         + rng.normal(0, 0.05, n)
     )
     df = pl.DataFrame(
@@ -47,8 +47,11 @@ def test_design_recovers_planted_channel_discount():
 
     def cash_pct(stage):
         x, ix = _design(df, stage)
-        return float(np.exp(_ols_coef(log_value, log_value * 0 + log_value, ix)) - 1) if False \
+        return (
+            float(np.exp(_ols_coef(log_value, log_value * 0 + log_value, ix)) - 1)
+            if False
             else float(np.exp(_ols_coef(x, log_value, ix)) - 1)
+        )
 
     raw = cash_pct("raw")
     pure = cash_pct("distress")

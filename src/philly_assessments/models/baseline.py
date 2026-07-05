@@ -299,9 +299,7 @@ class Calibration(TypedDict):
     y: list[float]
 
 
-def fit_vertical_calibration(
-    pred_log: npt.ArrayLike, actual_log: npt.ArrayLike
-) -> Calibration:
+def fit_vertical_calibration(pred_log: npt.ArrayLike, actual_log: npt.ArrayLike) -> Calibration:
     """Monotone correction of E[log price | predicted log price], fitted on the
     validation slice — the ML analog of assessors' vertical-equity adjustments.
 
@@ -408,10 +406,13 @@ def train_baseline(
             y = y + frame["time_adj_log"].to_numpy()
         return np.asarray(y, dtype=np.float64)
 
-    y = {name: target(frame) for name, frame in
-         (("fit", fit_df), ("val", val_df), ("test", test_df))}
-    x = {name: _encode(frame, mappings, numeric, categorical) for name, frame in
-         (("fit", fit_df), ("val", val_df), ("test", test_df))}
+    y = {
+        name: target(frame) for name, frame in (("fit", fit_df), ("val", val_df), ("test", test_df))
+    }
+    x = {
+        name: _encode(frame, mappings, numeric, categorical)
+        for name, frame in (("fit", fit_df), ("val", val_df), ("test", test_df))
+    }
 
     params = {**DEFAULT_LGB_PARAMS, **(lgb_params or {})}
     train_set = lgb.Dataset(
@@ -521,9 +522,7 @@ def train_baseline(
     )
     (run_dir / "categorical_mappings.json").write_text(json.dumps(mappings, indent=2) + "\n")
     if calibration is not None:
-        (run_dir / "vertical_calibration.json").write_text(
-            json.dumps(calibration, indent=2) + "\n"
-        )
+        (run_dir / "vertical_calibration.json").write_text(json.dumps(calibration, indent=2) + "\n")
     evaluation.write_parquet(run_dir / "evaluation.parquet")
     pl.DataFrame(
         {
@@ -555,6 +554,4 @@ def train_baseline(
     )
     write_derived_manifest(manifest, run_dir / "run.parquet")
     logger.info("baseline run %s -> %s", run_id, run_dir)
-    return BaselineRunResult(
-        run_dir=run_dir, run_id=run_id, overall=overall, evaluation=evaluation
-    )
+    return BaselineRunResult(run_dir=run_dir, run_id=run_id, overall=overall, evaluation=evaluation)

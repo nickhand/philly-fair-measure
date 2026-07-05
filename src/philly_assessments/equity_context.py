@@ -76,9 +76,7 @@ def equity_context(
     lo, hi = model / _VALUE_BAND, model * _VALUE_BAND
 
     band = (
-        res.filter(pl.col("model_median").is_between(lo, hi))
-        .select("opa_vs_model_ratio")
-        .collect()
+        res.filter(pl.col("model_median").is_between(lo, hi)).select("opa_vs_model_ratio").collect()
     )
     if band.height >= min_peers:
         peers, scope = band, "similar value"

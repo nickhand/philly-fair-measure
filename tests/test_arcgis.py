@@ -26,8 +26,15 @@ def _feature(oid, brt="123456789"):
         "properties": {"objectid": oid, "brt_id": brt, "num_brt": 1, "gross_area": 900.0},
         "geometry": {
             "type": "Polygon",
-            "coordinates": [[[-75.16, 39.95], [-75.159, 39.95], [-75.159, 39.951],
-                             [-75.16, 39.951], [-75.16, 39.95]]],
+            "coordinates": [
+                [
+                    [-75.16, 39.95],
+                    [-75.159, 39.95],
+                    [-75.159, 39.951],
+                    [-75.16, 39.951],
+                    [-75.16, 39.95],
+                ]
+            ],
         },
     }
 
@@ -44,9 +51,7 @@ def _handler(request: httpx.Request) -> httpx.Response:
             200, json={"type": "FeatureCollection", "features": [_feature(1), _feature(2)]}
         )
     if "objectid > 2" in where:
-        return httpx.Response(
-            200, json={"type": "FeatureCollection", "features": [_feature(3)]}
-        )
+        return httpx.Response(200, json={"type": "FeatureCollection", "features": [_feature(3)]})
     return httpx.Response(200, json={"type": "FeatureCollection", "features": []})
 
 

@@ -114,9 +114,7 @@ def join_delinquencies(frame: pl.DataFrame, delinquencies: pl.LazyFrame | None) 
     today's delinquents, so these features are honest for recent sales and the
     assessment screen, leaky for old sales — same caveat class as char_."""
     if delinquencies is None:
-        return frame.with_columns(
-            *[pl.lit(None, dtype=pl.Float64).alias(c) for c in DIST_COLUMNS]
-        )
+        return frame.with_columns(*[pl.lit(None, dtype=pl.Float64).alias(c) for c in DIST_COLUMNS])
     d = delinquencies.select(
         pl.col("opa_account_num").alias("parcel_id"),
         pl.lit(1.0).alias("dist_tax_delinquent"),
@@ -214,8 +212,7 @@ def distress_tenure_features(
     def _events(frame: pl.LazyFrame, date_col: str, *extra: pl.Expr) -> pl.DataFrame:
         return (
             frame.filter(
-                pl.col("opa_account_num").is_not_null()
-                & pl.col(f"{date_col}_parsed").is_not_null()
+                pl.col("opa_account_num").is_not_null() & pl.col(f"{date_col}_parsed").is_not_null()
             )
             .select(
                 pl.col("opa_account_num").alias("parcel_id"),
@@ -298,9 +295,7 @@ def distress_tenure_features(
             pl.col("decision").cast(pl.String).alias("decision"),
         ).filter(pl.col("decision").str.to_uppercase().str.contains("GRANT"))
         feats = (
-            _joined(granted)
-            .group_by("sale_id")
-            .agg(pl.len().alias("evt_n_appeal_granted_before"))
+            _joined(granted).group_by("sale_id").agg(pl.len().alias("evt_n_appeal_granted_before"))
         )
         out = out.join(feats, on="sale_id", how="left")
 
@@ -398,9 +393,7 @@ def financing_features(
                 on="parcel_id",
             )
             .filter(
-                (pl.col("event_date") - pl.col("purchase_date"))
-                .dt.total_days()
-                .abs()
+                (pl.col("event_date") - pl.col("purchase_date")).dt.total_days().abs()
                 <= _PURCHASE_MTG_WINDOW_DAYS
             )
             .select("_mtg_ix")
@@ -408,8 +401,11 @@ def financing_features(
         )
         events = (
             events.with_row_index("_mtg_ix")
-            .join(near_purchase.with_columns(pl.lit(True).alias("is_purchase_mtg")),
-                  on="_mtg_ix", how="left")
+            .join(
+                near_purchase.with_columns(pl.lit(True).alias("is_purchase_mtg")),
+                on="_mtg_ix",
+                how="left",
+            )
             .with_columns(pl.col("is_purchase_mtg").fill_null(False))
             .drop("_mtg_ix")
         )
@@ -425,32 +421,23 @@ def financing_features(
     feats = before.group_by("sale_id").agg(
         pl.col("in_window").sum().alias("fin_n_mortgages_5y_before"),
         pl.col("days_before").min().alias("fin_mtg_days_since"),
-        (pl.col("in_window") & ~pl.col("is_purchase_mtg"))
-        .sum()
-        .alias("fin_refi_5y_before"),
-        (pl.col("in_window") & pl.col("is_hard_money"))
-        .sum()
-        .alias("fin_hard_money_5y_before"),
+        (pl.col("in_window") & ~pl.col("is_purchase_mtg")).sum().alias("fin_refi_5y_before"),
+        (pl.col("in_window") & pl.col("is_hard_money")).sum().alias("fin_hard_money_5y_before"),
     )
     out = out.join(feats, on="sale_id", how="left")
 
     if sale_flags:
         at_sale = (
-            joined.filter(
-                pl.col("days_before").is_between(-_PURCHASE_MTG_WINDOW_DAYS, 15)
-            )
+            joined.filter(pl.col("days_before").is_between(-_PURCHASE_MTG_WINDOW_DAYS, 15))
             .group_by("sale_id")
             .agg(
                 pl.lit(0.0).first().alias("fin_cash_sale"),  # financed
                 pl.col("is_hard_money").any().cast(pl.Float64).alias("fin_hard_money_sale"),
             )
         )
-        out = (
-            out.join(at_sale, on="sale_id", how="left")
-            .with_columns(
-                pl.col("fin_cash_sale").fill_null(1.0),  # no mortgage near sale = cash
-                pl.col("fin_hard_money_sale").fill_null(0.0),
-            )
+        out = out.join(at_sale, on="sale_id", how="left").with_columns(
+            pl.col("fin_cash_sale").fill_null(1.0),  # no mortgage near sale = cash
+            pl.col("fin_hard_money_sale").fill_null(0.0),
         )
     for column in FIN_MODEL_COLUMNS:
         if column not in out.columns:
@@ -462,9 +449,7 @@ def join_parcel_shapes(frame: pl.DataFrame, parcels: pl.LazyFrame | None) -> pl.
     """Attach shp_* columns by OPA account; null columns when parcels are absent
     so the model feature set is stable either way."""
     if parcels is None:
-        return frame.with_columns(
-            *[pl.lit(None, dtype=pl.Float64).alias(c) for c in SHP_COLUMNS]
-        )
+        return frame.with_columns(*[pl.lit(None, dtype=pl.Float64).alias(c) for c in SHP_COLUMNS])
     shp = parcels.select(
         pl.col("brt_id").alias("parcel_id"),
         pl.col("num_brt").cast(pl.Float64).alias("shp_parcel_num_brt"),
@@ -473,10 +458,19 @@ def join_parcel_shapes(frame: pl.DataFrame, parcels: pl.LazyFrame | None) -> pl.
     ).collect()
     return frame.join(shp, on="parcel_id", how="left")
 
+
 # standalone (non-ROW/TWIN) style names observed in building_code_description_new
 _DETACHED_STYLES = [
-    "CONVENTIONAL", "CAPE", "COLONIAL", "SPLIT LEVEL", "RANCH", "RANCHER",
-    "BUNGALOW", "TUDOR", "VICTORIAN", "CONTEMPORARY",
+    "CONVENTIONAL",
+    "CAPE",
+    "COLONIAL",
+    "SPLIT LEVEL",
+    "RANCH",
+    "RANCHER",
+    "BUNGALOW",
+    "TUDOR",
+    "VICTORIAN",
+    "CONTEMPORARY",
 ]
 
 
@@ -524,11 +518,7 @@ def _block_id() -> pl.Expr:
     block_number = (pl.col("house_number_parsed") // 100) * 100
     return (
         pl.when(pl.col("street_code").is_not_null() & block_number.is_not_null())
-        .then(
-            pl.concat_str(
-                [pl.col("street_code"), block_number.cast(pl.String)], separator="_"
-            )
-        )
+        .then(pl.concat_str([pl.col("street_code"), block_number.cast(pl.String)], separator="_"))
         .alias("loc_block_id")
     )
 
@@ -615,10 +605,7 @@ def _knn_surface(pool: pl.DataFrame) -> pl.DataFrame:
 
     lo, hi = PPSF_AREA_BOUNDS
     points = (
-        pool.filter(
-            (pl.col("lonlat_status") == "ok")
-            & pl.col("livable_area").is_between(lo, hi)
-        )
+        pool.filter((pl.col("lonlat_status") == "ok") & pl.col("livable_area").is_between(lo, hi))
         .with_columns((pl.col("sale_price") / pl.col("livable_area")).alias("ppsf"))
         .filter(pl.col("ppsf").is_between(10.0, 2000.0))
         .with_columns(
@@ -743,8 +730,7 @@ def assemble_sale_features(
 
     permit_events = (
         permits.filter(
-            pl.col("opa_account_num").is_not_null()
-            & pl.col("permitissuedate_parsed").is_not_null()
+            pl.col("opa_account_num").is_not_null() & pl.col("permitissuedate_parsed").is_not_null()
         )
         .select(
             pl.col("opa_account_num").alias("parcel_id"),
@@ -768,8 +754,7 @@ def assemble_sale_features(
 
     violation_events = (
         violations.filter(
-            pl.col("opa_account_num").is_not_null()
-            & pl.col("violationdate_parsed").is_not_null()
+            pl.col("opa_account_num").is_not_null() & pl.col("violationdate_parsed").is_not_null()
         )
         .select(
             pl.col("opa_account_num").alias("parcel_id"),
@@ -791,11 +776,11 @@ def assemble_sale_features(
         )
         .filter(pl.col("days_before") >= 0)
         .with_columns(
-            ((pl.col("days_before") > 0) & (pl.col("days_before") <= EVENT_WINDOW_DAYS))
-            .alias("in_window"),
+            ((pl.col("days_before") > 0) & (pl.col("days_before") <= EVENT_WINDOW_DAYS)).alias(
+                "in_window"
+            ),
             (
-                pl.col("resolved_date").is_null()
-                | (pl.col("resolved_date") > pl.col("sale_date"))
+                pl.col("resolved_date").is_null() | (pl.col("resolved_date") > pl.col("sale_date"))
             ).alias("is_open"),
         )
         .group_by("sale_id")
@@ -805,9 +790,7 @@ def assemble_sale_features(
             (pl.col("in_window") & pl.col("is_severe"))
             .sum()
             .alias("evt_n_severe_violations_5y_before"),
-            (pl.col("is_open") & pl.col("is_severe"))
-            .sum()
-            .alias("evt_n_open_severe_at_sale"),
+            (pl.col("is_open") & pl.col("is_severe")).sum().alias("evt_n_open_severe_at_sale"),
         )
     )
 
@@ -861,9 +844,7 @@ def assemble_sale_features(
         # lon/lat/livable_area were pool-side helpers; the canonical copies come
         # from the opa_cols join below
         base.drop("lon", "lat", "lonlat_status", "livable_area")
-        .join(
-            opa_cols.drop("street_code", "house_number_parsed"), on="parcel_id", how="left"
-        )
+        .join(opa_cols.drop("street_code", "house_number_parsed"), on="parcel_id", how="left")
         .join(block_roll, on="sale_id", how="left")
         .join(parcel_prior, on="sale_id", how="left")
         .join(knn, on="sale_id", how="left")
@@ -927,8 +908,7 @@ def assemble_sale_features(
             pl.col("fin_hard_money_5y_before").fill_null(0.0),
             pl.when(pl.col("asmt_market_value_prev_year") > 0)
             .then(
-                pl.col("asmt_market_value_sale_year") / pl.col("asmt_market_value_prev_year")
-                - 1.0
+                pl.col("asmt_market_value_sale_year") / pl.col("asmt_market_value_prev_year") - 1.0
             )
             .alias("asmt_value_yoy_change"),
         )

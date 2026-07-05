@@ -16,7 +16,7 @@ def test_project_and_nearest_distance():
         [
             '{"type":"Point","coordinates":[-75.16,39.95]}',
             '{"type":"Polygon","coordinates":[[[-75.15,39.95],[-75.14,39.95],'
-            '[-75.14,39.96],[-75.15,39.96],[-75.15,39.95]]]}',
+            "[-75.14,39.96],[-75.15,39.96],[-75.15,39.95]]]}",
             "garbage",  # invalid geometry must be skipped, not fatal
         ]
     )

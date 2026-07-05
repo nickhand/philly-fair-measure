@@ -94,9 +94,7 @@ def join_tracts(df: pl.DataFrame, acs: pl.DataFrame) -> pl.DataFrame:
         100 * matched.mean(),
     )
     acs_cols = acs.drop("geometry_geojson")
-    joined = acs_cols[np.where(matched, tract_ix, 0)].with_columns(
-        pl.Series("_matched", matched)
-    )
+    joined = acs_cols[np.where(matched, tract_ix, 0)].with_columns(pl.Series("_matched", matched))
     joined = joined.select(
         *[
             pl.when(pl.col("_matched")).then(pl.col(c)).otherwise(None).alias(c)

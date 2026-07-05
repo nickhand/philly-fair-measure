@@ -9,31 +9,78 @@ from philly_assessments.ingest.manifests import InputRef
 def _screen_rows() -> list[dict]:
     def row(pid, addr, lon, lat, opa, model, ratio, z, flag, twin_n=6, twin_med=1.0):
         return {
-            "_lon": lon, "_lat": lat,  # consumed by the features fixture, not the screen
-            "parcel_id": pid, "address": addr, "char_category": "SINGLE FAMILY",
-            "opa_market_value": opa, "model_median": model,
-            "model_pi_low_90": model * 0.7, "model_pi_high_90": model * 1.4,
-            "opa_vs_model_ratio": ratio, "screen_z": z, "assessment_flag": flag,
-            "interval_method": "bayesian_posterior", "model_family": "residential",
-            "twin_n": twin_n, "opa_vs_twin_median": twin_med,
-            "aerial_change_flag": False, "aerial_pair": None,
+            "_lon": lon,
+            "_lat": lat,  # consumed by the features fixture, not the screen
+            "parcel_id": pid,
+            "address": addr,
+            "char_category": "SINGLE FAMILY",
+            "opa_market_value": opa,
+            "model_median": model,
+            "model_pi_low_90": model * 0.7,
+            "model_pi_high_90": model * 1.4,
+            "opa_vs_model_ratio": ratio,
+            "screen_z": z,
+            "assessment_flag": flag,
+            "interval_method": "bayesian_posterior",
+            "model_family": "residential",
+            "twin_n": twin_n,
+            "opa_vs_twin_median": twin_med,
+            "aerial_change_flag": False,
+            "aerial_pair": None,
             "evt_n_vacant_complaints_5y_before": 0.0,
             "evt_n_unpermitted_work_complaints_5y_before": 1.0,
-            "dist_tax_delinquent": 0.0, "ten_rental_license_at_sale": 0.0,
+            "dist_tax_delinquent": 0.0,
+            "ten_rental_license_at_sale": 0.0,
             "shp_n_linked_parcels": 1.0,
         }
 
     rows = [
-        row("p1", "108 ELFRETHS ALY", -75.1425, 39.9527, 441_900.0, 520_000.0,
-            0.85, -0.4, "within_range"),
-        row("p2", "110 ELFRETHS ALY", -75.1426, 39.9528, 900_000.0, 300_000.0,
-            3.0, 5.0, "over_assessed_candidate"),
-        row("p3", "9 FAKE ST", -75.20, 39.99, 65_000.0, 400_000.0,
-            0.16, -6.0, "under_assessed_candidate"),
+        row(
+            "p1",
+            "108 ELFRETHS ALY",
+            -75.1425,
+            39.9527,
+            441_900.0,
+            520_000.0,
+            0.85,
+            -0.4,
+            "within_range",
+        ),
+        row(
+            "p2",
+            "110 ELFRETHS ALY",
+            -75.1426,
+            39.9528,
+            900_000.0,
+            300_000.0,
+            3.0,
+            5.0,
+            "over_assessed_candidate",
+        ),
+        row(
+            "p3",
+            "9 FAKE ST",
+            -75.20,
+            39.99,
+            65_000.0,
+            400_000.0,
+            0.16,
+            -6.0,
+            "under_assessed_candidate",
+        ),
     ]
     rows += [
-        row(f"w{i}", f"{100 + i} MARKET ST", -75.15 + i * 1e-4, 39.951, 200_000.0,
-            210_000.0, 0.95, 0.1, "within_range")
+        row(
+            f"w{i}",
+            f"{100 + i} MARKET ST",
+            -75.15 + i * 1e-4,
+            39.951,
+            200_000.0,
+            210_000.0,
+            0.95,
+            0.1,
+            "within_range",
+        )
         for i in range(15)
     ]
     return rows
@@ -41,9 +88,14 @@ def _screen_rows() -> list[dict]:
 
 def _features_rows(screen: list[dict]) -> list[dict]:
     return [
-        {"parcel_id": r["parcel_id"], "address": r["address"],
-         "char_category": "SINGLE FAMILY",
-         "loc_lon": r["_lon"], "loc_lat": r["_lat"], "loc_zip5": "19106"}
+        {
+            "parcel_id": r["parcel_id"],
+            "address": r["address"],
+            "char_category": "SINGLE FAMILY",
+            "loc_lon": r["_lon"],
+            "loc_lat": r["_lat"],
+            "loc_zip5": "19106",
+        }
         for r in screen
     ]
 
@@ -52,11 +104,17 @@ def _client(tmp_path) -> TestClient:
     screen = _screen_rows()
     screen_cols = [{k: v for k, v in r.items() if not k.startswith("_")} for r in screen]
     write_derived_table(
-        pl.DataFrame(screen_cols), tmp_path, "marts", "assessment_screen",
+        pl.DataFrame(screen_cols),
+        tmp_path,
+        "marts",
+        "assessment_screen",
         [InputRef(dataset="t", fetched_at="t")],
     )
     write_derived_table(
-        pl.DataFrame(_features_rows(screen)), tmp_path, "marts", "assessment_features",
+        pl.DataFrame(_features_rows(screen)),
+        tmp_path,
+        "marts",
+        "assessment_features",
         [InputRef(dataset="t", fetched_at="t")],
     )
     return TestClient(create_app(tmp_path))

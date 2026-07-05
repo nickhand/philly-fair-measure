@@ -22,24 +22,45 @@ def test_complaint_windows_and_no_future_leakage():
     complaints = pl.LazyFrame(
         [
             # in-window interior + vacancy for p1
-            {"opa_account_num": "p1", "complaintdate_parsed": datetime(2022, 6, 1),
-             "complaintcodename": "MAINTENANCE RESIDENTIAL"},
-            {"opa_account_num": "p1", "complaintdate_parsed": datetime(2021, 6, 1),
-             "complaintcodename": "VACANT HOUSE"},
+            {
+                "opa_account_num": "p1",
+                "complaintdate_parsed": datetime(2022, 6, 1),
+                "complaintcodename": "MAINTENANCE RESIDENTIAL",
+            },
+            {
+                "opa_account_num": "p1",
+                "complaintdate_parsed": datetime(2021, 6, 1),
+                "complaintcodename": "VACANT HOUSE",
+            },
             # outside the 5y window: counts in nothing but days_since ignores it too
             # (vacancy recency looks at all strictly-prior events)
-            {"opa_account_num": "p1", "complaintdate_parsed": datetime(2010, 1, 1),
-             "complaintcodename": "VACANT HOUSE"},
+            {
+                "opa_account_num": "p1",
+                "complaintdate_parsed": datetime(2010, 1, 1),
+                "complaintcodename": "VACANT HOUSE",
+            },
             # FUTURE complaint must never count
-            {"opa_account_num": "p1", "complaintdate_parsed": datetime(2024, 1, 1),
-             "complaintcodename": "MAINTENANCE RESIDENTIAL"},
+            {
+                "opa_account_num": "p1",
+                "complaintdate_parsed": datetime(2024, 1, 1),
+                "complaintcodename": "MAINTENANCE RESIDENTIAL",
+            },
             # exterior for p2, plus modern-vocabulary interior + unpermitted work
-            {"opa_account_num": "p2", "complaintdate_parsed": datetime(2023, 1, 1),
-             "complaintcodename": "PROPERTY MAINTENANCE HIGH WEEDS"},
-            {"opa_account_num": "p2", "complaintdate_parsed": datetime(2023, 2, 1),
-             "complaintcodename": "PROPERTY MAINTENANCE COMPLAINT INTERIOR"},
-            {"opa_account_num": "p2", "complaintdate_parsed": datetime(2023, 3, 1),
-             "complaintcodename": "WORK UNDERWAY WITHOUT PERMITS"},
+            {
+                "opa_account_num": "p2",
+                "complaintdate_parsed": datetime(2023, 1, 1),
+                "complaintcodename": "PROPERTY MAINTENANCE HIGH WEEDS",
+            },
+            {
+                "opa_account_num": "p2",
+                "complaintdate_parsed": datetime(2023, 2, 1),
+                "complaintcodename": "PROPERTY MAINTENANCE COMPLAINT INTERIOR",
+            },
+            {
+                "opa_account_num": "p2",
+                "complaintdate_parsed": datetime(2023, 3, 1),
+                "complaintcodename": "WORK UNDERWAY WITHOUT PERMITS",
+            },
         ]
     )
     out = distress_tenure_features(_targets(), complaints=complaints)
@@ -59,12 +80,21 @@ def test_rental_license_spans_at_sale_date():
     licenses = pl.LazyFrame(
         [
             # active at sale (open-ended)
-            {"opa_account_num": "p1", "initialissuedate_parsed": datetime(2020, 1, 1),
-             "inactivedate_parsed": None, "owneroccupied": "No", "numberofunits": 2},
+            {
+                "opa_account_num": "p1",
+                "initialissuedate_parsed": datetime(2020, 1, 1),
+                "inactivedate_parsed": None,
+                "owneroccupied": "No",
+                "numberofunits": 2,
+            },
             # ended before the sale: must not count
-            {"opa_account_num": "p2", "initialissuedate_parsed": datetime(2015, 1, 1),
-             "inactivedate_parsed": datetime(2020, 1, 1), "owneroccupied": "No",
-             "numberofunits": 1},
+            {
+                "opa_account_num": "p2",
+                "initialissuedate_parsed": datetime(2015, 1, 1),
+                "inactivedate_parsed": datetime(2020, 1, 1),
+                "owneroccupied": "No",
+                "numberofunits": 1,
+            },
         ]
     )
     out = distress_tenure_features(_targets(), rental_licenses=licenses)
@@ -81,20 +111,31 @@ def test_financing_features_refi_hard_money_and_cash():
     mortgages = pl.LazyFrame(
         [
             # purchase mortgage for p1's 2020 purchase (30d after deed)
-            {"opa_account_num": "p1", "mortgage_date": datetime(2020, 1, 31),
-             "is_hard_money": False},
+            {
+                "opa_account_num": "p1",
+                "mortgage_date": datetime(2020, 1, 31),
+                "is_hard_money": False,
+            },
             # refi (far from any purchase) — capital injection
-            {"opa_account_num": "p1", "mortgage_date": datetime(2022, 6, 1),
-             "is_hard_money": False},
+            {
+                "opa_account_num": "p1",
+                "mortgage_date": datetime(2022, 6, 1),
+                "is_hard_money": False,
+            },
             # hard-money loan on p2 (renovation nearly certain)
-            {"opa_account_num": "p2", "mortgage_date": datetime(2022, 1, 1),
-             "is_hard_money": True},
+            {"opa_account_num": "p2", "mortgage_date": datetime(2022, 1, 1), "is_hard_money": True},
             # p2's purchase mortgage AT the target sale (recorded 20d after)
-            {"opa_account_num": "p2", "mortgage_date": datetime(2023, 6, 21),
-             "is_hard_money": False},
+            {
+                "opa_account_num": "p2",
+                "mortgage_date": datetime(2023, 6, 21),
+                "is_hard_money": False,
+            },
             # future mortgage must not count in as-of features
-            {"opa_account_num": "p1", "mortgage_date": datetime(2024, 1, 1),
-             "is_hard_money": False},
+            {
+                "opa_account_num": "p1",
+                "mortgage_date": datetime(2024, 1, 1),
+                "is_hard_money": False,
+            },
         ]
     )
     purchases = pl.DataFrame(
@@ -119,20 +160,38 @@ def test_financing_features_refi_hard_money_and_cash():
 def test_investigations_appeals_and_stable_schema():
     investigations = pl.LazyFrame(
         [
-            {"opa_account_num": "p1", "investigationcompleted_parsed": datetime(2022, 1, 1),
-             "investigationtype": "PRECOURT"},
-            {"opa_account_num": "p1", "investigationcompleted_parsed": datetime(2022, 2, 1),
-             "investigationtype": "HCEU INSP"},
+            {
+                "opa_account_num": "p1",
+                "investigationcompleted_parsed": datetime(2022, 1, 1),
+                "investigationtype": "PRECOURT",
+            },
+            {
+                "opa_account_num": "p1",
+                "investigationcompleted_parsed": datetime(2022, 2, 1),
+                "investigationtype": "HCEU INSP",
+            },
         ]
     )
     appeals = pl.LazyFrame(
         [
-            {"opa_account_num": "p1", "decisiondate_parsed": datetime(2019, 1, 1),
-             "appealtype": "ZBA Permit Denial - Variance", "decision": "GRANTED"},
-            {"opa_account_num": "p1", "decisiondate_parsed": datetime(2020, 1, 1),
-             "appealtype": "ZBA Permit Denial - Variance", "decision": "DENIED"},
-            {"opa_account_num": "p1", "decisiondate_parsed": datetime(2021, 1, 1),
-             "appealtype": "LIRB Violation Appeal", "decision": "GRANTED"},
+            {
+                "opa_account_num": "p1",
+                "decisiondate_parsed": datetime(2019, 1, 1),
+                "appealtype": "ZBA Permit Denial - Variance",
+                "decision": "GRANTED",
+            },
+            {
+                "opa_account_num": "p1",
+                "decisiondate_parsed": datetime(2020, 1, 1),
+                "appealtype": "ZBA Permit Denial - Variance",
+                "decision": "DENIED",
+            },
+            {
+                "opa_account_num": "p1",
+                "decisiondate_parsed": datetime(2021, 1, 1),
+                "appealtype": "LIRB Violation Appeal",
+                "decision": "GRANTED",
+            },
         ]
     )
     out = distress_tenure_features(_targets(), investigations=investigations, appeals=appeals)

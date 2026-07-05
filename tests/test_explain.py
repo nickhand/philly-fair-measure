@@ -8,10 +8,17 @@ def test_appeal_points_filters_correctable_and_flags_implausible():
         value=200_000.0,
         base_value=249_000.0,
         drivers=[
-            Driver("char_livable_area", "living area", "Home characteristics",
-                   420.0, -0.4, -80_000.0),
-            Driver("mkt_knn_log_ppsf", "nearby recent sale prices", "Recent nearby sales",
-                   None, 0.2, 40_000.0),
+            Driver(
+                "char_livable_area", "living area", "Home characteristics", 420.0, -0.4, -80_000.0
+            ),
+            Driver(
+                "mkt_knn_log_ppsf",
+                "nearby recent sale prices",
+                "Recent nearby sales",
+                None,
+                0.2,
+                40_000.0,
+            ),
             Driver("char_beds", "bedrooms", "Home characteristics", 3.0, 0.05, 9_000.0),
         ],
     )

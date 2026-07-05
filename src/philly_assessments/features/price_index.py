@@ -72,9 +72,7 @@ def build_price_index(data_dir: Path | None = None) -> BuildResult:
     # complete (district x month) grid so every month has an index value;
     # CITYWIDE is appended separately below, so keep it out of the grid
     months = citywide.select("month").sort("month")
-    district_names = [
-        d for d in points["district"].unique().to_list() if d != CITYWIDE
-    ]
+    district_names = [d for d in points["district"].unique().to_list() if d != CITYWIDE]
     grid = months.join(pl.DataFrame({"district": district_names}), how="cross")
 
     raw = (
@@ -183,10 +181,7 @@ def with_time_adjustment(
     out = (
         lf.lazy()
         .with_columns(
-            pl.col(date_col)
-            .dt.truncate("1mo")
-            .clip(pl.lit(lo), pl.lit(hi))
-            .alias("_adj_month"),
+            pl.col(date_col).dt.truncate("1mo").clip(pl.lit(lo), pl.lit(hi)).alias("_adj_month"),
             pl.col(district_col).fill_null(CITYWIDE).alias("_adj_district"),
         )
         .join(
@@ -201,9 +196,7 @@ def with_time_adjustment(
             right_on="month",
             how="left",
         )
-        .with_columns(
-            (-pl.coalesce("_d_index", "_city_index").fill_null(0.0)).alias(out_col)
-        )
+        .with_columns((-pl.coalesce("_d_index", "_city_index").fill_null(0.0)).alias(out_col))
         .drop("_adj_month", "_adj_district", "_d_index", "_city_index")
     )
     return out.collect() if isinstance(lf, pl.DataFrame) else out

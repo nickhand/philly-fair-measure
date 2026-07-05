@@ -142,8 +142,12 @@ def build_proximity(data_dir: Path | None = None) -> BuildResult:
     parcels = (
         pl.scan_parquet(root / "staged" / "opa_properties.parquet")
         .select(
-            "parcel_number", "street_code", "category_code_description",
-            "lon", "lat", "lonlat_status",
+            "parcel_number",
+            "street_code",
+            "category_code_description",
+            "lon",
+            "lat",
+            "lonlat_status",
         )
         .collect()
         .with_columns(*project_xy(pl.col("lon"), pl.col("lat")))
@@ -161,14 +165,16 @@ def build_proximity(data_dir: Path | None = None) -> BuildResult:
     rapid = np.concatenate([load_geoms(d) for d in RAPID_TRANSIT_DATASETS])
     regional = load_geoms(REGIONAL_RAIL_DATASET)
     parks = load_geoms(PARKS_DATASET)
-    expressways = load_geoms(
-        CENTERLINE_DATASET, pl.col("class").is_in(list(_EXPRESSWAY_CLASSES))
-    )
+    expressways = load_geoms(CENTERLINE_DATASET, pl.col("class").is_in(list(_EXPRESSWAY_CLASSES)))
     arterials = load_geoms(CENTERLINE_DATASET, pl.col("class").is_in(list(_ARTERIAL_CLASSES)))
     logger.info(
         "proximity targets: %d rapid-transit, %d regional-rail, %d parks, "
         "%d expressway segs, %d arterial segs",
-        len(rapid), len(regional), len(parks), len(expressways), len(arterials),
+        len(rapid),
+        len(regional),
+        len(parks),
+        len(expressways),
+        len(arterials),
     )
 
     bus = load_geoms(BUS_STOPS_DATASET)
@@ -190,8 +196,10 @@ def build_proximity(data_dir: Path | None = None) -> BuildResult:
         ]
     parcel_tree = cKDTree(xy[located])
     density[located] = (
-        np.array(parcel_tree.query_ball_point(xy[located], _DENSITY_RADIUS_M,
-                                              return_length=True), dtype=float)
+        np.array(
+            parcel_tree.query_ball_point(xy[located], _DENSITY_RADIUS_M, return_length=True),
+            dtype=float,
+        )
         - 1.0
     )
 
@@ -223,17 +231,13 @@ def build_proximity(data_dir: Path | None = None) -> BuildResult:
         pl.Series("prox_dist_vacant_land_m", dist_vacant).fill_nan(None),
     )
     centerline = (
-        pl.scan_parquet(latest[CENTERLINE_DATASET].data_path)
-        .select("st_code", "class")
-        .collect()
+        pl.scan_parquet(latest[CENTERLINE_DATASET].data_path).select("st_code", "class").collect()
     )
     frame = frame.join(_street_class(centerline), on="_street_code", how="left").drop(
         "_street_code"
     )
 
-    inputs = [
-        InputRef(dataset=latest[d].dataset, fetched_at=latest[d].fetched_at) for d in needed
-    ]
+    inputs = [InputRef(dataset=latest[d].dataset, fetched_at=latest[d].fetched_at) for d in needed]
     path, manifest = write_derived_table(
         frame,
         root,

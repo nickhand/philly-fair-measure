@@ -52,20 +52,18 @@ class ReportData:
 def gather(parcel_id: str, data_dir: Path | None = None) -> ReportData:
     root = data_dir if data_dir is not None else config.data_dir()
     screen_path = root / "marts" / "assessment_screen.parquet"
-    row = (
-        pl.scan_parquet(screen_path).filter(pl.col("parcel_id") == parcel_id).collect()
-    )
+    row = pl.scan_parquet(screen_path).filter(pl.col("parcel_id") == parcel_id).collect()
     if not row.height:
         raise KeyError(f"parcel {parcel_id} not in the assessment screen")
     screen = row.to_dicts()[0]
     is_condo = screen.get("model_family") == "condo"
 
-    features_path = root / "marts" / (
-        "condo_assessment_features.parquet" if is_condo else "assessment_features.parquet"
+    features_path = (
+        root
+        / "marts"
+        / ("condo_assessment_features.parquet" if is_condo else "assessment_features.parquet")
     )
-    feat = (
-        pl.scan_parquet(features_path).filter(pl.col("parcel_id") == parcel_id).collect()
-    )
+    feat = pl.scan_parquet(features_path).filter(pl.col("parcel_id") == parcel_id).collect()
     characteristics = feat.to_dicts()[0] if feat.height else {}
 
     comps = None
@@ -81,10 +79,7 @@ def gather(parcel_id: str, data_dir: Path | None = None) -> ReportData:
             from philly_assessments.validation.opa import strict_twin_key
 
             features = pl.scan_parquet(features_path)
-            key = (
-                pl.DataFrame([characteristics])
-                .select(strict_twin_key().alias("k"))["k"][0]
-            )
+            key = pl.DataFrame([characteristics]).select(strict_twin_key().alias("k"))["k"][0]
             twins = (
                 features.filter(strict_twin_key() == key)
                 .select("parcel_id", "address", "opa_market_value")
@@ -135,9 +130,7 @@ def gather(parcel_id: str, data_dir: Path | None = None) -> ReportData:
     if validity_path.exists():
         sale_history = (
             pl.scan_parquet(validity_path)
-            .filter(
-                (pl.col("parcel_id") == parcel_id) & pl.col("sale_date").is_not_null()
-            )
+            .filter((pl.col("parcel_id") == parcel_id) & pl.col("sale_date").is_not_null())
             .select("sale_date", "sale_price", "deed_kind", "validity_status")
             .sort("sale_date", descending=True)
             .head(10)
@@ -242,19 +235,21 @@ def _viewer_links(s: dict, c: dict) -> list[tuple[str, str]]:
     address = s.get("address")
     if address:
         links.append(
-            ("City Property Atlas (imagery, deeds, L&I)",
-             f"https://atlas.phila.gov/{quote(str(address))}")
+            (
+                "City Property Atlas (imagery, deeds, L&I)",
+                f"https://atlas.phila.gov/{quote(str(address))}",
+            )
         )
     parcel_id = s.get("parcel_id", "")
-    links.append(
-        ("OPA property record", f"https://property.phila.gov/?p={quote(parcel_id)}")
-    )
+    links.append(("OPA property record", f"https://property.phila.gov/?p={quote(parcel_id)}"))
     lon = c.get("loc_lon") if c.get("loc_lon") is not None else s.get("loc_lon")
     lat = c.get("loc_lat") if c.get("loc_lat") is not None else s.get("loc_lat")
     if lon is not None and lat is not None:
         links.append(
-            ("Google Street View",
-             f"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint={lat},{lon}")
+            (
+                "Google Street View",
+                f"https://www.google.com/maps/@?api=1&map_action=pano&viewpoint={lat},{lon}",
+            )
         )
     return links
 
@@ -285,8 +280,7 @@ def _evidence_rows(s: dict) -> list[tuple[str, str]]:
         rows.append(
             (
                 "Vacancy complaints",
-                f"{int(s['evt_n_vacant_complaints_5y_before'])} in the last 5 years"
-                + recency,
+                f"{int(s['evt_n_vacant_complaints_5y_before'])} in the last 5 years" + recency,
             )
         )
     if s.get("evt_n_unpermitted_work_complaints_5y_before"):
@@ -468,8 +462,7 @@ def render_html(data: ReportData) -> str:
         parts.append("<h2>View this property</h2><p class='note'>")
         parts.append(
             " · ".join(
-                f"<a href='{html.escape(url)}'>{html.escape(name)}</a>"
-                for name, url in links
+                f"<a href='{html.escape(url)}'>{html.escape(name)}</a>" for name, url in links
             )
         )
         parts.append(
@@ -578,9 +571,7 @@ def build_property_report(
             pl.scan_parquet(root / "marts" / "assessment_screen.parquet")
             .filter(
                 (pl.col("parcel_id") == query)
-                | pl.col("address").str.to_uppercase().str.contains(
-                    query.upper(), literal=True
-                )
+                | pl.col("address").str.to_uppercase().str.contains(query.upper(), literal=True)
             )
             .select("parcel_id", "address")
             .head(5)
@@ -626,13 +617,20 @@ def leaderboards(
     included). Verify any single row against its report, which surfaces data
     errors."""
     root = data_dir if data_dir is not None else config.data_dir()
-    s = pl.read_parquet(root / "marts" / "assessment_screen.parquet").filter(
-        (pl.col("opa_market_value") > 30_000) & (pl.col("model_median") > 30_000)
-    ).with_columns(
-        (pl.col("model_pi_high_90") / pl.col("model_pi_low_90")).alias("interval_width")
+    s = (
+        pl.read_parquet(root / "marts" / "assessment_screen.parquet")
+        .filter((pl.col("opa_market_value") > 30_000) & (pl.col("model_median") > 30_000))
+        .with_columns(
+            (pl.col("model_pi_high_90") / pl.col("model_pi_low_90")).alias("interval_width")
+        )
     )
     cols = [
-        "parcel_id", "address", "opa_market_value", "model_median", "opa_vs_model_ratio", "screen_z"
+        "parcel_id",
+        "address",
+        "opa_market_value",
+        "model_median",
+        "opa_vs_model_ratio",
+        "screen_z",
     ]
     over_flagged = s.filter(pl.col("assessment_flag") == AssessmentFlag.OVER)
     under_flagged = s.filter(pl.col("assessment_flag") == AssessmentFlag.UNDER)
@@ -651,8 +649,12 @@ def leaderboards(
         .sort("twin_gap", descending=True)
         .head(n)
         .select(
-            "parcel_id", "address", "opa_market_value", "model_median",
-            "twin_n", "opa_vs_twin_median",
+            "parcel_id",
+            "address",
+            "opa_market_value",
+            "model_median",
+            "twin_n",
+            "opa_vs_twin_median",
         )
     )
     return {"over_assessed": over, "under_assessed": under, "non_uniform_block": non_uniform}

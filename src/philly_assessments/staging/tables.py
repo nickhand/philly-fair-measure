@@ -81,7 +81,10 @@ def stg_opa_properties(raw: pl.LazyFrame) -> pl.LazyFrame:
     lf = with_parsed_year(lf, "year_built")
     lf = with_point_lonlat(lf)
     return lf.with_columns(
-        pl.col("house_number").cast(pl.String).str.strip_chars().cast(pl.Int32, strict=False)
+        pl.col("house_number")
+        .cast(pl.String)
+        .str.strip_chars()
+        .cast(pl.Int32, strict=False)
         .alias("house_number_parsed")
     )
 
@@ -447,9 +450,7 @@ def stg_deeds(raw: pl.LazyFrame, raw_opa: pl.LazyFrame | None = None) -> pl.Lazy
     return _with_condo_recovered_links(lf, raw_opa)
 
 
-def _with_condo_recovered_links(
-    lf: pl.LazyFrame, raw_opa: pl.LazyFrame | None
-) -> pl.LazyFrame:
+def _with_condo_recovered_links(lf: pl.LazyFrame, raw_opa: pl.LazyFrame | None) -> pl.LazyFrame:
     """Fill null opa_account_num on RTT rows by (address, unit) matching to
     88-prefix accounts; shared by stg_deeds and stg_mortgages."""
     if raw_opa is None:

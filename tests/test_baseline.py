@@ -54,9 +54,7 @@ def _synthetic_mart(n=800, seed=42, cash_fraction=0.0, cash_discount=0.30):
     start = datetime(2016, 1, 1)
     area = rng.uniform(800, 2400, n)
     zips = rng.choice(["19106", "19147", "19125"], n)
-    zip_factor = np.select(
-        [zips == "19106", zips == "19147"], [1.4, 1.1], default=0.9
-    )
+    zip_factor = np.select([zips == "19106", zips == "19147"], [1.4, 1.1], default=0.9)
     price = 150.0 * area * zip_factor * np.exp(rng.normal(0, 0.12, n))  # market value
     is_cash = rng.random(n) < cash_fraction
     sale_price = np.where(is_cash, price * (1.0 - cash_discount), price)  # cash sells low
@@ -164,9 +162,14 @@ def test_train_baseline_end_to_end(tmp_path):
     # scoring from the persisted run reproduces training-time predictions
     from philly_assessments.models.scoring import score_lightgbm
 
-    frame_scored = _synthetic_mart().tail(120).with_columns(
-        (pl.col("sale_date") - pl.datetime(1997, 1, 1)).dt.total_days()
-        .alias("time_sale_epoch_days")
+    frame_scored = (
+        _synthetic_mart()
+        .tail(120)
+        .with_columns(
+            (pl.col("sale_date") - pl.datetime(1997, 1, 1))
+            .dt.total_days()
+            .alias("time_sale_epoch_days")
+        )
     )
     scored = score_lightgbm(result.run_dir, frame_scored)
     np.testing.assert_allclose(scored, predictions["pred_lightgbm"].to_numpy(), rtol=1e-6)
@@ -181,14 +184,19 @@ def test_calibrate_on_financed_shifts_toward_market_value(tmp_path):
     write_derived_table(
         frame, tmp_path, "marts", "sale_features", [InputRef(dataset="test", fetched_at="t")]
     )
-    params = dict(test_fraction=0.15,
-                  lgb_params={"num_leaves": 15, "min_data_in_leaf": 5, "learning_rate": 0.1},
-                  num_boost_round=300, early_stopping_rounds=30)
+    params = dict(
+        test_fraction=0.15,
+        lgb_params={"num_leaves": 15, "min_data_in_leaf": 5, "learning_rate": 0.1},
+        num_boost_round=300,
+        early_stopping_rounds=30,
+    )
     res_all = train_baseline(tmp_path, calibrate_on_financed=False, **params)
     _time.sleep(1.1)  # second-resolution run_id must differ
     res_fin = train_baseline(tmp_path, calibrate_on_financed=True, **params)
 
     # centering on financed lifts predictions to market value, so ratios vs the
     # cash-blended sale prices rise (cash homes now assessed above their low price)
-    assert (res_fin.overall["lightgbm"]["median_ratio"]
-            > res_all.overall["lightgbm"]["median_ratio"] + 0.02)
+    assert (
+        res_fin.overall["lightgbm"]["median_ratio"]
+        > res_all.overall["lightgbm"]["median_ratio"] + 0.02
+    )

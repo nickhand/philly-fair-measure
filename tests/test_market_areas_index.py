@@ -47,9 +47,7 @@ def _blob_data(rng, n_per_blob=60):
     for i in range(n_per_blob):
         for blob, (lon0, lat0), price in (("w", _WEST, 480_000.0), ("e", _EAST, 120_000.0)):
             parcel = f"{blob}{i}"
-            opa.append(
-                _opa_row(parcel, lon0 + rng.normal(0, 0.001), lat0 + rng.normal(0, 0.001))
-            )
+            opa.append(_opa_row(parcel, lon0 + rng.normal(0, 0.001), lat0 + rng.normal(0, 0.001)))
             sales.append(
                 _sale(
                     f"s_{parcel}",

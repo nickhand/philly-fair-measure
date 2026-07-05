@@ -185,9 +185,7 @@ def snapshot_arcgis_layer(
     dataset = dataset or service.lower()
     owns_client = client is None
     if client is None:
-        client = (
-            arcgis.ArcGISClient(base_url) if base_url is not None else arcgis.ArcGISClient()
-        )
+        client = arcgis.ArcGISClient(base_url) if base_url is not None else arcgis.ArcGISClient()
     try:
         fetched_at = datetime.now(UTC)
         started = time.monotonic()
@@ -229,7 +227,7 @@ def snapshot_arcgis_layer(
             dataset=dataset,
             endpoint=client.layer_url(service, layer) + "/query",
             query=(
-                f'{service}/FeatureServer/{layer}: outFields=*, outSR=4326, f=geojson, '
+                f"{service}/FeatureServer/{layer}: outFields=*, outSR=4326, f=geojson, "
                 f'keyset on "{arcgis.KEYSET_FIELD}"'
             ),
             fetched_at=fetched_at,
@@ -250,9 +248,7 @@ def snapshot_arcgis_layer(
                 )
                 for f in fields
             ]
-            + [
-                ColumnInfo(name=arcgis.GEOMETRY_COLUMN, pg_type="geojson", arrow_type="string")
-            ],
+            + [ColumnInfo(name=arcgis.GEOMETRY_COLUMN, pg_type="geojson", arrow_type="string")],
             files=[
                 FileInfo(
                     path=DATA_FILENAME,

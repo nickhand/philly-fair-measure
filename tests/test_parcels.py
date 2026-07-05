@@ -59,9 +59,7 @@ def test_multipolygon_uses_largest_part_and_invalid_is_null():
 
 
 def _opa_owners(rows):
-    return pl.LazyFrame(
-        [{"parcel_number": brt, "owner_1": owner} for brt, owner in rows]
-    )
+    return pl.LazyFrame([{"parcel_number": brt, "owner_1": owner} for brt, owner in rows])
 
 
 def test_stg_parcels_dedupes_brt_keeping_largest():

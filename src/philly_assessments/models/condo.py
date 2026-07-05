@@ -139,10 +139,13 @@ def train_condo(
             y = y + frame["time_adj_log"].to_numpy()
         return np.asarray(y, dtype=np.float64)
 
-    y = {name: target(frame) for name, frame in
-         (("fit", fit_df), ("val", val_df), ("test", test_df))}
-    x = {name: _encode(frame, mappings, numeric, categorical) for name, frame in
-         (("fit", fit_df), ("val", val_df), ("test", test_df))}
+    y = {
+        name: target(frame) for name, frame in (("fit", fit_df), ("val", val_df), ("test", test_df))
+    }
+    x = {
+        name: _encode(frame, mappings, numeric, categorical)
+        for name, frame in (("fit", fit_df), ("val", val_df), ("test", test_df))
+    }
 
     params = {**CONDO_LGB_PARAMS, **(lgb_params or {})}
     train_set = lgb.Dataset(
@@ -166,9 +169,11 @@ def train_condo(
     pred = np.exp(pred_ref - test_adj)
 
     sale_price = test_df["sale_price"].to_numpy()
-    opa_value = test_df["asmt_market_value_sale_year"].to_numpy() if (
-        "asmt_market_value_sale_year" in test_df.columns
-    ) else np.full(test_df.height, np.nan)
+    opa_value = (
+        test_df["asmt_market_value_sale_year"].to_numpy()
+        if ("asmt_market_value_sale_year" in test_df.columns)
+        else np.full(test_df.height, np.nan)
+    )
     estimates = {"condo_lightgbm": pred, "opa_assessment": opa_value}
 
     segments: list[tuple[str, str, pl.Series]] = [
@@ -225,9 +230,7 @@ def train_condo(
     )
     (run_dir / "categorical_mappings.json").write_text(json.dumps(mappings, indent=2) + "\n")
     if calibration is not None:
-        (run_dir / "vertical_calibration.json").write_text(
-            json.dumps(calibration, indent=2) + "\n"
-        )
+        (run_dir / "vertical_calibration.json").write_text(json.dumps(calibration, indent=2) + "\n")
     evaluation.write_parquet(run_dir / "evaluation.parquet")
     pl.DataFrame(
         {

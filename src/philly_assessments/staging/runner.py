@@ -46,9 +46,7 @@ class BuildResult:
     manifest: DerivedManifest
 
 
-def build_all(
-    data_dir: Path | None = None, only: Sequence[str] | None = None
-) -> list[BuildResult]:
+def build_all(data_dir: Path | None = None, only: Sequence[str] | None = None) -> list[BuildResult]:
     root = data_dir if data_dir is not None else config.data_dir()
     latest = catalog.latest_snapshots(data_dir)
     staged_dir = root / "staged"

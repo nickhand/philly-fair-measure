@@ -20,10 +20,20 @@ def _screen(tmp_path):
         for i in range(100)
     ]
     rows += [
-        {"parcel_id": "over", "model_family": "residential", "loc_zip5": "19100",
-         "model_median": 200_000.0, "opa_market_value": 320_000.0},  # ratio 1.60
-        {"parcel_id": "under", "model_family": "residential", "loc_zip5": "19100",
-         "model_median": 200_000.0, "opa_market_value": 100_000.0},  # ratio 0.50
+        {
+            "parcel_id": "over",
+            "model_family": "residential",
+            "loc_zip5": "19100",
+            "model_median": 200_000.0,
+            "opa_market_value": 320_000.0,
+        },  # ratio 1.60
+        {
+            "parcel_id": "under",
+            "model_family": "residential",
+            "loc_zip5": "19100",
+            "model_median": 200_000.0,
+            "opa_market_value": 100_000.0,
+        },  # ratio 0.50
     ]
     df = pl.DataFrame(rows).with_columns(
         (pl.col("opa_market_value") / pl.col("model_median")).alias("opa_vs_model_ratio")
@@ -55,6 +65,5 @@ def test_equity_context_flags_over_and_under(tmp_path):
 
 def test_equity_context_none_without_ratio(tmp_path):
     _screen(tmp_path)
-    row = {"parcel_id": "x", "loc_zip5": "19100", "model_median": None,
-           "opa_vs_model_ratio": None}
+    row = {"parcel_id": "x", "loc_zip5": "19100", "model_median": None, "opa_vs_model_ratio": None}
     assert equity_context(row, tmp_path, min_peers=20) is None

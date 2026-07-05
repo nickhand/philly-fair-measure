@@ -56,9 +56,7 @@ def _usable_images(images: list[dict], lon: float, lat: float) -> list[dict]:
         out.append(
             {
                 "image_id": img["id"],
-                "captured_year": datetime.fromtimestamp(
-                    img["captured_at"] / 1000, UTC
-                ).year,
+                "captured_year": datetime.fromtimestamp(img["captured_at"] / 1000, UTC).year,
                 "distance_m": dist,
                 "is_pano": bool(img.get("is_pano")),
                 "thumb_url": img.get("thumb_1024_url"),
@@ -87,8 +85,7 @@ def facade_coverage(
             & pl.col("loc_lat").is_not_null()
             & pl.col("loc_district").is_not_null()
         )
-        .select("parcel_id", "loc_lon", "loc_lat", "loc_district",
-                "char_exterior_condition")
+        .select("parcel_id", "loc_lon", "loc_lat", "loc_district", "char_exterior_condition")
         .collect()
     )
     per_district = max(20, n_sample // parcels["loc_district"].n_unique())

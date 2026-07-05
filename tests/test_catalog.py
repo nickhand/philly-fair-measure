@@ -13,9 +13,7 @@ from philly_assessments.ingest.manifests import (
 )
 
 
-def _write_snapshot(
-    data_dir: Path, dataset: str, fetched_at: str, rows: dict[str, list]
-) -> Path:
+def _write_snapshot(data_dir: Path, dataset: str, fetched_at: str, rows: dict[str, list]) -> Path:
     directory = (
         data_dir / "raw" / "source=carto" / f"dataset={dataset}" / f"fetched_at={fetched_at}"
     )

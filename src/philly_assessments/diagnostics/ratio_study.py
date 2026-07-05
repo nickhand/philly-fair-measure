@@ -130,8 +130,9 @@ def iaao_bridge(data_dir: Path | None = None) -> pl.DataFrame:
     y_full = np.log(full["sale_price"].to_numpy())
     if params.get("time_adjusted"):
         y_full = y_full + full["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy()
-    logger.info("in-window refit on %s sales (%s rounds)", f"{full.height:,}",
-                params["best_iteration"])
+    logger.info(
+        "in-window refit on %s sales (%s rounds)", f"{full.height:,}", params["best_iteration"]
+    )
     booster = lgb.train(
         params["lgb_params"],
         lgb.Dataset(
@@ -156,9 +157,7 @@ def iaao_bridge(data_dir: Path | None = None) -> pl.DataFrame:
     # carry-forward values.
     root = data_dir if data_dir is not None else config.data_dir()
     assessments = pl.scan_parquet(root / "staged" / "assessments.parquet")
-    latest_year = (
-        assessments.select(pl.col("year_parsed").max()).collect().item()
-    )
+    latest_year = assessments.select(pl.col("year_parsed").max()).collect().item()
     fresh = (
         assessments.filter(pl.col("year_parsed") == latest_year)
         .select(
@@ -183,9 +182,7 @@ def iaao_bridge(data_dir: Path | None = None) -> pl.DataFrame:
     rows += _rows("opa", fresh_step, opa_fresh, price_tasp)
     rows += _rows("model", "in_window_model", np.exp(pred_in_ref), price_tasp)
     rows += _rows("opa", "iaao_trimmed", opa_fresh, price_tasp, style, trim=True)
-    rows += _rows(
-        "model", "iaao_trimmed", np.exp(pred_in_ref), price_tasp, style, trim=True
-    )
+    rows += _rows("model", "iaao_trimmed", np.exp(pred_in_ref), price_tasp, style, trim=True)
     return pl.DataFrame(rows)
 
 
@@ -235,9 +232,8 @@ def sale_chasing_check(
             sub = joined.filter(pl.col("sale_date").is_between(start, stop))
             if sub.height < 200:
                 continue
-            price_tasp = (
-                sub["sale_price"].to_numpy()
-                * np.exp(sub["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy())
+            price_tasp = sub["sale_price"].to_numpy() * np.exp(
+                sub["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy()
             )
             value = sub["roll_value"].cast(pl.Float64).to_numpy()
             ratio = value / price_tasp
@@ -250,14 +246,12 @@ def sale_chasing_check(
                     "window": window,
                     **{
                         k: v
-                        for k, v in evaluate_estimates(
-                            value[keep], price_tasp[keep]
-                        ).as_row().items()
+                        for k, v in evaluate_estimates(value[keep], price_tasp[keep])
+                        .as_row()
+                        .items()
                         if k in ("n", "median_ratio", "cod", "prd", "prb")
                     },
-                    "pct_within_2pct_of_price": float(
-                        (np.abs(raw_ratio - 1.0) <= 0.02).mean()
-                    ),
+                    "pct_within_2pct_of_price": float((np.abs(raw_ratio - 1.0) <= 0.02).mean()),
                     "assesspy_chased": bool(chased),
                 }
             )

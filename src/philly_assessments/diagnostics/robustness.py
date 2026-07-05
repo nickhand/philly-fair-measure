@@ -52,8 +52,7 @@ def char_leakage_bound(data_dir: Path | None = None) -> pl.DataFrame:
     permits = (
         pl.scan_parquet(root / "staged" / "permits.parquet")
         .filter(
-            pl.col("opa_account_num").is_not_null()
-            & pl.col("permitissuedate_parsed").is_not_null()
+            pl.col("opa_account_num").is_not_null() & pl.col("permitissuedate_parsed").is_not_null()
         )
         .select(pl.col("opa_account_num").alias("parcel_id"), "permitissuedate_parsed")
         .collect()
@@ -83,9 +82,7 @@ def char_leakage_bound(data_dir: Path | None = None) -> pl.DataFrame:
         m_model = evaluate_estimates(model[mask], price[mask])
         m_opa = evaluate_estimates(opa[mask], price[mask])
         edge = (
-            m_opa.cod - m_model.cod
-            if m_model.cod is not None and m_opa.cod is not None
-            else None
+            m_opa.cod - m_model.cod if m_model.cod is not None and m_opa.cod is not None else None
         )
         rows.append(
             {
@@ -122,7 +119,10 @@ def racial_gap_conventions(
             & (pl.col("asmt_market_value_sale_year").fill_null(0) > 0)
         )
         .select(
-            "loc_lon", "loc_lat", "sale_price", "asmt_market_value_sale_year",
+            "loc_lon",
+            "loc_lat",
+            "sale_price",
+            "asmt_market_value_sale_year",
             "fin_cash_sale",
         )
         .collect()

@@ -118,9 +118,7 @@ def _quote_identifier(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
 
-def connect(
-    data_dir: Path | None = None, database: str = ":memory:"
-) -> duckdb.DuckDBPyConnection:
+def connect(data_dir: Path | None = None, database: str = ":memory:") -> duckdb.DuckDBPyConnection:
     """Open DuckDB with views over the data lake.
 
     raw_<dataset> reads each dataset's latest snapshot; stg_<table> and

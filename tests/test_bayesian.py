@@ -53,9 +53,7 @@ def test_covariate_encoder_imputes_and_standardizes():
 def test_covariate_encoder_survives_float_nan():
     # float NaN (e.g. upstream 0/0) must be treated as missing, not poison
     # the column's mean/std (regression: first v2 training run failed on this)
-    df = _frame().with_columns(
-        pl.Series("mkt_block_roll_ppsf", [float("nan"), 180.0, 300.0])
-    )
+    df = _frame().with_columns(pl.Series("mkt_block_roll_ppsf", [float("nan"), 180.0, 300.0]))
     encoder = CovariateEncoder.fit(df)
     x = encoder.transform(df)
     assert np.isfinite(x).all()
@@ -148,9 +146,7 @@ def test_train_bayesian_end_to_end(tmp_path):
     write_derived_table(
         frame, tmp_path, "marts", "sale_features", [InputRef(dataset="test", fetched_at="t")]
     )
-    result = train_bayesian(
-        tmp_path, test_fraction=0.15, draws=150, tune=150, chains=2, seed=7
-    )
+    result = train_bayesian(tmp_path, test_fraction=0.15, draws=150, tune=150, chains=2, seed=7)
     row = result.overall
     assert row["n"] == 60
     assert row["r2_log"] is not None and row["r2_log"] > 0.2

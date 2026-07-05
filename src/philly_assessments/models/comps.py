@@ -56,8 +56,10 @@ def _leaf_matrix(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
 def _distance_m(lon0: float | None, lat0: float | None, lon: pl.Expr, lat: pl.Expr) -> pl.Expr:
     m_per_deg_lon = 111_320.0 * math.cos(math.radians(lat0 or 39.95))
     return (
-        ((lon - lon0) * m_per_deg_lon) ** 2 + ((lat - lat0) * 110_540.0) ** 2
-    ).sqrt().alias("distance_m")
+        (((lon - lon0) * m_per_deg_lon) ** 2 + ((lat - lat0) * 110_540.0) ** 2)
+        .sqrt()
+        .alias("distance_m")
+    )
 
 
 def find_comps(
@@ -71,9 +73,7 @@ def find_comps(
     features_path = root / "marts" / "assessment_features.parquet"
     sales_path = root / "marts" / "sale_features.parquet"
     if not features_path.exists():
-        raise FileNotFoundError(
-            f"{features_path} missing; run `philly screen-assessments` first"
-        )
+        raise FileNotFoundError(f"{features_path} missing; run `philly screen-assessments` first")
 
     target_df = pl.read_parquet(features_path).filter(pl.col("parcel_id") == parcel_id)
     if target_df.height == 0:
@@ -144,9 +144,4 @@ def resolve_parcel(query: str, data_dir: Path | None = None) -> list[dict]:
             .str.to_uppercase()
             .str.contains(query.upper(), literal=True)
         )
-    return (
-        matches.select("parcel_id", "address", "opa_market_value")
-        .head(5)
-        .collect()
-        .to_dicts()
-    )
+    return matches.select("parcel_id", "address", "opa_market_value").head(5).collect().to_dicts()

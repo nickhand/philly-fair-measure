@@ -185,8 +185,12 @@ def _fmt_value(value: object) -> str:
 
 
 _SINGULAR_UNITS: dict[str, str] = {
-    "beds": "bed", "baths": "bath", "rooms": "room", "stories": "story",
-    "fireplaces": "fireplace", "garage spaces": "garage space",
+    "beds": "bed",
+    "baths": "bath",
+    "rooms": "room",
+    "stories": "story",
+    "fireplaces": "fireplace",
+    "garage spaces": "garage space",
 }
 
 
@@ -209,16 +213,27 @@ def display_value(feature: str, value: object) -> str | None:
 # Only codes the city documents are decoded — everything else stays raw rather
 # than risk an invented meaning on a civic site.
 _CONDITION_CODES: dict[str, str] = {
-    "0": "not applicable", "1": "newer construction", "2": "rehabilitated",
-    "3": "above average", "4": "average", "5": "below average",
-    "6": "vacant", "7": "sealed / structurally compromised",
+    "0": "not applicable",
+    "1": "newer construction",
+    "2": "rehabilitated",
+    "3": "above average",
+    "4": "average",
+    "5": "below average",
+    "6": "vacant",
+    "7": "sealed / structurally compromised",
 }
 _BASEMENT_CODES: dict[str, str] = {
-    "0": "none", "A": "full, finished", "B": "full, semi-finished",
-    "C": "full, unfinished", "D": "full, unknown finish",
-    "E": "partial, finished", "F": "partial, semi-finished",
-    "G": "partial, unfinished", "H": "partial, unknown finish",
-    "I": "unknown size, finished", "J": "unknown size, unfinished",
+    "0": "none",
+    "A": "full, finished",
+    "B": "full, semi-finished",
+    "C": "full, unfinished",
+    "D": "full, unknown finish",
+    "E": "partial, finished",
+    "F": "partial, semi-finished",
+    "G": "partial, unfinished",
+    "H": "partial, unknown finish",
+    "I": "unknown size, finished",
+    "J": "unknown size, unfinished",
 }
 _YES_NO = {"Y": "yes", "N": "no", "1": "yes", "0": "no"}
 
@@ -337,13 +352,27 @@ def explain(run_dir: Path, df: pl.DataFrame) -> list[Explanation]:
 # Recorded characteristics a homeowner can contest — the appeal grounds. Location,
 # market, parcel-geometry and event-record features are excluded: they aren't
 # "facts about my house" an owner corrects (and OPA's own record is the source).
-CORRECTABLE = frozenset({
-    "char_livable_area", "char_lot_area", "char_beds", "char_baths", "char_rooms",
-    "char_stories", "char_year_built", "char_garage_spaces", "char_fireplaces",
-    "char_exterior_condition", "char_interior_condition", "char_basement",
-    "char_central_air", "char_construction", "char_quality_grade_raw",
-    "char_unit_area", "char_floor",
-})
+CORRECTABLE = frozenset(
+    {
+        "char_livable_area",
+        "char_lot_area",
+        "char_beds",
+        "char_baths",
+        "char_rooms",
+        "char_stories",
+        "char_year_built",
+        "char_garage_spaces",
+        "char_fireplaces",
+        "char_exterior_condition",
+        "char_interior_condition",
+        "char_basement",
+        "char_central_air",
+        "char_construction",
+        "char_quality_grade_raw",
+        "char_unit_area",
+        "char_floor",
+    }
+)
 
 # "Looks unusual, verify first" bounds for numeric characteristics — deliberately
 # generous; outside → flagged for the owner to check, not asserted as wrong.

@@ -249,9 +249,7 @@ def _core(s: dict[str, Any]) -> PropertyCore:
             aerial_change=bool(s.get("aerial_change_flag")),
             aerial_pair=s.get("aerial_pair"),
             vacancy_complaints_5y=_i(s.get("evt_n_vacant_complaints_5y_before")),
-            unpermitted_work_complaints_5y=_i(
-                s.get("evt_n_unpermitted_work_complaints_5y_before")
-            ),
+            unpermitted_work_complaints_5y=_i(s.get("evt_n_unpermitted_work_complaints_5y_before")),
             tax_delinquent=bool(_f(s.get("dist_tax_delinquent")) or 0.0),
             rental_license=bool(_f(s.get("ten_rental_license_at_sale")) or 0.0),
             linked_parcels=_i(s.get("shp_n_linked_parcels")),
@@ -308,11 +306,7 @@ def _drivers(root: Path, parcel_id: str, s: dict[str, Any]) -> Drivers | None:
     is_condo = s.get("model_family") == "condo"
     mart = "condo_assessment_features.parquet" if is_condo else "assessment_features.parquet"
     run_kind: RunKind = "condo" if is_condo else "baseline"
-    feat = (
-        pl.scan_parquet(root / "marts" / mart)
-        .filter(pl.col("parcel_id") == parcel_id)
-        .collect()
-    )
+    feat = pl.scan_parquet(root / "marts" / mart).filter(pl.col("parcel_id") == parcel_id).collect()
     if not feat.height:
         return None
     exp = explain(latest_run_dir(run_kind, root), feat)[0]
@@ -382,8 +376,7 @@ def _histories(root: Path, parcel_id: str) -> tuple[list[YearValue], list[SaleRo
             .collect()
         )
         assessments = [
-            YearValue(year=int(r["year"]), value=float(r["market_value"]))
-            for r in rows.to_dicts()
+            YearValue(year=int(r["year"]), value=float(r["market_value"])) for r in rows.to_dicts()
         ]
     sales: list[SaleRow] = []
     path = root / "marts" / "sale_validity.parquet"
@@ -451,13 +444,15 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
 
     @app.get("/api/parcels")
     def parcels(
-        minx: float, miny: float, maxx: float, maxy: float,
+        minx: float,
+        miny: float,
+        maxx: float,
+        maxy: float,
         limit: int = Query(default=_BBOX_LIMIT, le=_BBOX_LIMIT),
     ) -> dict[str, Any]:
         """GeoJSON points in a map viewport (client gates to high zoom)."""
         sub = frame.filter(
-            pl.col("loc_lon").is_between(minx, maxx)
-            & pl.col("loc_lat").is_between(miny, maxy)
+            pl.col("loc_lon").is_between(minx, maxx) & pl.col("loc_lat").is_between(miny, maxy)
         ).head(limit)
         features = [
             {
@@ -472,8 +467,13 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                 },
             }
             for r in sub.select(
-                "parcel_id", "loc_lon", "loc_lat", "assessment_flag",
-                "opa_market_value", "model_median", "model_family",
+                "parcel_id",
+                "loc_lon",
+                "loc_lat",
+                "assessment_flag",
+                "opa_market_value",
+                "model_median",
+                "model_family",
             ).to_dicts()
             if r["loc_lon"] is not None
         ]
@@ -574,8 +574,11 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
         from philly_assessments.report import leaderboards
 
         boards = leaderboards(root, n=n, plausible=not extremes)
-        key = {"over": "over_assessed", "under": "under_assessed",
-               "nonuniform": "non_uniform_block"}[kind]
+        key = {
+            "over": "over_assessed",
+            "under": "under_assessed",
+            "nonuniform": "non_uniform_block",
+        }[kind]
         return [
             LeaderRow(
                 parcel_id=str(r["parcel_id"]),

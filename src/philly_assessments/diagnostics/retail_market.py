@@ -71,11 +71,15 @@ def _train_predict(
     x_val = _encode(val_df, mappings, numeric, categorical)
     x_test = _encode(test_df, mappings, numeric, categorical)
     train_set = lgb.Dataset(
-        x_fit, label=target(fit_df), feature_name=numeric + categorical,
+        x_fit,
+        label=target(fit_df),
+        feature_name=numeric + categorical,
         categorical_feature=categorical,
     )
     booster = lgb.train(
-        DEFAULT_LGB_PARAMS, train_set, num_boost_round=5000,
+        DEFAULT_LGB_PARAMS,
+        train_set,
+        num_boost_round=5000,
         valid_sets=[train_set.create_valid(x_val, label=target(val_df))],
         callbacks=[lgb.early_stopping(100, verbose=False)],
     )
@@ -112,15 +116,23 @@ def retail_vs_blend(data_dir: Path | None = None) -> RetailResult:
     is_cash = (test_df["fin_cash_sale"].fill_null(1.0) == 1.0).to_numpy()
     edges = np.quantile(price, [0.2, 0.4, 0.6, 0.8])
     quintile = np.digitize(price, edges) + 1
-    segments = [("overall", np.ones(test_df.height, bool)),
-                ("financed_sales", ~is_cash), ("cash_sales", is_cash)]
+    segments = [
+        ("overall", np.ones(test_df.height, bool)),
+        ("financed_sales", ~is_cash),
+        ("cash_sales", is_cash),
+    ]
     segments += [(f"q{q}", quintile == q) for q in range(1, 6)]
 
     rows = []
     for name, mask in segments:
         for model, pred in (("blend", pred_blend), ("retail", pred_retail)):
-            rows.append({"segment": name, "model": model,
-                         **evaluate_estimates(pred[mask], price[mask]).as_row()})
+            rows.append(
+                {
+                    "segment": name,
+                    "model": model,
+                    **evaluate_estimates(pred[mask], price[mask]).as_row(),
+                }
+            )
     model_table = pl.DataFrame(rows)
 
     # OPA ratio study under both value conventions: actual sale price vs
@@ -141,17 +153,25 @@ def retail_vs_blend(data_dir: Path | None = None) -> RetailResult:
     for q in range(1, 6):
         m = quintile == q
         ok = m & np.isfinite(opa) & (opa > 0)
-        conv_rows.append({
-            "quintile": f"q{q}",
-            "n": int(m.sum()),
-            "pct_cash": float(is_cash[m].mean()),
-            "opa_ratio_vs_sale_price": float(np.median(opa[ok] / price[ok])),
-            "opa_ratio_vs_retail": float(np.median(opa[ok] / retail_equiv[ok])),
-        })
+        conv_rows.append(
+            {
+                "quintile": f"q{q}",
+                "n": int(m.sum()),
+                "pct_cash": float(is_cash[m].mean()),
+                "opa_ratio_vs_sale_price": float(np.median(opa[ok] / price[ok])),
+                "opa_ratio_vs_retail": float(np.median(opa[ok] / retail_equiv[ok])),
+            }
+        )
     opa_convention_table = pl.DataFrame(conv_rows)
 
     from philly_assessments.ingest.derived import write_derived_table
 
-    write_derived_table(model_table, root, "diagnostics", "retail_vs_blend", [],
-                        notes="blend vs financed-only retail model on the test set")
+    write_derived_table(
+        model_table,
+        root,
+        "diagnostics",
+        "retail_vs_blend",
+        [],
+        notes="blend vs financed-only retail model on the test set",
+    )
     return RetailResult(model_table=model_table, opa_convention_table=opa_convention_table)

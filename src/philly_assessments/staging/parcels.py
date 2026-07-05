@@ -103,9 +103,7 @@ def _mrr_ratios(geoms: npt.NDArray[np.object_]) -> dict[str, np.ndarray]:
     import shapely
 
     mrr = shapely.oriented_envelope(geoms)
-    area_ratio = np.where(
-        shapely.area(mrr) > 0, shapely.area(geoms) / shapely.area(mrr), np.nan
-    )
+    area_ratio = np.where(shapely.area(mrr) > 0, shapely.area(geoms) / shapely.area(mrr), np.nan)
     coords, ix = shapely.get_coordinates(shapely.get_exterior_ring(mrr), return_index=True)
     side_ratio = np.full(len(geoms), np.nan)
     counts = np.bincount(ix, minlength=len(geoms))
@@ -128,9 +126,7 @@ def parcel_shape_features(geojson: pl.Series) -> pl.DataFrame:
     """Shape features for a series of GeoJSON polygon strings (row-aligned)."""
     import shapely
 
-    geoms = shapely.from_geojson(
-        geojson.fill_null("").to_numpy(), on_invalid="ignore"
-    )
+    geoms = shapely.from_geojson(geojson.fill_null("").to_numpy(), on_invalid="ignore")
     # MultiPolygons -> largest part; invalid/missing -> empty placeholder
     multi = shapely.get_type_id(geoms) == 6  # MultiPolygon
     if multi.any():
@@ -168,9 +164,7 @@ def _owner_links(frame: pl.DataFrame, geoms: npt.NDArray[np.object_]) -> pl.Data
     shp_linked_lot_area_m2 (own + linked area)."""
     import shapely
 
-    owner = (
-        frame["owner_norm"].fill_null("").to_numpy()
-    )
+    owner = frame["owner_norm"].fill_null("").to_numpy()
     counts = frame.group_by("owner_norm").len().rename({"len": "owner_parcels"})
     frame_counts = frame.join(counts, on="owner_norm", how="left")
     linkable = (
@@ -193,9 +187,9 @@ def _owner_links(frame: pl.DataFrame, geoms: npt.NDArray[np.object_]) -> pl.Data
     np.add.at(linked_area, a, shapely.area(geoms[b]))
     return frame.with_columns(
         pl.Series("shp_n_linked_parcels", n_linked),
-        pl.Series(
-            "shp_linked_lot_area_m2", np.where(n_linked > 0, linked_area, np.nan)
-        ).fill_nan(None),
+        pl.Series("shp_linked_lot_area_m2", np.where(n_linked > 0, linked_area, np.nan)).fill_nan(
+            None
+        ),
     ).drop("owner_norm")
 
 

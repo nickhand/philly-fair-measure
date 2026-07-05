@@ -55,9 +55,12 @@ CHANNEL_DISCOUNT_BY_QUINTILE: Final = (-0.216, -0.127, -0.088, -0.049, -0.027)
 def sale_price_quintile_edges(data_dir: Path | None = None) -> list[float]:
     """The 20/40/60/80 sale-price cut points the discounts are keyed to."""
     root = data_dir if data_dir is not None else config.data_dir()
-    price = pl.scan_parquet(root / "marts" / "sale_features.parquet").select(
-        "sale_price"
-    ).collect()["sale_price"].to_numpy()
+    price = (
+        pl.scan_parquet(root / "marts" / "sale_features.parquet")
+        .select("sale_price")
+        .collect()["sale_price"]
+        .to_numpy()
+    )
     return [float(v) for v in np.quantile(price, [0.2, 0.4, 0.6, 0.8])]
 
 
@@ -67,6 +70,7 @@ def cash_market_value(retail_value: np.ndarray, edges: list[float]) -> np.ndarra
     quintile = np.digitize(retail_value, edges)  # 0..4
     discount = np.array(CHANNEL_DISCOUNT_BY_QUINTILE)[np.clip(quintile, 0, 4)]
     return np.asarray(retail_value * (1.0 + discount), dtype=np.float64)
+
 
 _HEDONIC_NUMERIC = [
     "char_livable_area",  # logged below
@@ -90,8 +94,11 @@ _DISTRESS = [
 def _onehot(df: pl.DataFrame, column: str) -> np.ndarray:
     values = df[column].cast(pl.String).fill_null("__na__")
     levels = sorted(values.unique().to_list())[1:]  # drop first as reference
-    return np.column_stack([(values == lv).to_numpy().astype(float) for lv in levels]) if levels \
+    return (
+        np.column_stack([(values == lv).to_numpy().astype(float) for lv in levels])
+        if levels
         else np.empty((df.height, 0))
+    )
 
 
 def _standardize(a: np.ndarray) -> np.ndarray:
@@ -147,7 +154,7 @@ def channel_decomposition(
     df = _load_frame(root / "marts" / "sale_features.parquet").filter(
         pl.col("loc_district").is_not_null() & (pl.col("sale_price") > 0)
     )
-    y = (np.log(df["sale_price"].to_numpy()) + df["time_adj_log"].to_numpy())
+    y = np.log(df["sale_price"].to_numpy()) + df["time_adj_log"].to_numpy()
 
     def pct(beta: float) -> float:
         return float(np.exp(beta) - 1.0)
@@ -199,7 +206,11 @@ def channel_decomposition(
     from philly_assessments.ingest.derived import write_derived_table
 
     write_derived_table(
-        table, root, "diagnostics", "channel_decomposition", [],
+        table,
+        root,
+        "diagnostics",
+        "channel_decomposition",
+        [],
         notes="cash-vs-financed discount by control stage; retail-value diagnostic",
     )
     logger.info("channel decomposition: %s", interaction)

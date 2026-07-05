@@ -60,9 +60,9 @@ _M_PER_DEG_LAT = 110_540.0
 
 
 def project_xy(lon: pl.Expr, lat: pl.Expr) -> tuple[pl.Expr, pl.Expr]:
-    return ((lon - _LON0) * _M_PER_DEG_LON).alias("x_m"), (
-        (lat - _LAT0) * _M_PER_DEG_LAT
-    ).alias("y_m")
+    return ((lon - _LON0) * _M_PER_DEG_LON).alias("x_m"), ((lat - _LAT0) * _M_PER_DEG_LAT).alias(
+        "y_m"
+    )
 
 
 def sale_points(sales: pl.LazyFrame, opa: pl.LazyFrame) -> pl.DataFrame:
@@ -234,9 +234,7 @@ def build_market_areas(
     # districts: cluster ORIGINAL area spatial centroids
     points = points.with_columns(pl.Series("area_ix", labels))
     centroids = (
-        points.group_by("area_ix")
-        .agg(pl.col("x_m").mean(), pl.col("y_m").mean())
-        .sort("area_ix")
+        points.group_by("area_ix").agg(pl.col("x_m").mean(), pl.col("y_m").mean()).sort("area_ix")
     )
     district_of_area = KMeans(n_clusters=n_districts, n_init=4, random_state=seed).fit_predict(
         centroids.select("x_m", "y_m").to_numpy()
@@ -267,17 +265,19 @@ def build_market_areas(
         .join(final_stats, on="area_ix", how="left")
         .with_columns(
             _ma_name(pl.col("area_ix")).alias("market_area"),
-            pl.format("d_{}", pl.col("district_ix").cast(pl.String).str.zfill(2)).alias(
-                "district"
-            ),
+            pl.format("d_{}", pl.col("district_ix").cast(pl.String).str.zfill(2)).alias("district"),
         )
         .select("parcel_id", "market_area", "district", "ma_n_sales", "ma_med_adj_log_ppsf")
     )
-    unlocated = parcels.filter(pl.col("lonlat_status") != "ok").select("parcel_id").with_columns(
-        pl.lit(None, dtype=pl.String).alias("market_area"),
-        pl.lit(None, dtype=pl.String).alias("district"),
-        pl.lit(None, dtype=pl.Int64).alias("ma_n_sales"),
-        pl.lit(None, dtype=pl.Float64).alias("ma_med_adj_log_ppsf"),
+    unlocated = (
+        parcels.filter(pl.col("lonlat_status") != "ok")
+        .select("parcel_id")
+        .with_columns(
+            pl.lit(None, dtype=pl.String).alias("market_area"),
+            pl.lit(None, dtype=pl.String).alias("district"),
+            pl.lit(None, dtype=pl.Int64).alias("ma_n_sales"),
+            pl.lit(None, dtype=pl.Float64).alias("ma_med_adj_log_ppsf"),
+        )
     )
     frame = pl.concat([assignments, unlocated.select(assignments.columns)])
 

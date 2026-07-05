@@ -221,29 +221,29 @@ def build_pilot_sample(
         .unique()
         .collect()
     )
-    touched = pl.concat(
-        [
-            permits.filter(pl.col("permitissuedate_parsed") >= quiet_start).select(
-                pl.col("opa_account_num").alias("parcel_id")
-            ),
-            pl.scan_parquet(root / "staged" / "demolitions.parquet")
-            .filter(pl.coalesce("completed_date_parsed", "start_date_parsed") >= quiet_start)
-            .select(pl.col("opa_account_num").alias("parcel_id")),
-            pl.scan_parquet(root / "staged" / "complaints.parquet")
-            .filter(
-                (pl.col("complaintdate_parsed") >= quiet_start)
-                & pl.col("complaintcodename")
-                .cast(pl.String)
-                .str.contains("WORK UNDERWAY")
-            )
-            .select(pl.col("opa_account_num").alias("parcel_id")),
-        ]
-    ).unique().collect()
+    touched = (
+        pl.concat(
+            [
+                permits.filter(pl.col("permitissuedate_parsed") >= quiet_start).select(
+                    pl.col("opa_account_num").alias("parcel_id")
+                ),
+                pl.scan_parquet(root / "staged" / "demolitions.parquet")
+                .filter(pl.coalesce("completed_date_parsed", "start_date_parsed") >= quiet_start)
+                .select(pl.col("opa_account_num").alias("parcel_id")),
+                pl.scan_parquet(root / "staged" / "complaints.parquet")
+                .filter(
+                    (pl.col("complaintdate_parsed") >= quiet_start)
+                    & pl.col("complaintcodename").cast(pl.String).str.contains("WORK UNDERWAY")
+                )
+                .select(pl.col("opa_account_num").alias("parcel_id")),
+            ]
+        )
+        .unique()
+        .collect()
+    )
     residential = (
         pl.scan_parquet(root / "staged" / "opa_properties.parquet")
-        .filter(
-            pl.col("category_code_description").is_in(["SINGLE FAMILY", "MULTI FAMILY"])
-        )
+        .filter(pl.col("category_code_description").is_in(["SINGLE FAMILY", "MULTI FAMILY"]))
         .select(pl.col("parcel_number").alias("parcel_id"))
         .collect()
     )
@@ -257,9 +257,9 @@ def build_pilot_sample(
             demos.sample(n=min(n_demolition, demos.height), seed=seed).with_columns(
                 pl.lit("demolition").alias("group")
             ),
-            construction.sample(
-                n=min(n_construction, construction.height), seed=seed
-            ).with_columns(pl.lit("new_construction").alias("group")),
+            construction.sample(n=min(n_construction, construction.height), seed=seed).with_columns(
+                pl.lit("new_construction").alias("group")
+            ),
             control.with_columns(pl.lit("control").alias("group")),
         ]
     )
@@ -488,9 +488,7 @@ def pilot_summary(table: pl.DataFrame) -> pl.DataFrame:
             sub = pl.concat([event, control]).drop_nulls(metric)
             if sub["group"].n_unique() < 2:
                 continue
-            auc = roc_auc_score(
-                (sub["group"] == group).to_numpy(), sub[metric].to_numpy()
-            )
+            auc = roc_auc_score((sub["group"] == group).to_numpy(), sub[metric].to_numpy())
             rows.append(
                 {
                     "group": group,

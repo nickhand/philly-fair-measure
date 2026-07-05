@@ -43,33 +43,58 @@ def test_render_html_full_packet():
         parcel_id="052174500",
         screen=_screen_row(),
         characteristics={
-            "char_livable_area": 1120.0, "char_lot_area": 700.0, "char_style": "row",
-            "char_stories": 2.0, "char_year_built": 1755.0, "char_beds": 3.0,
-            "char_baths": 1.0, "char_exterior_condition": "4",
-            "char_interior_condition": "4", "char_quality_grade_raw": "C",
-            "loc_lon": -75.1425, "loc_lat": 39.9527,
+            "char_livable_area": 1120.0,
+            "char_lot_area": 700.0,
+            "char_style": "row",
+            "char_stories": 2.0,
+            "char_year_built": 1755.0,
+            "char_beds": 3.0,
+            "char_baths": 1.0,
+            "char_exterior_condition": "4",
+            "char_interior_condition": "4",
+            "char_quality_grade_raw": "C",
+            "loc_lon": -75.1425,
+            "loc_lat": 39.9527,
         },
         comps=pl.DataFrame(
             [
-                {"address": "109 ELFRETHS ALY", "sale_date": datetime(2024, 5, 1),
-                 "sale_price": 500_000.0, "price_adj_today": 520_000.0,
-                 "char_livable_area": 1100.0, "char_style": "row", "distance_m": 26.0}
+                {
+                    "address": "109 ELFRETHS ALY",
+                    "sale_date": datetime(2024, 5, 1),
+                    "sale_price": 500_000.0,
+                    "price_adj_today": 520_000.0,
+                    "char_livable_area": 1100.0,
+                    "char_style": "row",
+                    "distance_m": 26.0,
+                }
             ]
         ),
         twins=pl.DataFrame(
             [
-                {"parcel_id": "052174500", "address": "108 ELFRETHS ALY",
-                 "opa_market_value": 441_900.0},
-                {"parcel_id": "052174501", "address": "110 ELFRETHS ALY",
-                 "opa_market_value": 310_000.0},
+                {
+                    "parcel_id": "052174500",
+                    "address": "108 ELFRETHS ALY",
+                    "opa_market_value": 441_900.0,
+                },
+                {
+                    "parcel_id": "052174501",
+                    "address": "110 ELFRETHS ALY",
+                    "opa_market_value": 310_000.0,
+                },
             ]
         ),
         assessment_history=pl.DataFrame(
             {"year": [2015, 2020, 2026], "market_value": [200_000.0, 300_000.0, 441_900.0]}
         ),
         sale_history=pl.DataFrame(
-            [{"sale_date": datetime(2023, 4, 1), "sale_price": 405_000.0,
-              "deed_kind": "standard", "validity_status": "arms_length"}]
+            [
+                {
+                    "sale_date": datetime(2023, 4, 1),
+                    "sale_price": 405_000.0,
+                    "deed_kind": "standard",
+                    "validity_status": "arms_length",
+                }
+            ]
         ),
         provenance={"screen_built": "2026-07-03", "generated": "2026-07-03"},
     )
@@ -105,10 +130,17 @@ def test_render_html_includes_driver_panel():
         value=520_000.0,
         base_value=249_000.0,
         drivers=[
-            Driver("char_livable_area", "living area", "Home characteristics",
-                   1120.0, 0.15, 78_000.0),
-            Driver("mkt_block_roll_mean_price", "recent sale prices on your block",
-                   "Recent nearby sales", None, -0.08, -40_000.0),
+            Driver(
+                "char_livable_area", "living area", "Home characteristics", 1120.0, 0.15, 78_000.0
+            ),
+            Driver(
+                "mkt_block_roll_mean_price",
+                "recent sale prices on your block",
+                "Recent nearby sales",
+                None,
+                -0.08,
+                -40_000.0,
+            ),
         ],
     )
     data = ReportData(
@@ -130,16 +162,20 @@ def test_render_html_includes_appeal_panel():
     from philly_assessments.models.explain import Driver, Explanation
 
     exp = Explanation(
-        value=200_000.0, base_value=249_000.0,
+        value=200_000.0,
+        base_value=249_000.0,
         drivers=[
-            Driver("char_livable_area", "living area", "Home characteristics",
-                   420.0, -0.4, -80_000.0),
+            Driver(
+                "char_livable_area", "living area", "Home characteristics", 420.0, -0.4, -80_000.0
+            ),
         ],
     )
     data = ReportData(
-        parcel_id="052174500", screen=_screen_row(),
+        parcel_id="052174500",
+        screen=_screen_row(),
         characteristics={"char_livable_area": 420.0},
-        explanation=exp, provenance={"generated": "2026-07-03"},
+        explanation=exp,
+        provenance={"generated": "2026-07-03"},
     )
     out = render_html(data)
     assert "Facts to check" in out
@@ -151,12 +187,19 @@ def test_render_html_includes_equity_panel():
     from philly_assessments.equity_context import EquityContext
 
     ctx = EquityContext(
-        ratio=1.18, peer_median_ratio=0.95, peer_n=1240, percentile=88.0,
-        peer_label="ZIP 19146, similar value", verdict="over",
+        ratio=1.18,
+        peer_median_ratio=0.95,
+        peer_n=1240,
+        percentile=88.0,
+        peer_label="ZIP 19146, similar value",
+        verdict="over",
     )
     data = ReportData(
-        parcel_id="052174500", screen=_screen_row(), characteristics={},
-        equity=ctx, provenance={"generated": "2026-07-03"},
+        parcel_id="052174500",
+        screen=_screen_row(),
+        characteristics={},
+        equity=ctx,
+        provenance={"generated": "2026-07-03"},
     )
     out = render_html(data)
     assert "How your assessment compares" in out
@@ -173,29 +216,100 @@ def test_leaderboards_rank_by_confidence_and_uniformity(tmp_path):
     from philly_assessments.report import leaderboards
 
     def row(pid, addr, opa, model, ratio, z, pi_lo, pi_hi, flag, twin_n=6, twin_med=1.0):
-        return {"parcel_id": pid, "address": addr, "opa_market_value": opa, "model_median": model,
-                "opa_vs_model_ratio": ratio, "screen_z": z, "model_pi_low_90": pi_lo,
-                "model_pi_high_90": pi_hi, "assessment_flag": flag, "twin_n": twin_n,
-                "opa_vs_twin_median": twin_med}
+        return {
+            "parcel_id": pid,
+            "address": addr,
+            "opa_market_value": opa,
+            "model_median": model,
+            "opa_vs_model_ratio": ratio,
+            "screen_z": z,
+            "model_pi_low_90": pi_lo,
+            "model_pi_high_90": pi_hi,
+            "assessment_flag": flag,
+            "twin_n": twin_n,
+            "opa_vs_twin_median": twin_med,
+        }
 
-    rows = [row(f"w{i}", f"{i} MAIN ST", 200_000.0, 200_000.0, 1.0, 0.0, 180_000.0, 220_000.0,
-                "within_range") for i in range(15)]
+    rows = [
+        row(
+            f"w{i}",
+            f"{i} MAIN ST",
+            200_000.0,
+            200_000.0,
+            1.0,
+            0.0,
+            180_000.0,
+            220_000.0,
+            "within_range",
+        )
+        for i in range(15)
+    ]
     rows += [
         # over-assessed, tight intervals: ranked by screen_z, not ratio
-        row("over_confident", "1 HIGH ST", 300_000.0, 100_000.0, 3.0, 5.0, 80_000.0, 130_000.0,
-            "over_assessed_candidate"),
-        row("over_modest", "2 HIGH ST", 180_000.0, 120_000.0, 1.5, 2.0, 100_000.0, 150_000.0,
-            "over_assessed_candidate"),
+        row(
+            "over_confident",
+            "1 HIGH ST",
+            300_000.0,
+            100_000.0,
+            3.0,
+            5.0,
+            80_000.0,
+            130_000.0,
+            "over_assessed_candidate",
+        ),
+        row(
+            "over_modest",
+            "2 HIGH ST",
+            180_000.0,
+            120_000.0,
+            1.5,
+            2.0,
+            100_000.0,
+            150_000.0,
+            "over_assessed_candidate",
+        ),
         # biggest ratio but a 20x interval -> the model can't value it (blind spot)
-        row("over_blindspot", "9 HUGE ST", 700_000.0, 50_000.0, 14.0, 2.5, 20_000.0, 400_000.0,
-            "over_assessed_candidate"),
-        row("under_x", "1 LOW ST", 100_000.0, 300_000.0, 0.33, -4.0, 250_000.0, 380_000.0,
-            "under_assessed_candidate"),
-        row("odd_twin", "9 SAME ST", 350_000.0, 200_000.0, 1.75, 1.0, 180_000.0, 240_000.0,
-            "within_range", twin_n=8, twin_med=1.5),
+        row(
+            "over_blindspot",
+            "9 HUGE ST",
+            700_000.0,
+            50_000.0,
+            14.0,
+            2.5,
+            20_000.0,
+            400_000.0,
+            "over_assessed_candidate",
+        ),
+        row(
+            "under_x",
+            "1 LOW ST",
+            100_000.0,
+            300_000.0,
+            0.33,
+            -4.0,
+            250_000.0,
+            380_000.0,
+            "under_assessed_candidate",
+        ),
+        row(
+            "odd_twin",
+            "9 SAME ST",
+            350_000.0,
+            200_000.0,
+            1.75,
+            1.0,
+            180_000.0,
+            240_000.0,
+            "within_range",
+            twin_n=8,
+            twin_med=1.5,
+        ),
     ]
     write_derived_table(
-        pl.DataFrame(rows), tmp_path, "marts", "assessment_screen",
+        pl.DataFrame(rows),
+        tmp_path,
+        "marts",
+        "assessment_screen",
         [InputRef(dataset="t", fetched_at="t")],
     )
     boards = leaderboards(tmp_path, n=5)  # default: interval-width filter + screen_z rank
@@ -214,12 +328,18 @@ def test_render_html_minimal_condo():
     data = ReportData(
         parcel_id="888080493",
         screen=_screen_row(
-            parcel_id="888080493", address="1420 LOCUST ST #16C",
-            model_family="condo", interval_method="conformal_knn",
-            twin_n=None, opa_vs_twin_median=None, aerial_change_score=None,
-            bldg_n_units=270, evt_n_vacant_complaints_5y_before=0.0,
+            parcel_id="888080493",
+            address="1420 LOCUST ST #16C",
+            model_family="condo",
+            interval_method="conformal_knn",
+            twin_n=None,
+            opa_vs_twin_median=None,
+            aerial_change_score=None,
+            bldg_n_units=270,
+            evt_n_vacant_complaints_5y_before=0.0,
             evt_n_unpermitted_work_complaints_5y_before=0.0,
-            ten_rental_license_at_sale=0.0, shp_n_linked_parcels=None,
+            ten_rental_license_at_sale=0.0,
+            shp_n_linked_parcels=None,
         ),
         characteristics={},
         provenance={"generated": "2026-07-03"},

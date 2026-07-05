@@ -55,18 +55,47 @@ NON_MARKET_DEED_KINDS = ("land_bank", "deceased", "adverse_possession", "other")
 # Tokens that mark a legal-entity party rather than a person. Uppercase match;
 # grantor/grantee strings in rtt_summary are uppercase free text.
 ENTITY_TOKENS = [
-    "LLC", "LLP", "INC", "CORP", "CORPORATION", "COMPANY", "BANK", "TRUST",
-    "PARTNERSHIP", "PARTNERS", "AUTHORITY", "REDEVELOPMENT", "HOUSING",
-    "COMMONWEALTH", "HUD", "SECRETARY", "FANNIE", "FREDDIE", "PROPERTIES",
-    "REALTY", "HOLDINGS", "DEVELOPMENT", "CONSTRUCTION", "INVESTMENTS",
-    "GROUP", "EXECUTOR", "ADMINISTRATOR", "MORTGAGE", "FINANCE", "CREDIT",
+    "LLC",
+    "LLP",
+    "INC",
+    "CORP",
+    "CORPORATION",
+    "COMPANY",
+    "BANK",
+    "TRUST",
+    "PARTNERSHIP",
+    "PARTNERS",
+    "AUTHORITY",
+    "REDEVELOPMENT",
+    "HOUSING",
+    "COMMONWEALTH",
+    "HUD",
+    "SECRETARY",
+    "FANNIE",
+    "FREDDIE",
+    "PROPERTIES",
+    "REALTY",
+    "HOLDINGS",
+    "DEVELOPMENT",
+    "CONSTRUCTION",
+    "INVESTMENTS",
+    "GROUP",
+    "EXECUTOR",
+    "ADMINISTRATOR",
+    "MORTGAGE",
+    "FINANCE",
+    "CREDIT",
 ]
 _ENTITY_REGEX = r"\b(" + "|".join(ENTITY_TOKENS) + r")\b"
 
 
 def _entity_flag(column: str) -> pl.Expr:
-    return pl.col(column).cast(pl.String).str.to_uppercase().str.contains(_ENTITY_REGEX).fill_null(
-        False
+    return (
+        pl.col(column)
+        .cast(pl.String)
+        .str.to_uppercase()
+        .str.contains(_ENTITY_REGEX)
+        .fill_null(False)
     )
 
 
@@ -141,10 +170,9 @@ def classify_sales(deeds: pl.LazyFrame, opa: pl.LazyFrame) -> pl.LazyFrame:
         .alias("possible_related"),
         pl.col("deed_kind").is_in(DISTRESS_DEED_KINDS).alias("is_distress_deed"),
         pl.col("deed_kind").is_in(NON_MARKET_DEED_KINDS).alias("is_non_market_deed"),
-        (
-            ~pl.col("is_nominal")
-            & (pl.col("sale_price").fill_null(0) <= LOW_PRICE_THRESHOLD)
-        ).alias("is_low_price"),
+        (~pl.col("is_nominal") & (pl.col("sale_price").fill_null(0) <= LOW_PRICE_THRESHOLD)).alias(
+            "is_low_price"
+        ),
     )
 
     # Group price statistics from the eligible pool only, so nominal/distressed
@@ -165,9 +193,7 @@ def classify_sales(deeds: pl.LazyFrame, opa: pl.LazyFrame) -> pl.LazyFrame:
         eligible.alias("in_reference_pool"),
         ppsf.alias("price_per_sqft"),
         pl.when(
-            pl.col("opa_account_num").cast(pl.String).str.starts_with(
-                config.CONDO_ACCOUNT_PREFIX
-            )
+            pl.col("opa_account_num").cast(pl.String).str.starts_with(config.CONDO_ACCOUNT_PREFIX)
         )
         .then(pl.lit("CONDO UNIT"))
         .otherwise(pl.col("category_code_description"))

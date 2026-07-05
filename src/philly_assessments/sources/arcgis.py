@@ -162,8 +162,6 @@ class ArcGISClient:
 
 
 def arrow_schema(fields: list[dict[str, Any]]) -> pa.Schema:
-    columns = [
-        (f["name"], _ESRI_TO_ARROW.get(f["esri_type"] or "", pa.string())) for f in fields
-    ]
+    columns = [(f["name"], _ESRI_TO_ARROW.get(f["esri_type"] or "", pa.string())) for f in fields]
     columns.append((GEOMETRY_COLUMN, pa.string()))
     return pa.schema(columns)

@@ -55,9 +55,7 @@ def test_knn_at_date_windows_and_excludes_own_parcel():
             _point("s4", "p4", 30, 0, datetime(2026, 8, 1), 9.0),  # after valuation date
         ]
     )
-    targets = pl.DataFrame(
-        {"parcel_id": ["p1", "p9"], "x_m": [0.0, 5.0], "y_m": [0.0, 0.0]}
-    )
+    targets = pl.DataFrame({"parcel_id": ["p1", "p9"], "x_m": [0.0, 5.0], "y_m": [0.0, 0.0]})
     out = {
         row["parcel_id"]: row
         for row in knn_ppsf_at_date(points, targets, datetime(2026, 7, 1), k=15).to_dicts()

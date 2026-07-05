@@ -207,8 +207,7 @@ def assemble_assessment_features(
     # kNN surface from the trailing window (own parcel excluded inside)
     knn_points = (
         pool.filter(
-            (pl.col("lonlat_status") == "ok")
-            & pl.col("livable_area").is_between(lo_a, hi_a)
+            (pl.col("lonlat_status") == "ok") & pl.col("livable_area").is_between(lo_a, hi_a)
         )
         .with_columns((pl.col("sale_price") / pl.col("livable_area")).alias("ppsf"))
         .filter(pl.col("ppsf").is_between(10.0, 2000.0))
@@ -265,10 +264,12 @@ def assemble_assessment_features(
         )
         .collect()
         .with_columns(
-            ((pl.col("days_before") > 0) & (pl.col("days_before") <= ROLL_WINDOW_DAYS))
-            .alias("in_window"),
-            (pl.col("resolved_date").is_null() | (pl.col("resolved_date") > valuation_date))
-            .alias("is_open"),
+            ((pl.col("days_before") > 0) & (pl.col("days_before") <= ROLL_WINDOW_DAYS)).alias(
+                "in_window"
+            ),
+            (pl.col("resolved_date").is_null() | (pl.col("resolved_date") > valuation_date)).alias(
+                "is_open"
+            ),
         )
         .group_by("parcel_id")
         .agg(
@@ -289,10 +290,7 @@ def assemble_assessment_features(
             )
             .select(
                 pl.col("opa_account_num").alias("parcel_id"),
-                (
-                    pl.lit(valuation_date)
-                    - pl.coalesce("completed_date_parsed", "start_date_parsed")
-                )
+                (pl.lit(valuation_date) - pl.coalesce("completed_date_parsed", "start_date_parsed"))
                 .dt.total_days()
                 .alias("days_before"),
             )
@@ -320,8 +318,14 @@ def assemble_assessment_features(
             *[
                 pl.col(c).fill_null(0.0)
                 for c in (
-                    "own_w", "own_wp", "own_wppsf", "own_w_ppsf",
-                    "block_w", "block_wp", "block_wppsf", "block_w_ppsf",
+                    "own_w",
+                    "own_wp",
+                    "own_wppsf",
+                    "own_w_ppsf",
+                    "block_w",
+                    "block_wp",
+                    "block_wppsf",
+                    "block_w_ppsf",
                 )
             ],
             pl.col("own_n").fill_null(0),
@@ -329,9 +333,7 @@ def assemble_assessment_features(
         )
         .with_columns(
             pl.when(pl.col("block_w") - pl.col("own_w") > 0)
-            .then(
-                (pl.col("block_wp") - pl.col("own_wp")) / (pl.col("block_w") - pl.col("own_w"))
-            )
+            .then((pl.col("block_wp") - pl.col("own_wp")) / (pl.col("block_w") - pl.col("own_w")))
             .alias("mkt_block_roll_mean_price"),
             pl.when(pl.col("block_w_ppsf") - pl.col("own_w_ppsf") > 0)
             .then(
@@ -342,8 +344,16 @@ def assemble_assessment_features(
             (pl.col("block_n") - pl.col("own_n")).alias("mkt_block_roll_n"),
         )
         .drop(
-            "block_w", "block_wp", "block_wppsf", "block_w_ppsf", "block_n",
-            "own_w", "own_wp", "own_wppsf", "own_w_ppsf", "own_n",
+            "block_w",
+            "block_wp",
+            "block_wppsf",
+            "block_w_ppsf",
+            "block_n",
+            "own_w",
+            "own_wp",
+            "own_wppsf",
+            "own_w_ppsf",
+            "own_n",
         )
         .join(prior_sales, on="parcel_id", how="left")
         .join(knn, on="parcel_id", how="left")

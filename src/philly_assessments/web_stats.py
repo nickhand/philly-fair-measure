@@ -53,9 +53,7 @@ def _iqr_trim_mask(ratio: np.ndarray) -> np.ndarray:
     return np.asarray(~_iaao_outlier_mask(ratio))
 
 
-def export_web_stats(
-    data_dir: Path | None = None, out_path: Path = DEFAULT_OUT
-) -> dict[str, Any]:
+def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT) -> dict[str, Any]:
     root = data_dir if data_dir is not None else config.data_dir()
     run_dir = latest_run_dir("baseline", root)
     run_id = run_dir.name.removeprefix("run_id=")
@@ -75,12 +73,8 @@ def export_web_stats(
     # drop_nulls does NOT drop float NaN (polars NaN != null — the recurring
     # gotcha): a few dozen OPA values are NaN and would poison the percentile
     # trim below. Keep only rows finite in every array.
-    ok = (
-        np.isfinite(price) & (price > 0) & np.isfinite(model) & np.isfinite(opa)
-    )
-    price, model, opa, adj, financed = (
-        price[ok], model[ok], opa[ok], adj[ok], financed[ok]
-    )
+    ok = np.isfinite(price) & (price > 0) & np.isfinite(model) & np.isfinite(opa)
+    price, model, opa, adj, financed = (price[ok], model[ok], opa[ok], adj[ok], financed[ok])
 
     # Full sample, out-of-time — what a homeowner actually experiences.
     full_card = {"opa": _card(opa, price), "model": _card(model, price)}
@@ -123,9 +117,7 @@ def export_web_stats(
     share_q1 = float((~financed[test_q1]).mean())
     # Median within-district price gap, cash vs financed (needs both sides).
     gaps: list[float] = []
-    for _, d in sf.select("loc_district", "sale_price", "fin_cash_sale").group_by(
-        "loc_district"
-    ):
+    for _, d in sf.select("loc_district", "sale_price", "fin_cash_sale").group_by("loc_district"):
         c = d.filter(pl.col("fin_cash_sale") == 1.0)["sale_price"]
         f = d.filter(pl.col("fin_cash_sale") == 0.0)["sale_price"]
         if c.len() >= 50 and f.len() >= 50:

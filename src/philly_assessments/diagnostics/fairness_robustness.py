@@ -46,12 +46,22 @@ logger = logging.getLogger(__name__)
 # categorical geography, WITHOUT the learned market areas, kNN sale surface,
 # and block rolling means that carry local price level in the rich model.
 COARSE_NUMERIC = [
-    "char_livable_area", "char_lot_area", "char_beds", "char_baths",
-    "char_year_built", "char_garage_spaces", "char_fireplaces",
+    "char_livable_area",
+    "char_lot_area",
+    "char_beds",
+    "char_baths",
+    "char_year_built",
+    "char_garage_spaces",
+    "char_fireplaces",
 ]
 COARSE_CATEGORICAL = [
-    "char_style", "char_era", "char_exterior_condition", "char_interior_condition",
-    "char_quality_grade_raw", "loc_zip5", "loc_ward",
+    "char_style",
+    "char_era",
+    "char_exterior_condition",
+    "char_interior_condition",
+    "char_quality_grade_raw",
+    "loc_zip5",
+    "loc_ward",
 ]
 _GROUPS = ("White alone", "Black alone", "Hispanic/Latino, any race")
 
@@ -90,12 +100,14 @@ def mechanism_demo(data_dir: Path | None = None) -> pl.DataFrame:
     opa = test["asmt_market_value_sale_year"].to_numpy()
 
     rows = []
-    for model, value in (("opa", opa), ("coarse_model", preds["coarse"]),
-                         ("rich_model", preds["rich"])):
+    for model, value in (
+        ("opa", opa),
+        ("coarse_model", preds["coarse"]),
+        ("rich_model", preds["rich"]),
+    ):
         stats = _by_race(test, value, price)
         for g, m in stats.items():
-            rows.append({"model": model, "group": g,
-                         "median_ratio": m.median_ratio, "cod": m.cod})
+            rows.append({"model": model, "group": g, "median_ratio": m.median_ratio, "cod": m.cod})
     return pl.DataFrame(rows)
 
 
@@ -133,12 +145,14 @@ def race_gap_cv(data_dir: Path | None = None, *, n_folds: int = 5) -> pl.DataFra
                     return black - white
             return None
 
-        rows.append({
-            "fold": i + 1,
-            "test_from": str(test_df["sale_date"].min())[:10],
-            "opa_black_white_gap": gap(opa_stats),
-            "model_black_white_gap": gap(model_stats),
-        })
+        rows.append(
+            {
+                "fold": i + 1,
+                "test_from": str(test_df["sale_date"].min())[:10],
+                "opa_black_white_gap": gap(opa_stats),
+                "model_black_white_gap": gap(model_stats),
+            }
+        )
         logger.info("race-gap fold %d done", i + 1)
     return pl.DataFrame(rows)
 
@@ -167,12 +181,14 @@ def full_roll_fairness(data_dir: Path | None = None) -> pl.DataFrame:
         m = maj == g
         if m.sum() < 300:
             continue
-        rows.append({
-            "group": g,
-            "n_properties": int(m.sum()),
-            "median_opa_over_model": float(np.median(opa[m] / model[m])),
-            "share_opa_over_110pct": float((opa[m] / model[m] > 1.10).mean()),
-        })
+        rows.append(
+            {
+                "group": g,
+                "n_properties": int(m.sum()),
+                "median_opa_over_model": float(np.median(opa[m] / model[m])),
+                "share_opa_over_110pct": float((opa[m] / model[m] > 1.10).mean()),
+            }
+        )
     return pl.DataFrame(rows)
 
 
@@ -209,22 +225,22 @@ def vertical_regressivity_cv(
         quint = np.digitize(price, edges)  # 0..4
         retail = np.where(is_cash, price / (1.0 + disc[np.clip(quint, 0, 4)]), price)
 
-        def med(
-            value: np.ndarray, denom: np.ndarray, q: int, quint: np.ndarray = quint
-        ) -> float:
+        def med(value: np.ndarray, denom: np.ndarray, q: int, quint: np.ndarray = quint) -> float:
             m = (quint == q) & np.isfinite(value) & (denom > 0)
             return float(np.median(value[m] / denom[m])) if m.sum() >= 50 else float("nan")
 
         q1s, q5s = med(opa, price, 0), med(opa, price, 4)
         q1r, q5r = med(opa, retail, 0), med(opa, retail, 4)
-        rows.append({
-            "period_from": str(w["sale_date"].min())[:10],
-            "n": length,
-            "q1q5_vs_sale": q1s / q5s,
-            "q1q5_vs_retail": q1r / q5r,
-            "prd_vs_sale": evaluate_estimates(opa, price).prd,
-            "prd_vs_retail": evaluate_estimates(opa, retail).prd,
-        })
+        rows.append(
+            {
+                "period_from": str(w["sale_date"].min())[:10],
+                "n": length,
+                "q1q5_vs_sale": q1s / q5s,
+                "q1q5_vs_retail": q1r / q5r,
+                "prd_vs_sale": evaluate_estimates(opa, price).prd,
+                "prd_vs_retail": evaluate_estimates(opa, retail).prd,
+            }
+        )
     table = pl.DataFrame(rows)
     summary = {
         "q1q5_retail_mean": as_float(table["q1q5_vs_retail"].mean()),
