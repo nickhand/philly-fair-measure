@@ -20,11 +20,15 @@ import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import polars as pl
 
 from philly_assessments import config
 from philly_assessments.ingest.manifests import read_derived_manifest
+
+if TYPE_CHECKING:
+    from philly_assessments.models.explain import Explanation
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +43,7 @@ class ReportData:
     assessment_history: pl.DataFrame | None = None
     sale_history: pl.DataFrame | None = None
     provenance: dict = field(default_factory=dict)
+    explanation: Explanation | None = None
 
 
 def gather(parcel_id: str, data_dir: Path | None = None) -> ReportData:
@@ -84,6 +89,20 @@ def gather(parcel_id: str, data_dir: Path | None = None) -> ReportData:
                 .sort("opa_market_value", descending=True)
             )
 
+    explanation = None
+    if not is_condo and characteristics:
+        try:
+            from philly_assessments.models.explain import explain
+            from philly_assessments.models.scoring import latest_run_dir
+
+            exp = explain(latest_run_dir("baseline", data_dir), feat)[0]
+            headline = screen.get("model_median")
+            if isinstance(headline, (int, float)) and headline > 0:
+                exp = exp.anchored_to(float(headline))
+            explanation = exp
+        except Exception:  # noqa: BLE001 — the driver panel is optional evidence
+            logger.warning("explanation unavailable for %s", parcel_id, exc_info=True)
+
     assessments_path = root / "staged" / "assessments.parquet"
     assessment_history = None
     if assessments_path.exists():
@@ -128,6 +147,7 @@ def gather(parcel_id: str, data_dir: Path | None = None) -> ReportData:
         assessment_history=assessment_history,
         sale_history=sale_history,
         provenance=provenance,
+        explanation=explanation,
     )
 
 
@@ -279,6 +299,32 @@ def _evidence_rows(s: dict) -> list[tuple[str, str]]:
     return rows
 
 
+def _render_explanation(exp: Explanation) -> list[str]:
+    """The 'what goes into your assessment' panel: a category-level view first
+    (the faithful way to show correlated location signals), then the biggest
+    individual factors in plain language."""
+    from philly_assessments.models.explain import plain_language
+
+    out = [
+        "<h2>What's driving this estimate</h2>",
+        "<p class='note'>How the model builds this estimate up from a typical home "
+        f"(about {_fmt_money(exp.base_value)}). Figures are approximate — value is "
+        "multiplicative, so factors don't sum exactly — and they explain the model's "
+        "reasoning, not whether the assessment is fair.</p>",
+        "<table><tr><th>What matters most</th><th class='num'>Effect on value</th></tr>",
+    ]
+    for group, dollars in exp.by_group()[:5]:
+        sign = "+" if dollars >= 0 else "−"
+        out.append(
+            f"<tr><td>{html.escape(group)}</td>"
+            f"<td class='num'>{sign}{_fmt_money(abs(dollars))}</td></tr>"
+        )
+    out.append("</table><p class='note'>Biggest individual factors:</p><ul>")
+    out += [f"<li>{html.escape(line)}</li>" for line in plain_language(exp, 6)]
+    out.append("</ul>")
+    return out
+
+
 def render_html(data: ReportData) -> str:
     s = data.screen
     c = data.characteristics
@@ -309,6 +355,8 @@ def render_html(data: ReportData) -> str:
         "public-data model trained on validated arms-length sales; it inherits "
         "the city roll's characteristic errors and cannot see interior condition.</p>",
     ]
+    if data.explanation is not None:
+        parts += _render_explanation(data.explanation)
     if s.get("retail_value") is not None:
         parts += [
             "<h2>Two value conventions</h2><div class='kv'>",

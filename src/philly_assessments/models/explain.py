@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -201,6 +201,16 @@ class Explanation:
         for d in self.drivers:
             agg[d.group] = agg.get(d.group, 0.0) + d.dollar_effect
         return sorted(agg.items(), key=lambda kv: abs(kv[1]), reverse=True)
+
+    def anchored_to(self, value: float) -> Explanation:
+        """Rescale per-driver dollars to a different display value (e.g. the
+        report's Bayesian headline) while leaving the log-space contributions —
+        and therefore the ranking — untouched. The dollars stay approximate."""
+        drivers = [
+            replace(d, dollar_effect=value * (1.0 - float(np.exp(-d.contribution))))
+            for d in self.drivers
+        ]
+        return replace(self, value=value, drivers=drivers)
 
 
 def explain(run_dir: Path, df: pl.DataFrame) -> list[Explanation]:

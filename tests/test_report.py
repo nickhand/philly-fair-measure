@@ -98,6 +98,34 @@ def test_render_html_full_packet():
     assert "<svg" in out and "polyline" in out
 
 
+def test_render_html_includes_driver_panel():
+    from philly_assessments.models.explain import Driver, Explanation
+
+    exp = Explanation(
+        value=520_000.0,
+        base_value=249_000.0,
+        drivers=[
+            Driver("char_livable_area", "living area", "Home characteristics",
+                   1120.0, 0.15, 78_000.0),
+            Driver("mkt_block_roll_mean_price", "recent sale prices on your block",
+                   "Recent nearby sales", None, -0.08, -40_000.0),
+        ],
+    )
+    data = ReportData(
+        parcel_id="052174500",
+        screen=_screen_row(),
+        characteristics={},
+        explanation=exp,
+        provenance={"generated": "2026-07-03"},
+    )
+    out = render_html(data)
+    assert "What's driving this estimate" in out
+    assert "typical home (about $249,000)" in out
+    assert "Home characteristics" in out and "+$78,000" in out  # category view
+    assert "Living area (1,120 sq ft) adds about $78,000." in out  # plain-language driver
+    assert "not whether the assessment is fair" in out  # honesty caveat kept
+
+
 def test_render_html_minimal_condo():
     data = ReportData(
         parcel_id="888080493",
