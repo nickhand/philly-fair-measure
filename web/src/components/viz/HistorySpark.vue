@@ -1,5 +1,7 @@
 <script setup lang="ts">
-/** Assessment history line with sale markers. */
+/** Assessment history line with sale markers.
+ * Azure line = the city's assessment through time; gold diamonds = real
+ * sales (the chart grammar's "a real-world event" color). */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { scaleLinear } from 'd3-scale'
 import { line as d3line } from 'd3-shape'
@@ -21,7 +23,7 @@ onMounted(() => {
 onBeforeUnmount(() => observer?.disconnect())
 
 const HEIGHT = 170
-const PAD = { left: 8, right: 56, top: 22, bottom: 26 }
+const PAD = { left: 8, right: 64, top: 22, bottom: 26 }
 
 const salePoints = computed(() =>
   props.sales
@@ -54,13 +56,17 @@ const path = computed(() => {
 
 const last = computed(() => props.assessments[props.assessments.length - 1])
 
+function diamond(cx: number, cy: number, r = 5.5): string {
+  return `M ${cx} ${cy - r} L ${cx + r} ${cy} L ${cx} ${cy + r} L ${cx - r} ${cy} Z`
+}
+
 const ariaLabel = computed(() => {
   const first = props.assessments[0]
   if (!first || !last.value) return 'No assessment history available.'
   return (
     `City assessment history from ${first.year} (${money(first.value)}) ` +
     `to ${last.value.year} (${money(last.value.value)}). ` +
-    `${salePoints.value.length} recorded sales shown as dots.`
+    `${salePoints.value.length} recorded sales shown as diamonds.`
   )
 })
 </script>
@@ -75,48 +81,61 @@ const ariaLabel = computed(() => {
       :aria-label="ariaLabel"
       class="block w-full"
     >
-      <path :d="path" fill="none" stroke="#1e56a0" stroke-width="2.5" />
+      <!-- baseline hairline -->
+      <line
+        :x1="PAD.left"
+        :x2="width - 8"
+        :y1="HEIGHT - PAD.bottom"
+        :y2="HEIGHT - PAD.bottom"
+        stroke="#dfe5ec"
+        stroke-width="1"
+      />
+      <path :d="path" fill="none" stroke="#0f4d90" stroke-width="2.5" />
       <circle
         v-for="a in props.assessments"
         :key="`a${a.year}`"
         :cx="x(a.year)"
         :cy="y(a.value)"
-        r="3"
-        fill="#1e56a0"
+        r="2.5"
+        fill="#0f4d90"
       >
         <title>{{ a.year }} assessment: {{ money(a.value) }}</title>
       </circle>
       <g v-for="s in salePoints" :key="`s${s.year}${s.value}`">
-        <circle :cx="x(s.year)" :cy="y(s.value)" r="5.5" fill="#c2410c">
+        <path :d="diamond(x(s.year), y(s.value))" fill="#f3c613" stroke="#8a6100" stroke-width="1.5">
           <title>Sold {{ Math.floor(s.year) }} for {{ money(s.value) }}</title>
-        </circle>
+        </path>
       </g>
       <text
         v-if="last"
         :x="x(last.year) + 8"
         :y="y(last.value) + 4"
-        class="fill-brand-700 text-[12px] font-semibold"
+        fill="#0f4d90"
+        class="text-[12px] font-bold"
       >
-        {{ moneyCompact(last.value) }}
+        {{ moneyCompact(last.value) }} today
       </text>
-      <text :x="PAD.left" :y="HEIGHT - 8" class="fill-slate-500 text-[12px]">
+      <text :x="PAD.left" :y="HEIGHT - 8" fill="#5d6b7c" class="text-[12px]">
         {{ years[0] }}
       </text>
       <text
         :x="width - PAD.right"
         :y="HEIGHT - 8"
         text-anchor="end"
-        class="fill-slate-500 text-[12px]"
+        fill="#5d6b7c"
+        class="text-[12px]"
       >
         {{ Math.floor(years[1]) }}
       </text>
     </svg>
-    <p class="mt-1 flex items-center gap-4 text-xs text-slate-500">
+    <p class="mt-1 flex items-center gap-4 text-caption text-muted">
       <span class="inline-flex items-center gap-1.5">
         <span aria-hidden="true" class="inline-block h-0.5 w-5 bg-brand-600"></span> City assessment
       </span>
       <span class="inline-flex items-center gap-1.5">
-        <span aria-hidden="true" class="inline-block h-2.5 w-2.5 rounded-full bg-over"></span>
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+          <path d="M 6 1 L 11 6 L 6 11 L 1 6 Z" fill="#f3c613" stroke="#8a6100" stroke-width="1.2" />
+        </svg>
         Actual sale
       </span>
     </p>

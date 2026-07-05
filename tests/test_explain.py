@@ -68,3 +68,17 @@ def test_explain_is_faithful_ranked_and_readable(tmp_path):
         for d, line in zip(e.top(4), lines, strict=True):
             assert ("adds about" in line) == d.raises
             assert ("reduces value by about" in line) != d.raises
+
+
+def test_display_value_gates_and_formats_for_residents():
+    from philly_assessments.models.explain import display_value
+
+    # self-explanatory facts get human formatting with units
+    assert display_value("char_livable_area", 1120.0) == "1,120 sq ft"
+    assert display_value("char_beds", 3.0) == "3 beds"
+    # a year is not a quantity — no thousands separator
+    assert display_value("char_year_built", 1750.0) == "1750"
+    # model-internal values (log surfaces, encoded geography) are suppressed
+    assert display_value("mkt_knn_log_ppsf", 6.2306) is None
+    assert display_value("loc_census_tract_raw", 1.0) is None
+    assert display_value("char_livable_area", None) is None

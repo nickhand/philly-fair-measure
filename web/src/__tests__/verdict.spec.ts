@@ -18,8 +18,11 @@ describe('verdictFor', () => {
   })
 
   it('uses the colorblind-safe blue/orange pair', () => {
+    // Flag & Ledger design pass: under shifted #1d4ed8 → #0369a1 (cyan-leaning)
+    // so it can't be read as the brand azure. The blue/orange opposition —
+    // the thing this test protects — is unchanged.
     expect(VERDICTS.over_assessed_candidate.hex).toBe('#c2410c')
-    expect(VERDICTS.under_assessed_candidate.hex).toBe('#1d4ed8')
+    expect(VERDICTS.under_assessed_candidate.hex).toBe('#0369a1')
   })
 
   it('falls back safely for unknown flags', () => {

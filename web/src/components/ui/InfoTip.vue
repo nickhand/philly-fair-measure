@@ -1,18 +1,38 @@
 <script setup lang="ts">
-/** Tap-to-expand plain-language definition. Native <details> = accessible
- * for free (keyboard, screen readers, no JS). */
-defineProps<{ label?: string }>()
+/** The "honesty note" — trust furniture, always visible (never buried behind
+ * a toggle). Brand-blue by default; the gold variant is reserved for the
+ * twin-uniformity callout and "what we cannot see". */
+import { Info } from 'lucide-vue-next'
+
+withDefaults(defineProps<{ label?: string; variant?: 'brand' | 'gold' }>(), {
+  label: undefined,
+  variant: 'brand',
+})
 </script>
 
 <template>
-  <details class="group mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm">
-    <summary
-      class="cursor-pointer list-none font-medium text-brand-600 group-open:mb-1.5"
-    >
-      <span aria-hidden="true">ⓘ</span> {{ label ?? 'What does this mean?' }}
-    </summary>
-    <div class="text-slate-700">
+  <div
+    role="note"
+    class="mt-3 flex gap-2.5 rounded-md border p-3 text-body-sm"
+    :class="
+      variant === 'gold' ? 'border-gold-border bg-gold-soft' : 'border-[#d8e4f2] bg-[#eef4fb]'
+    "
+  >
+    <Info
+      aria-hidden="true"
+      :size="16"
+      class="mt-0.5 shrink-0"
+      :class="variant === 'gold' ? 'text-gold-700' : 'text-brand-600'"
+    />
+    <div class="text-body">
+      <p
+        v-if="label"
+        class="mb-0.5 font-bold"
+        :class="variant === 'gold' ? 'text-gold-700' : 'text-brand-600'"
+      >
+        {{ label }}
+      </p>
       <slot />
     </div>
-  </details>
+  </div>
 </template>

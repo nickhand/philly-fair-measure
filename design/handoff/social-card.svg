@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Fair Measure — Is your home&#39;s assessment fair? A free, independent check for Philadelphia.">
+  <rect width="1200" height="630" fill="#f4f6f9"></rect>
+  <rect width="1200" height="14" fill="#f3c613"></rect>
+  
+  <g transform="translate(84,72)">
+    <rect x="0" y="12" width="52" height="14" rx="7" fill="#b9d2ee"></rect>
+    <rect x="21" y="3" width="8" height="32" rx="2.5" fill="#0f4d90"></rect>
+    <circle cx="43" cy="5" r="6" fill="#f3c613"></circle>
+    <text x="70" y="30" font-family="&#39;Public Sans&#39;, Arial, sans-serif" font-size="28" font-weight="800" fill="#16243a">Fair Measure</text>
+    <text x="71" y="48" font-family="&#39;Public Sans&#39;, Arial, sans-serif" font-size="12" font-weight="600" letter-spacing="3" fill="#5d6b7c">PHILADELPHIA</text>
+  </g>
+  
+  <text x="84" y="240" font-family="&#39;Source Serif 4&#39;, Georgia, serif" font-size="64" font-weight="700" fill="#16243a">Is your home’s assessment fair?</text>
+  <text x="84" y="296" font-family="&#39;Public Sans&#39;, Arial, sans-serif" font-size="26" fill="#425061">A free, independent check of the city’s value for your home.</text>
+  
+  <g transform="translate(84,380)" font-family="&#39;Public Sans&#39;, Arial, sans-serif">
+    <text x="330" y="18" font-size="24" font-weight="700" fill="#0f4d90">Our estimate</text>
+    <rect x="120" y="52" width="480" height="44" rx="10" fill="#dbe7f5" stroke="#b9d2ee" stroke-width="2"></rect>
+    <rect x="384" y="34" width="9" height="80" rx="3" fill="#0f4d90"></rect>
+    <text x="836" y="18" font-size="24" font-weight="700" fill="#c2410c" text-anchor="middle">City value</text>
+    <path d="M 836 30 L 848 48 L 824 48 Z" fill="#c2410c"></path>
+    <line x1="836" y1="48" x2="836" y2="112" stroke="#c2410c" stroke-width="4" stroke-dasharray="6 8"></line>
+    <circle cx="836" cy="118" r="7" fill="#c2410c"></circle>
+    <line x1="60" y1="74" x2="120" y2="74" stroke="#c6d0dc" stroke-width="2"></line>
+    <line x1="600" y1="74" x2="1030" y2="74" stroke="#c6d0dc" stroke-width="2"></line>
+  </g>
+  <text x="84" y="576" font-family="&#39;Public Sans&#39;, Arial, sans-serif" font-size="18" font-weight="600" fill="#8593a4">Independent — not a City of Philadelphia product · No ads, no cookies, no analytics</text>
+</svg>

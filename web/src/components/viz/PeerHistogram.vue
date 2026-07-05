@@ -1,17 +1,24 @@
 <script setup lang="ts">
 /** Where this home sits among its neighbors: the distribution of
- * (city value ÷ our estimate) for similar homes nearby, with markers for
- * "this home" and the fair line at 1.0. */
+ * (city value ÷ our estimate) for similar homes nearby. Your bin is
+ * highlighted; the peer median is a solid azure line; "you" is a dashed
+ * line + dot in the verdict color (color is never the only channel —
+ * both markers carry direct labels). */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { scaleLinear } from 'd3-scale'
 import { pct } from '@/utils/format'
 import type { HistBin } from '@/api/types'
 
-const props = defineProps<{
-  histogram: HistBin[]
-  you: number
-  peerMedian: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    histogram: HistBin[]
+    you: number
+    peerMedian: number
+    /** Verdict hex for the "you" marker; defaults to ink. */
+    youHex?: string
+  }>(),
+  { youHex: '#16243a' },
+)
 
 const wrapper = ref<HTMLDivElement | null>(null)
 const width = ref(560)
@@ -25,8 +32,8 @@ onMounted(() => {
 })
 onBeforeUnmount(() => observer?.disconnect())
 
-const HEIGHT = 190
-const PAD = { left: 10, right: 10, top: 34, bottom: 34 }
+const HEIGHT = 200
+const PAD = { left: 10, right: 10, top: 36, bottom: 44 }
 
 const domain = computed<[number, number]>(() => {
   const first = props.histogram[0]
@@ -46,6 +53,18 @@ const clampedYou = computed(() =>
   Math.min(Math.max(props.you, domain.value[0]), domain.value[1]),
 )
 
+function isYourBin(b: HistBin): boolean {
+  return clampedYou.value >= b.x0 && clampedYou.value < b.x1
+}
+
+const medianAnchor = computed(() =>
+  x.value(props.peerMedian) <= x.value(clampedYou.value) ? 'end' : 'start',
+)
+
+const ticks = computed(() =>
+  [0.7, 1.0, 1.3].filter((t) => t >= domain.value[0] && t <= domain.value[1]),
+)
+
 const ariaLabel = computed(
   () =>
     `This home is assessed at ${pct(props.you)} of our estimated value. ` +
@@ -63,64 +82,92 @@ const ariaLabel = computed(
       :aria-label="ariaLabel"
       class="block w-full"
     >
-      <!-- bars -->
+      <!-- bins (yours highlighted) -->
       <rect
         v-for="b in props.histogram"
         :key="b.x0"
         :x="x(b.x0) + 1"
         :y="y(b.n)"
         :width="Math.max(0, x(b.x1) - x(b.x0) - 2)"
-        :height="HEIGHT - PAD.bottom - y(b.n)"
-        rx="2"
-        class="fill-slate-300"
+        :height="Math.max(0, HEIGHT - PAD.bottom - y(b.n))"
+        rx="1.5"
+        :fill="isYourBin(b) ? '#ffd9bd' : '#c9d9ec'"
       />
 
-      <!-- fair line at 1.0 -->
+      <!-- quiet baseline -->
       <line
-        :x1="x(1)"
-        :x2="x(1)"
-        :y1="PAD.top - 6"
+        :x1="PAD.left"
+        :x2="width - PAD.right"
+        :y1="HEIGHT - PAD.bottom"
         :y2="HEIGHT - PAD.bottom"
-        stroke="#334155"
-        stroke-width="1.5"
-        stroke-dasharray="4 3"
+        stroke="#dfe5ec"
+        stroke-width="1"
       />
-      <text :x="x(1)" :y="PAD.top - 12" text-anchor="middle" class="fill-slate-600 text-[12px]">
-        Fair (100%)
-      </text>
 
-      <!-- this home -->
+      <!-- peer median: solid azure -->
+      <g>
+        <line
+          :x1="x(props.peerMedian)"
+          :x2="x(props.peerMedian)"
+          :y1="PAD.top - 6"
+          :y2="HEIGHT - PAD.bottom"
+          stroke="#0f4d90"
+          stroke-width="2"
+        />
+        <text
+          :x="x(props.peerMedian) + (medianAnchor === 'start' ? 6 : -6)"
+          :y="PAD.top + 6"
+          :text-anchor="medianAnchor"
+          fill="#0f4d90"
+          class="text-[12px] font-bold"
+        >
+          Similar homes’ middle {{ pct(props.peerMedian) }}
+        </text>
+      </g>
+
+      <!-- you: dashed verdict-colored line + dot -->
       <g :transform="`translate(${x(clampedYou)}, 0)`">
         <line
           x1="0"
           x2="0"
-          :y1="PAD.top + 8"
+          y1="18"
           :y2="HEIGHT - PAD.bottom"
-          stroke="#163e75"
-          stroke-width="3"
+          :stroke="props.youHex"
+          stroke-width="2"
+          stroke-dasharray="4 3"
         />
-        <circle cx="0" :cy="PAD.top + 8" r="5" fill="#163e75" />
+        <circle cx="0" cy="14" r="4" :fill="props.youHex" />
         <text
           x="0"
-          :y="PAD.top + 0"
+          y="9"
           text-anchor="middle"
-          class="fill-brand-700 text-[13px] font-semibold"
+          :fill="props.youHex"
+          class="text-[13px] font-bold"
         >
-          Your home {{ pct(props.you) }}
+          You {{ pct(props.you) }}
         </text>
       </g>
 
-      <!-- x axis labels -->
-      <text :x="PAD.left" :y="HEIGHT - 10" class="fill-slate-500 text-[12px]">
-        Assessed low
+      <!-- axis ticks + caption -->
+      <text
+        v-for="t in ticks"
+        :key="t"
+        :x="x(t)"
+        :y="HEIGHT - 26"
+        text-anchor="middle"
+        fill="#5d6b7c"
+        class="text-[12px]"
+      >
+        {{ Math.round(t * 100) }}%
       </text>
       <text
-        :x="width - PAD.right"
-        :y="HEIGHT - 10"
-        text-anchor="end"
-        class="fill-slate-500 text-[12px]"
+        :x="(PAD.left + width - PAD.right) / 2"
+        :y="HEIGHT - 8"
+        text-anchor="middle"
+        fill="#8593a4"
+        class="text-[10.5px]"
       >
-        Assessed high
+        assessment as % of our estimate
       </text>
     </svg>
   </div>

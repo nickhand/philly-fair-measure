@@ -75,7 +75,7 @@ const dots = computed(() => {
 <template>
   <div ref="wrapper" class="w-full">
     <div class="mb-3 flex flex-wrap items-center gap-3">
-      <label for="ci-level" class="text-sm font-medium text-slate-800">
+      <label for="ci-level" class="text-body-sm font-semibold text-ink">
         How sure should we be?
       </label>
       <div class="flex gap-1" role="group" aria-labelledby="ci-level">
@@ -83,11 +83,11 @@ const dots = computed(() => {
           v-for="l in levels"
           :key="l"
           type="button"
-          class="min-h-11 rounded-lg px-3.5 text-sm font-semibold"
+          class="min-h-10 rounded-md border px-3.5 text-body-sm font-bold"
           :class="
             level === l
-              ? 'bg-brand-600 text-white'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              ? 'border-brand-600 bg-brand-600 text-white'
+              : 'border-line bg-white text-body hover:bg-paper'
           "
           :aria-pressed="level === l"
           @click="level = l"
@@ -111,8 +111,9 @@ const dots = computed(() => {
         :width="Math.max(0, x(band[1]) - x(band[0]))"
         :height="HEIGHT - PAD.top - PAD.bottom"
         rx="8"
-        fill="#bfd3ee"
-        opacity="0.55"
+        fill="#dbe7f5"
+        stroke="#b9d2ee"
+        opacity="0.7"
         style="transition: all 0.35s ease"
       />
       <circle
@@ -121,8 +122,10 @@ const dots = computed(() => {
         :cx="d.cx"
         :cy="d.cy"
         r="4.5"
-        :fill="d.price >= band[0] && d.price <= band[1] ? '#1e56a0' : '#cbd5e1'"
-        style="transition: fill 0.35s ease"
+        :fill="d.price >= band[0] && d.price <= band[1] ? '#0f4d90' : '#ffffff'"
+        :stroke="d.price >= band[0] && d.price <= band[1] ? 'none' : '#9db1c7'"
+        stroke-width="1.5"
+        style="transition: fill 0.35s ease, stroke 0.35s ease"
       >
         <title>Sold for {{ moneyCompact(d.price) }}</title>
       </circle>
@@ -131,26 +134,27 @@ const dots = computed(() => {
         :x2="x(median)"
         :y1="PAD.top - 6"
         :y2="HEIGHT - PAD.bottom + 6"
-        stroke="#163e75"
+        stroke="#0f4d90"
         stroke-width="3"
       />
       <text
         :x="x(median)"
         :y="PAD.top - 8"
         text-anchor="middle"
-        class="fill-brand-700 text-[13px] font-semibold"
+        fill="#0f4d90"
+        class="text-[13px] font-bold"
       >
         Best estimate {{ moneyCompact(median) }}
       </text>
-      <text :x="x(band[0])" :y="HEIGHT - 14" text-anchor="middle" class="fill-slate-600 text-[12px]">
+      <text :x="x(band[0])" :y="HEIGHT - 14" text-anchor="middle" fill="#5d6b7c" class="text-[12px]">
         {{ moneyCompact(band[0]) }}
       </text>
-      <text :x="x(band[1])" :y="HEIGHT - 14" text-anchor="middle" class="fill-slate-600 text-[12px]">
+      <text :x="x(band[1])" :y="HEIGHT - 14" text-anchor="middle" fill="#5d6b7c" class="text-[12px]">
         {{ moneyCompact(band[1]) }}
       </text>
     </svg>
 
-    <p class="mt-2 text-sm text-slate-700" aria-live="polite">
+    <p class="mt-2 text-body-sm text-body" aria-live="polite">
       Each dot is a sale of a similar home. A <strong>{{ level }}%</strong> range covers
       <strong>{{ covered }} of 80</strong> dots — if we made this promise 100 times, we’d expect to
       be right about {{ level }} times. More certainty means a wider range. We use

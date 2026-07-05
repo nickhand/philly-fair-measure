@@ -7,7 +7,7 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: () => import('@/views/HomeView.vue'),
-      meta: { title: 'Philly Assessment Check' },
+      meta: { title: 'Fair Measure' },
     },
     {
       path: '/property/:parcelId',
@@ -29,6 +29,12 @@ const router = createRouter({
       meta: { title: 'How this works' },
     },
     {
+      path: '/trust',
+      name: 'trust',
+      component: () => import('@/views/TrustView.vue'),
+      meta: { title: 'Why trust these numbers' },
+    },
+    {
       // Staff worklists — intentionally unlinked from public navigation.
       path: '/admin',
       name: 'admin',
@@ -48,9 +54,8 @@ const router = createRouter({
 })
 
 router.afterEach((to) => {
-  const title = (to.meta.title as string) ?? 'Philly Assessment Check'
-  document.title =
-    to.name === 'home' ? title : `${title} — Philly Assessment Check`
+  const title = (to.meta.title as string) ?? 'Fair Measure'
+  document.title = to.name === 'home' ? title : `${title} — Fair Measure`
   // Accessibility: move focus to the main heading on route change so screen
   // readers announce the new page.
   requestAnimationFrame(() => {

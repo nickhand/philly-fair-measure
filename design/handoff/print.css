@@ -1,0 +1,93 @@
+/* ============================================================
+   Fair Measure — print stylesheet for the property report.
+   Goal: one Letter page, black-safe (survives a photocopier),
+   with the live URL printed in full (no QR — appeal boards
+   photocopy, and QR codes degrade; the URL is the fallback
+   that always works).
+   Import: top of main.css → @import './print.css' print;
+   (@import must precede all other rules.)
+   Hooks needed in PropertyView.vue (class additions only):
+     .report-root   on the outer div
+     .no-print      on: header nav links, "← New search",
+                    InfoTip panels, the how-to-act panel's link row
+   ============================================================ */
+
+@page {
+  size: letter;
+  margin: 0.6in 0.65in;
+}
+
+@media print {
+  /* -- black-safe base -- */
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11pt;
+    line-height: 1.45;
+  }
+  .no-print,
+  nav,
+  footer,
+  button {
+    display: none !important;
+  }
+
+  /* Header collapses to a document masthead */
+  header {
+    border: 0 !important;
+    border-bottom: 2.5pt solid #000 !important;
+    padding: 0 0 6pt !important;
+  }
+
+  /* Cards flatten to ruled blocks; shadows and tints go */
+  .report-root [class*='rounded'],
+  .report-root [class*='shadow'] {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  .report-root [class*='bg-'] {
+    background: #fff !important;
+  }
+  .report-root > * {
+    break-inside: avoid;
+  }
+
+  /* Verdict block: heavy border replaces color */
+  .verdict-card {
+    border: 2.5pt solid #000 !important;
+    padding: 10pt 12pt !important;
+  }
+  .verdict-card h2 {
+    font-size: 16pt;
+  }
+
+  /* Charts: SVGs print, but color → ink. The city marker keeps its
+     meaning through shape + label (color never sole channel). */
+  svg text { fill: #000 !important; }
+  svg [stroke='#c2410c'], svg [stroke='#0369a1'], svg [stroke='#0f4d90'] { stroke: #000 !important; }
+  svg [fill='#c2410c'], svg [fill='#0369a1'], svg [fill='#0f4d90'] { fill: #000 !important; }
+  svg [fill='#dbe7f5'] { fill: #e8e8e8 !important; stroke: #999 !important; }
+
+  /* Tables: hairline rules, tabular numerals */
+  table { border-collapse: collapse; }
+  th, td { border-bottom: 0.5pt solid #888; padding: 3pt 6pt 3pt 0; font-variant-numeric: tabular-nums; }
+  thead tr { border-bottom: 1pt solid #000; }
+
+  /* Provenance footer with the live URL, printed on every copy */
+  .report-root::after {
+    content: 'Live report with sources: fairmeasure.org/property/' attr(data-parcel-id)
+      '  ·  Independent — not a City of Philadelphia product  ·  Data updated ' attr(data-updated);
+    display: block;
+    margin-top: 12pt;
+    padding-top: 6pt;
+    border-top: 1pt solid #000;
+    font-size: 8.5pt;
+    color: #000;
+  }
+
+  /* Keep it to one page: drop the two least-decisive panels in print */
+  .print-compact .history-panel,
+  .print-compact .signals-panel {
+    display: none !important;
+  }
+}

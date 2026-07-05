@@ -181,6 +181,8 @@ def display_value(feature: str, value: object) -> str | None:
     dashboard API) must use this rather than str(raw_value)."""
     if value is None or feature not in _VALUE_UNITS:
         return None
+    if feature == "char_year_built" and isinstance(value, (int, float)):
+        return str(int(value))  # a year, not a quantity — no thousands separator
     return f"{_fmt_value(value)} {_VALUE_UNITS[feature]}".strip()
 
 

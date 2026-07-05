@@ -16,6 +16,12 @@ import PropertySheet from '@/components/map/PropertySheet.vue'
 const MIN_PARCEL_ZOOM = 14.5
 const PHILLY_CENTER: [number, number] = [-75.16, 39.985]
 
+const legendChips = [
+  { hex: VERDICTS.over_assessed_candidate.hex, label: 'Above our range' },
+  { hex: VERDICTS.within_range.hex, label: 'Inside' },
+  { hex: VERDICTS.under_assessed_candidate.hex, label: 'Below' },
+]
+
 const router = useRouter()
 const container = ref<HTMLDivElement | null>(null)
 const map = shallowRef<maplibregl.Map | null>(null)
@@ -91,7 +97,7 @@ function ensureParcelLayer(m: maplibregl.Map) {
           VERDICTS.over_assessed_candidate.hex,
           'under_assessed_candidate',
           VERDICTS.under_assessed_candidate.hex,
-          /* within/other */ '#94a3b8',
+          /* within/other */ VERDICTS.within_range.hex,
         ],
         'circle-opacity': 0.85,
         'circle-stroke-width': 1,
@@ -144,7 +150,9 @@ onBeforeUnmount(() => {
 
     <!-- search overlay -->
     <div class="absolute inset-x-0 top-3 z-20 mx-auto w-[min(92%,28rem)]">
-      <AddressSearch compact @select="onSearchSelect" />
+      <div class="rounded-[10px] bg-white p-1.5 shadow-float">
+        <AddressSearch compact @select="onSearchSelect" />
+      </div>
     </div>
 
     <div
@@ -157,37 +165,34 @@ onBeforeUnmount(() => {
     <!-- zoom hint -->
     <div
       v-if="zoomedOut"
-      class="pointer-events-none absolute inset-x-0 bottom-24 z-10 mx-auto w-fit rounded-full bg-slate-900/80 px-4 py-2 text-sm font-medium text-white"
+      class="pointer-events-none absolute inset-x-0 bottom-24 z-10 mx-auto w-fit rounded-full bg-[rgba(22,36,58,0.85)] px-4 py-2 text-body-sm font-semibold text-white"
       role="status"
     >
       Zoom in to street level to see homes
     </div>
     <div
       v-if="loadError"
-      class="absolute inset-x-0 bottom-24 z-10 mx-auto w-fit rounded-full bg-over px-4 py-2 text-sm font-medium text-white"
+      class="absolute inset-x-0 bottom-24 z-10 mx-auto w-fit rounded-full bg-over px-4 py-2 text-body-sm font-semibold text-white"
       role="alert"
     >
       Could not load homes for this area. Pan or zoom to retry.
     </div>
 
-    <!-- legend -->
+    <!-- legend: pill chips, part of the map furniture -->
     <div
-      class="absolute top-20 left-3 z-10 rounded-xl border border-slate-200 bg-white/95 p-3 text-xs shadow sm:top-auto sm:bottom-8"
+      class="absolute top-[4.5rem] left-3 z-10 flex flex-col gap-1.5 sm:top-auto sm:bottom-8 sm:flex-row"
       role="img"
       aria-label="Legend: orange means the city value is above our range, blue means below, gray means it looks fair."
     >
-      <p class="mb-1.5 font-bold text-slate-800">City value vs our range</p>
-      <ul class="space-y-1" aria-hidden="true">
-        <li class="flex items-center gap-2">
-          <span class="h-3 w-3 rounded-full" style="background: #c2410c"></span> Above (may be high)
-        </li>
-        <li class="flex items-center gap-2">
-          <span class="h-3 w-3 rounded-full" style="background: #1d4ed8"></span> Below
-        </li>
-        <li class="flex items-center gap-2">
-          <span class="h-3 w-3 rounded-full bg-slate-400"></span> Looks fair
-        </li>
-      </ul>
+      <span
+        v-for="chip in legendChips"
+        :key="chip.label"
+        aria-hidden="true"
+        class="inline-flex w-fit items-center gap-1.5 rounded-full border border-line-soft bg-white/95 px-2.5 py-1 text-caption font-semibold text-body shadow-sm"
+      >
+        <span class="h-2.5 w-2.5 rounded-full" :style="{ background: chip.hex }"></span>
+        {{ chip.label }}
+      </span>
     </div>
 
     <PropertySheet v-if="selected" :property="selected" @close="selected = null" />
