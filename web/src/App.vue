@@ -49,7 +49,7 @@ import { SITE } from '@/config/site'
           to="/trust"
           class="rounded-sm px-2 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
           active-class="bg-brand-50 text-brand-600"
-          >The proof</RouterLink
+          >The Proof</RouterLink
         >
       </div>
     </nav>
@@ -96,7 +96,7 @@ import { SITE } from '@/config/site'
         >.
       </p>
       <p>
-        Prefer the source? The
+        The
         <a :href="SITE.githubUrl" rel="noopener" class="font-semibold text-brand-600 underline"
           >code and data pipeline</a
         >

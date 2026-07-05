@@ -88,7 +88,7 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
       </div>
       <p class="mt-3 text-center text-caption leading-normal text-body">
         <strong class="text-brand-600">{{ filled }} of {{ TOTAL }}</strong> sold inside the range —
-        <span class="text-muted">open dots are the misses no honest model can avoid.</span>
+        <span class="text-muted">open dots are sales that landed outside the range.</span>
       </p>
       <p class="mt-2 text-center text-caption text-muted">
         We only flag an assessment when the city’s value falls <strong>outside</strong> the 90%

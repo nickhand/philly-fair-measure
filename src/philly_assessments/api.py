@@ -494,10 +494,16 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                             "type": "Point",
                             "coordinates": [r["loc_lon"], r["loc_lat"]],
                         },
-                        "properties": {"id": r["parcel_id"], "flag": r["assessment_flag"]},
+                        "properties": {
+                            "id": r["parcel_id"],
+                            "flag": r["assessment_flag"],
+                            # condo flags come from the conformal-only engine and
+                            # are weaker evidence; the map lets users separate them
+                            "family": r["model_family"],
+                        },
                     }
                     for r in sub.select(
-                        "parcel_id", "loc_lon", "loc_lat", "assessment_flag"
+                        "parcel_id", "loc_lon", "loc_lat", "assessment_flag", "model_family"
                     ).to_dicts()
                 ],
             }

@@ -71,7 +71,7 @@ const fullCard = [
       <p class="text-caption font-bold uppercase tracking-[0.1em] text-brand-600">The proof</p>
       <h1 class="mt-2 font-display text-[28px] font-bold leading-tight text-ink sm:text-[34px]">Why trust these numbers?</h1>
       <p class="mt-2.5 text-base leading-relaxed text-body">
-        You shouldn’t trust us because we say so. This page shows the test we’re graded on, how we
+        You don’t have to take our word for it. This page shows the test we’re graded on, how we
         made sure the test was fair, and where our model still falls short.
       </p>
     </div>
@@ -111,7 +111,7 @@ const fullCard = [
         </span>
         <p class="mt-2 text-body-sm text-body">
           <strong class="text-ink">We publish our misses.</strong> Where the model falls short, this
-          page says so — in the same type size as the wins.
+          page says so.
         </p>
       </div>
     </div>
@@ -162,8 +162,8 @@ const fullCard = [
       </div>
       <p class="mt-3 text-body-sm text-body">
         <strong>The bottom line:</strong> our model passes both fairness-across-price tests; the
-        city’s roll fails all three of the strict tests. Same homes, same sales, same official
-        yardstick.
+        city’s roll fails all three of the strict tests. Both were scored on the same homes and
+        the same sales.
       </p>
       <InfoTip label="What these tests mean, in plain words">
         “Median ratio” asks whether values are centered on real prices. “COD” asks whether similar
@@ -201,7 +201,7 @@ const fullCard = [
     <!-- what we say in the city's favor -->
     <SectionCard
       title="What we found in the city’s favor"
-      subtitle="An honest referee reports both sides. Two findings defend OPA."
+      subtitle="Two findings came out on the city’s side."
     >
       <ul class="list-disc space-y-2 pl-5 text-body">
         <li>

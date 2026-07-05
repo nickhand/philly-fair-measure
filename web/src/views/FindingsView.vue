@@ -125,7 +125,7 @@ function colH(m: number): number {
       </div>
 
       <div class="mt-3 rounded-md border border-gold-border bg-gold-soft p-3 text-body-sm leading-relaxed text-body">
-        <strong class="text-gold-700">The 2020–22 dip is a trap, not a fix.</strong> The city froze
+        <strong class="text-gold-700">The 2020–22 dip does not mean the problem was fixed.</strong> The city froze
         assessments while prices boomed, so rising prices temporarily hid the pattern. It snapped
         right back with the 2023 reassessment.
       </div>
@@ -145,15 +145,14 @@ function colH(m: number): number {
         This complicates the story honestly: measured against regular mortgage-financed sales, the
         city’s fairness problem shrinks a lot. Much of the unfairness lives in the
         <em>cash market</em> — homes taxed on values they cannot actually fetch. Any serious fix
-        has to decide which market an assessment should reflect. We publish both views instead of
-        picking silently.
+        has to decide which market an assessment should reflect. We publish both views.
       </p>
     </section>
 
     <!-- Finding 4: in the city's favor -->
     <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
       <p class="text-caption font-bold text-brand-600">FINDING 4 — IN THE CITY’S FAVOR</p>
-      <h2 class="mt-1 text-title font-bold text-ink">This is a national problem, honestly run.</h2>
+      <h2 class="mt-1 text-title font-bold text-ink">The same pattern shows up across the country.</h2>
       <ul class="mt-1.5 list-disc space-y-1.5 pl-5 text-body-sm leading-relaxed text-body">
         <li>
           <strong>No number-gaming.</strong> We tested for “sales chasing” — quietly matching

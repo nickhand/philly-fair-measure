@@ -41,11 +41,13 @@ const router = createRouter({
       meta: { title: 'Why trust these numbers' },
     },
     {
-      // Staff worklists — intentionally unlinked from public navigation.
-      path: '/admin',
+      // Leaderboards — intentionally unlinked from public navigation; moves
+      // behind a real paywall/admin login when the product tier ships.
+      path: '/leaderboards',
+      alias: '/admin',
       name: 'admin',
       component: () => import('@/views/AdminView.vue'),
-      meta: { title: 'Staff' },
+      meta: { title: 'Leaderboards' },
     },
     {
       path: '/:pathMatch(.*)*',

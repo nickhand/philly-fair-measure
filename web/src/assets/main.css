@@ -143,6 +143,14 @@ td, .money {
 [tabindex='-1']:focus-visible {
   outline: none;
 }
+/* Text fields match :focus-visible even on mouse click (per spec). Ours carry
+   their own focus treatment (wrapper border + ring), so the global outline
+   would double up. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
 .on-dark :focus-visible,
 header.site-dark :focus-visible {
   outline-color: var(--color-gold);

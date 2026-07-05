@@ -420,8 +420,8 @@ function printPage() {
           </div>
           <p class="mt-2 text-caption text-faint">
             “In today’s market” adjusts each sale to current prices using our district price index.
-            These are the model’s comparables, not an appraiser’s — bring your own better ones if
-            you have them.
+            These are the model’s comparables, not an appraiser’s. You can bring your own comparables
+            to an appeal.
           </p>
         </template>
         <p v-else class="text-body-sm text-muted">

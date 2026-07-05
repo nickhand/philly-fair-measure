@@ -26,6 +26,10 @@ const router = useRouter()
 const container = ref<HTMLDivElement | null>(null)
 /** Which legend groups are visible; chips toggle these on/off. */
 const enabledLabels = ref<Set<string>>(new Set(legend.map((l) => l.label)))
+/** Citywide layer: condo flags come from a different (conformal-only) engine
+ * and cluster in Center City towers — a separate toggle keeps them from being
+ * read as the rowhome pattern. */
+const showCondos = ref(true)
 
 function applyDotFilter() {
   const m = map.value
@@ -33,9 +37,19 @@ function applyDotFilter() {
   const flags = legend
     .filter((l) => enabledLabels.value.has(l.label))
     .flatMap((l) => [...l.flags])
-  const expr = ['in', ['get', 'flag'], ['literal', flags]] as maplibregl.FilterSpecification
-  if (m.getLayer('fm-dots')) m.setFilter('fm-dots', expr)
-  if (m.getLayer('fm-dots-far')) m.setFilter('fm-dots-far', expr)
+  const flagExpr = ['in', ['get', 'flag'], ['literal', flags]]
+  if (m.getLayer('fm-dots')) m.setFilter('fm-dots', flagExpr as maplibregl.FilterSpecification)
+  if (m.getLayer('fm-dots-far')) {
+    const farExpr = showCondos.value
+      ? flagExpr
+      : ['all', flagExpr, ['!=', ['get', 'family'], 'condo']]
+    m.setFilter('fm-dots-far', farExpr as maplibregl.FilterSpecification)
+  }
+}
+
+function toggleCondos() {
+  showCondos.value = !showCondos.value
+  applyDotFilter()
 }
 
 function toggleLegend(label: string) {
@@ -223,6 +237,16 @@ onBeforeUnmount(() => {
           aria-hidden="true"
         ></span>
         {{ l.label }}
+      </button>
+      <button
+        v-if="zoomedOut"
+        type="button"
+        :aria-pressed="showCondos"
+        class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-caption font-semibold shadow-float transition-colors duration-[var(--duration-fast)]"
+        :class="showCondos ? 'border-line-soft bg-white text-body' : 'border-line bg-paper text-faint line-through'"
+        @click="toggleCondos"
+      >
+        Condos
       </button>
     </div>
 

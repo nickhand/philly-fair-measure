@@ -103,7 +103,7 @@ deliberately kept:
 
 ## Product notes
 
-- `/admin` ("Leaderboards") is the review-worklist page — planned to move
+- `/leaderboards` (alias `/admin`) is the review-worklist page — planned to move
   behind a real paywall/admin login when the product tier ships; the current
   passphrase is a placeholder only.
 - Site-wide links (creator credit → nickhand.dev, GitHub repo, technical model
