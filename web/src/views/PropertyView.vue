@@ -12,7 +12,7 @@ import { computed, ref, watch } from 'vue'
 import { api, ApiError } from '@/api/client'
 import type { PropertyCore, Report } from '@/api/types'
 import { money, num, pct } from '@/utils/format'
-import { opaInquiryUrl } from '@/config/site'
+import { opaInquiryUrl, SITE } from '@/config/site'
 import type { CompRow } from '@/api/types'
 import { verdictFor } from '@/utils/verdict'
 import IntervalStrip from '@/components/viz/IntervalStrip.vue'
@@ -485,14 +485,21 @@ function printPage() {
           <h3 class="text-body-sm font-extrabold text-brand-900">How to act on this (all free)</h3>
           <ol class="mt-2 list-decimal space-y-1.5 pl-5">
             <li>
-              Wrong facts on file?
+              Check the facts first:
               <a :href="inquiryLink" rel="noopener" class="font-bold text-brand-600 underline"
-                >See exactly what the city has recorded for your home</a
-              >, then ask OPA for a review — this is called a
-              <strong>First Level Review</strong> and takes one form.
+                >see exactly what the city has recorded for your home</a
+              >.
             </li>
             <li>
-              Think the value itself is too high? File an appeal with the
+              Facts wrong, or the value looks off? Ask OPA for a
+              <a :href="SITE.flrUrl" rel="noopener" class="font-bold text-brand-600 underline"
+                >First Level Review (FLR)</a
+              >
+              — the FLR form comes in the mail with your new assessment notice, or you can request
+              one from OPA.
+            </li>
+            <li>
+              Still disagree after the review? File a formal appeal with the
               <strong>Board of Revision of Taxes (BRT)</strong> — the deadline is the first Monday
               of October each year.
             </li>

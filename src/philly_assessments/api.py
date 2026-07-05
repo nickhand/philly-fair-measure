@@ -27,7 +27,7 @@ from pydantic import BaseModel
 
 from philly_assessments import config
 from philly_assessments.ingest.manifests import read_derived_manifest
-from philly_assessments.vocab import AssessmentFlag
+from philly_assessments.vocab import AssessmentFlag, RunKind
 
 logger = logging.getLogger(__name__)
 
@@ -260,10 +260,14 @@ def _core(s: dict[str, Any]) -> PropertyCore:
 
 
 def _peer_histogram(frame: pl.DataFrame, s: dict[str, Any]) -> list[HistBin]:
-    """Ratio distribution of same-ZIP, similar-value homes (equity peer rule)."""
+    """Ratio distribution of same-ZIP, similar-value homes (equity peer rule).
+    Peers come from the subject's own family — houses vs houses, condos vs
+    condos — so condo-heavy ZIPs don't distort rowhome histograms."""
     zip5, median = s.get("loc_zip5"), _f(s.get("model_median"))
     if not zip5 or not median:
         return []
+    family = s.get("model_family") or "residential"
+    frame = frame.filter(pl.col("model_family") == family)
     peers = frame.filter(
         (pl.col("loc_zip5") == zip5)
         & (pl.col("opa_market_value") > _MIN_VALUE)
@@ -298,16 +302,19 @@ def _drivers(root: Path, parcel_id: str, s: dict[str, Any]) -> Drivers | None:
     )
     from philly_assessments.models.scoring import latest_run_dir
 
-    if s.get("model_family") == "condo":
-        return None  # condo model has no TreeSHAP arm yet
+    # Both families share the explain layer: the condo run persists the same
+    # artifacts (booster, feature lists, categorical mappings) as the baseline.
+    is_condo = s.get("model_family") == "condo"
+    mart = "condo_assessment_features.parquet" if is_condo else "assessment_features.parquet"
+    run_kind: RunKind = "condo" if is_condo else "baseline"
     feat = (
-        pl.scan_parquet(root / "marts" / "assessment_features.parquet")
+        pl.scan_parquet(root / "marts" / mart)
         .filter(pl.col("parcel_id") == parcel_id)
         .collect()
     )
     if not feat.height:
         return None
-    exp = explain(latest_run_dir("baseline", root), feat)[0]
+    exp = explain(latest_run_dir(run_kind, root), feat)[0]
     headline = _f(s.get("model_median"))
     if headline and headline > 0:
         exp = exp.anchored_to(headline)
@@ -343,8 +350,6 @@ def _drivers(root: Path, parcel_id: str, s: dict[str, Any]) -> Drivers | None:
 def _equity(frame: pl.DataFrame, root: Path, s: dict[str, Any]) -> Equity | None:
     from philly_assessments.equity_context import equity_context
 
-    if s.get("model_family") == "condo":
-        return None
     ctx = equity_context(s, root)
     if ctx is None:
         return None
@@ -461,11 +466,12 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                     "flag": r["assessment_flag"],
                     "opa": r["opa_market_value"],
                     "model": r["model_median"],
+                    "family": r["model_family"],
                 },
             }
             for r in sub.select(
                 "parcel_id", "loc_lon", "loc_lat", "assessment_flag",
-                "opa_market_value", "model_median",
+                "opa_market_value", "model_median", "model_family",
             ).to_dicts()
             if r["loc_lon"] is not None
         ]

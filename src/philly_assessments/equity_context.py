@@ -62,8 +62,10 @@ def equity_context(
     root = data_dir if data_dir is not None else config.data_dir()
     parcel_id = screen_row.get("parcel_id")
     zip5 = screen_row.get("loc_zip5")
+    # peers come from the subject's own family: houses vs houses, condos vs condos
+    family = str(screen_row.get("model_family") or "residential")
     res = pl.scan_parquet(root / "marts" / "assessment_screen.parquet").filter(
-        (pl.col("model_family") == "residential")
+        (pl.col("model_family") == family)
         & (pl.col("opa_market_value") > 0)
         & (pl.col("model_median") > 0)
         & (pl.col("opa_vs_model_ratio").is_not_null())
@@ -96,5 +98,6 @@ def equity_context(
     else:
         verdict = "in line"
 
-    where = f"ZIP {zip5}, {scope}" if zip5 is not None else scope
+    kind = "condos in " if family == "condo" else ""
+    where = f"{kind}ZIP {zip5}, {scope}" if zip5 is not None else scope
     return EquityContext(ratio, peer_median, peers.height, percentile, where, verdict)

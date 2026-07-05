@@ -1,8 +1,12 @@
 <script setup lang="ts">
 /** HistorySpark — the city's value over time, with real sales as gold
  * diamonds (gold = a real-world event, per the chart grammar).
- * Handoff template on our real types (YearValue[], SaleRow[]); the parent
- * guards for assessments.length > 1 before rendering. */
+ *
+ * Only arms-length sales are PLOTTED: $1 family transfers and other nominal
+ * deeds would crush the y-scale and mislead (the "Recorded sales" list below
+ * the chart still shows every deed, annotated). Labels are line-aware and
+ * clamped so they never collide with the assessment line, the "today" label,
+ * or the plot edges. */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { scaleLinear } from 'd3-scale'
 import { moneyCompact } from '@/utils/format'
@@ -32,7 +36,7 @@ const BASE = 90
 
 const pricedSales = computed(() =>
   props.sales
-    .filter((s) => s.price != null && s.price > 0)
+    .filter((s) => s.price != null && s.price > 0 && s.validity === 'arms_length')
     .map((s) => ({ ...s, year: Number(s.date.slice(0, 4)) })),
 )
 const years = computed(() => {
@@ -55,19 +59,43 @@ const path = computed(() =>
 )
 const last = computed(() => props.assessments[props.assessments.length - 1])
 
-/** Sale labels: flip the anchor near either edge so text never clips, and
- * drop below the diamond when it would collide with the "today" label. */
+/** Assessment-line height at an arbitrary year (linear interpolation) — used
+ * to keep sale labels off the line. */
+function lineYAt(year: number): number | null {
+  const pts = props.assessments
+  if (!pts.length) return null
+  if (year <= pts[0]!.year) return y.value(pts[0]!.value)
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1]!
+    const b = pts[i]!
+    if (year <= b.year) {
+      const t = (year - a.year) / Math.max(1e-9, b.year - a.year)
+      return y.value(a.value + t * (b.value - a.value))
+    }
+  }
+  return y.value(pts[pts.length - 1]!.value)
+}
+
 function saleAnchor(sx: number): 'start' | 'middle' | 'end' {
   if (sx < PAD + 50) return 'start'
   if (sx > width.value - PAD - 50) return 'end'
   return 'middle'
 }
-function saleLabelY(sx: number, sy: number): number {
-  if (!last.value) return sy - 12
-  const lx = x.value(last.value.year)
-  const ly = y.value(last.value.value)
-  const collides = Math.abs(sx - lx) < 110 && Math.abs(sy - 12 - (ly - 8)) < 16
-  return collides ? sy + 22 : sy - 12
+
+/** Place each sale label above its diamond unless that spot is (a) off the top
+ * of the plot, (b) within a band of the assessment line, or (c) colliding with
+ * the "today" label — then drop it below the diamond. */
+function saleLabelY(sx: number, sy: number, year: number): number {
+  const above = sy - 12
+  let collide = above < 11 // clipped at the top edge
+  const ly = lineYAt(year)
+  if (ly != null && Math.abs(above - ly) < 11) collide = true
+  if (last.value) {
+    const lx = x.value(last.value.year)
+    const ty = y.value(last.value.value) - 8
+    if (Math.abs(sx - lx) < 110 && Math.abs(above - ty) < 14) collide = true
+  }
+  return collide ? Math.min(BASE - 2, sy + 22) : above
 }
 
 const ariaLabel = computed(() => {
@@ -87,7 +115,7 @@ const ariaLabel = computed(() => {
       <path :d="path" fill="none" stroke="#0f4d90" stroke-width="2.5" stroke-linecap="round" />
       <template v-if="last">
         <circle :cx="x(last.year)" :cy="y(last.value)" r="4" fill="#0f4d90" />
-        <text :x="x(last.year)" :y="y(last.value) - 8" text-anchor="end" font-size="12.5" font-weight="700" fill="#0f4d90" style="font-variant-numeric: tabular-nums">
+        <text :x="x(last.year)" :y="Math.max(11, y(last.value) - 8)" text-anchor="end" font-size="12.5" font-weight="700" fill="#0f4d90" style="font-variant-numeric: tabular-nums">
           {{ moneyCompact(last.value) }} today
         </text>
       </template>
@@ -99,7 +127,7 @@ const ariaLabel = computed(() => {
         />
         <text
           :x="x(s.year)"
-          :y="saleLabelY(x(s.year), y(s.price as number))"
+          :y="saleLabelY(x(s.year), y(s.price as number), s.year)"
           :text-anchor="saleAnchor(x(s.year))"
           font-size="12"
           font-weight="600"

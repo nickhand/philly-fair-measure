@@ -123,6 +123,14 @@ FEATURE_LABELS: dict[str, tuple[str, str]] = {
     "evt_n_vacant_complaints_5y_before": ("vacancy complaints", _DISTRESS),
     "ten_rental_license_at_sale": ("rental license", _HOME),
     "ten_rental_units": ("rental units", _HOME),
+    # condo-model features (the condo run shares this explain layer)
+    "char_unit_area": ("unit size", _HOME),
+    "char_floor": ("floor", _HOME),
+    "unit_area_share": ("share of the building", _HOME),
+    "bldg_n_units": ("units in the building", _LOCATION),
+    "mkt_bldg_roll_mean_price": ("recent sale prices in your building", _SALES),
+    "mkt_bldg_roll_ppsf": ("recent price per sq ft in your building", _SALES),
+    "mkt_bldg_roll_n": ("number of recent sales in your building", _SALES),
     # fin_ (mortgage-history) features are intentionally not surfaced — see
     # _SUPPRESSED_PREFIXES.
 }
@@ -150,6 +158,8 @@ _VALUE_UNITS: dict[str, str] = {
     "char_year_built": "",
     "char_garage_spaces": "garage spaces",
     "char_fireplaces": "fireplaces",
+    "char_unit_area": "sq ft",
+    "char_floor": "",
 }
 
 
@@ -283,6 +293,7 @@ CORRECTABLE = frozenset({
     "char_stories", "char_year_built", "char_garage_spaces", "char_fireplaces",
     "char_exterior_condition", "char_interior_condition", "char_basement",
     "char_central_air", "char_construction", "char_quality_grade_raw",
+    "char_unit_area", "char_floor",
 })
 
 # "Looks unusual, verify first" bounds for numeric characteristics — deliberately

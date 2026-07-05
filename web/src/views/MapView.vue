@@ -26,25 +26,30 @@ const router = useRouter()
 const container = ref<HTMLDivElement | null>(null)
 /** Which legend groups are visible; chips toggle these on/off. */
 const enabledLabels = ref<Set<string>>(new Set(legend.map((l) => l.label)))
-/** Citywide layer: condo flags come from a different (conformal-only) engine
- * and cluster in Center City towers — a separate toggle keeps them from being
- * read as the rowhome pattern. */
+/** Condo flags come from a different (conformal-only) engine and cluster in
+ * Center City towers — a separate toggle (applied at every zoom) keeps them
+ * from being read as the rowhome pattern. */
 const showCondos = ref(true)
+
+const FLAGGED = ['over_assessed_candidate', 'under_assessed_candidate']
 
 function applyDotFilter() {
   const m = map.value
   if (!m) return
-  const flags = legend
+  const enabled = legend
     .filter((l) => enabledLabels.value.has(l.label))
     .flatMap((l) => [...l.flags])
-  const flagExpr = ['in', ['get', 'flag'], ['literal', flags]]
-  if (m.getLayer('fm-dots')) m.setFilter('fm-dots', flagExpr as maplibregl.FilterSpecification)
-  if (m.getLayer('fm-dots-far')) {
-    const farExpr = showCondos.value
-      ? flagExpr
-      : ['all', flagExpr, ['!=', ['get', 'family'], 'condo']]
-    m.setFilter('fm-dots-far', farExpr as maplibregl.FilterSpecification)
+  const withCondoRule = (flags: string[]) => {
+    const expr = ['in', ['get', 'flag'], ['literal', flags]]
+    return (
+      showCondos.value ? expr : ['all', expr, ['!=', ['get', 'family'], 'condo']]
+    ) as maplibregl.FilterSpecification
   }
+  const flaggedEnabled = enabled.filter((f) => FLAGGED.includes(f))
+  const baseEnabled = enabled.filter((f) => !FLAGGED.includes(f))
+  if (m.getLayer('fm-dots-base')) m.setFilter('fm-dots-base', withCondoRule(baseEnabled))
+  if (m.getLayer('fm-dots-flagged')) m.setFilter('fm-dots-flagged', withCondoRule(flaggedEnabled))
+  if (m.getLayer('fm-dots-far')) m.setFilter('fm-dots-far', withCondoRule(flaggedEnabled))
 }
 
 function toggleCondos() {
@@ -129,7 +134,12 @@ function ensureParcelLayer(m: maplibregl.Map) {
       type: 'geojson',
       data: { type: 'FeatureCollection', features: [] },
     })
-    for (const layer of dotLayers('parcels')) m.addLayer({ ...layer, minzoom: MIN_PARCEL_ZOOM })
+    // Near layers: within-range dots first, flagged dots after (flagged homes
+    // always paint ON TOP of the gray majority), then the selected ring.
+    const [dotsSpec, selectedSpec] = dotLayers('parcels')
+    m.addLayer({ ...dotsSpec!, id: 'fm-dots-base', minzoom: MIN_PARCEL_ZOOM })
+    m.addLayer({ ...dotsSpec!, id: 'fm-dots-flagged', minzoom: MIN_PARCEL_ZOOM })
+    m.addLayer({ ...selectedSpec!, minzoom: MIN_PARCEL_ZOOM })
     // Citywide pattern layer: every flagged home (~9k points, one cached
     // payload) drawn below street zoom so over/under clustering reads at a
     // glance; the viewport layer takes over past MIN_PARCEL_ZOOM.
@@ -152,12 +162,14 @@ function ensureParcelLayer(m: maplibregl.Map) {
     m.on('mouseenter', 'fm-dots-far', () => (m.getCanvas().style.cursor = 'pointer'))
     m.on('mouseleave', 'fm-dots-far', () => (m.getCanvas().style.cursor = ''))
     applyDotFilter()
-    m.on('click', 'fm-dots', (e) => {
-      const id = e.features?.[0]?.properties?.id as string | undefined
-      if (id) openParcel(id)
-    })
-    m.on('mouseenter', 'fm-dots', () => (m.getCanvas().style.cursor = 'pointer'))
-    m.on('mouseleave', 'fm-dots', () => (m.getCanvas().style.cursor = ''))
+    for (const layerId of ['fm-dots-base', 'fm-dots-flagged']) {
+      m.on('click', layerId, (e) => {
+        const id = e.features?.[0]?.properties?.id as string | undefined
+        if (id) openParcel(id)
+      })
+      m.on('mouseenter', layerId, () => (m.getCanvas().style.cursor = 'pointer'))
+      m.on('mouseleave', layerId, () => (m.getCanvas().style.cursor = ''))
+    }
     refreshParcels()
   } catch {
     // style not ready for layers yet — the next styledata event retries
@@ -239,7 +251,6 @@ onBeforeUnmount(() => {
         {{ l.label }}
       </button>
       <button
-        v-if="zoomedOut"
         type="button"
         :aria-pressed="showCondos"
         class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-caption font-semibold shadow-float transition-colors duration-[var(--duration-fast)]"
