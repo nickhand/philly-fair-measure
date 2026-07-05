@@ -1,6 +1,8 @@
 <script setup lang="ts">
-/** Staff worklists (leaderboards). Deliberately unlinked from public nav and
- * deliberately utilitarian — no verdict theatrics here.
+/** Leaderboards — the review/appeal worklists. Deliberately unlinked from
+ * public nav and deliberately utilitarian — no verdict theatrics here.
+ * Product plan: this page moves behind a real paywall/admin login before any
+ * public deploy (the passphrase below is a placeholder, not auth).
  *
  * SECURITY NOTE: the passphrase gate below is a placeholder so casual visitors
  * don't wander in — it is NOT authentication. The /api/admin endpoints must be
@@ -58,7 +60,7 @@ onMounted(() => {
 
 <template>
   <div class="mx-auto max-w-5xl px-4 py-8">
-    <h1 class="text-2xl font-extrabold text-ink">Staff worklists</h1>
+    <h1 class="text-2xl font-extrabold text-ink">Leaderboards</h1>
 
     <div v-if="!unlocked" class="mt-6 max-w-md rounded-lg border border-line-soft bg-white p-6">
       <p class="text-body">This area is for project staff.</p>

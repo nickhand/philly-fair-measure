@@ -11,6 +11,7 @@
  * Regenerate when the model retrains. */
 import { Check, Scale, X } from 'lucide-vue-next'
 import SectionCard from '@/components/ui/SectionCard.vue'
+import { SITE } from '@/config/site'
 import InfoTip from '@/components/ui/InfoTip.vue'
 
 /** IAAO-standard basis (time-adjusted, 3×IQR-trimmed) — the official convention. */
@@ -67,9 +68,9 @@ const fullCard = [
 <template>
   <div class="mx-auto max-w-3xl space-y-6 px-4 py-8">
     <div>
-      <p class="text-[11px] font-bold tracking-[0.18em] text-brand-600">THE PROOF</p>
-      <h1 class="font-display mt-1 text-3xl font-bold text-ink">Why trust these numbers?</h1>
-      <p class="mt-3 text-lg text-body">
+      <p class="text-caption font-bold uppercase tracking-[0.1em] text-brand-600">The proof</p>
+      <h1 class="mt-2 font-display text-[28px] font-bold leading-tight text-ink sm:text-[34px]">Why trust these numbers?</h1>
+      <p class="mt-2.5 text-base leading-relaxed text-body">
         You shouldn’t trust us because we say so. This page shows the test we’re graded on, how we
         made sure the test was fair, and where our model still falls short.
       </p>
@@ -82,7 +83,7 @@ const fullCard = [
           class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-50"
           aria-hidden="true"
         >
-          <Scale :size="18" class="text-brand-600" />
+          <Scale :size="20" class="text-brand-600" />
         </span>
         <p class="mt-2 text-body-sm text-body">
           <strong class="text-ink">We use the official test.</strong> Assessors nationwide are
@@ -94,7 +95,7 @@ const fullCard = [
           class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-50"
           aria-hidden="true"
         >
-          <Check :size="18" class="text-brand-600" />
+          <Check :size="20" class="text-brand-600" />
         </span>
         <p class="mt-2 text-body-sm text-body">
           <strong class="text-ink">We test the hard way.</strong> Our model is graded only on sales
@@ -106,7 +107,7 @@ const fullCard = [
           class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-50"
           aria-hidden="true"
         >
-          <X :size="18" class="text-brand-600" />
+          <X :size="20" class="text-brand-600" />
         </span>
         <p class="mt-2 text-body-sm text-body">
           <strong class="text-ink">We publish our misses.</strong> Where the model falls short, this
@@ -331,9 +332,15 @@ const fullCard = [
       <p class="mt-4 text-caption text-faint">
         Source: out-of-time test slice of model run 20260705T015912Z, n ≈ 19,500 arms-length
         Philadelphia sales; the sale-chasing check uses the assesspy implementation across
-        TY2025–2026. Every figure is reproducible from the open-source pipeline
-        (<code>philly train-baseline</code>, <code>philly ratio-study</code>) and documented, with
-        the measurements that did NOT work, in the project repository.
+        TY2025–2026. Every figure is reproducible from the
+        <a :href="SITE.githubUrl" rel="noopener" class="font-semibold text-brand-600 underline"
+          >open-source pipeline</a
+        >
+        (<code>philly train-baseline</code>, <code>philly ratio-study</code>) and documented — with
+        the measurements that did NOT work — in the
+        <a :href="SITE.modelDocsUrl" rel="noopener" class="font-semibold text-brand-600 underline"
+          >technical model documentation</a
+        >.
       </p>
     </SectionCard>
 

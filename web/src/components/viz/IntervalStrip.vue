@@ -53,6 +53,25 @@ const opaLabelAnchor = computed(() => {
   return frac < 0.18 ? 'start' : frac > 0.82 ? 'end' : 'middle'
 })
 
+/** Estimate label: flip anchor near the chart edges (no cut-off text), and
+ * when the city marker is close, slide to the far side of its drop line so
+ * the dashed line never strikes through the label. */
+const medX = computed(() => x.value(props.median))
+const estAnchor = computed<'start' | 'middle' | 'end'>(() => {
+  const frac = (medX.value - PAD) / Math.max(1, width.value - 2 * PAD)
+  if (frac < 0.15) return 'start'
+  if (frac > 0.85) return 'end'
+  if (Math.abs(medX.value - opaX.value) < 95) {
+    return medX.value <= opaX.value ? 'end' : 'start'
+  }
+  return 'middle'
+})
+const estLabelX = computed(() => {
+  if (estAnchor.value === 'start') return medX.value + 8
+  if (estAnchor.value === 'end') return medX.value - 8
+  return medX.value
+})
+
 const ariaLabel = computed(
   () =>
     `Our model estimates this home is worth between ${money(props.low)} and ${money(props.high)}, ` +
@@ -77,7 +96,7 @@ const ariaLabel = computed(
           :text-anchor="opaLabelAnchor"
           :x="opaLabelAnchor === 'end' ? 10 : opaLabelAnchor === 'start' ? -10 : 0"
           y="14"
-          font-size="13"
+          font-size="14"
           font-weight="700"
           :fill="verdict.hex"
           style="font-variant-numeric: tabular-nums"
@@ -110,10 +129,10 @@ const ariaLabel = computed(
         stroke-width="3"
       />
       <text
-        :x="x(props.median)"
+        :x="estLabelX"
         :y="inside ? BAND_Y + BAND_H + 27 : BAND_Y - 16"
-        text-anchor="middle"
-        font-size="13"
+        :text-anchor="estAnchor"
+        font-size="14"
         font-weight="700"
         fill="#0f4d90"
         style="font-variant-numeric: tabular-nums"
@@ -122,22 +141,22 @@ const ariaLabel = computed(
       </text>
 
       <!-- range end labels + caption -->
-      <text :x="x(props.low)" :y="BAND_Y + BAND_H + 22" text-anchor="middle" font-size="12" fill="#5d6b7c" style="font-variant-numeric: tabular-nums">
+      <text :x="x(props.low)" :y="BAND_Y + BAND_H + 22" text-anchor="middle" font-size="13" fill="#5d6b7c" style="font-variant-numeric: tabular-nums">
         {{ moneyCompact(props.low) }}
       </text>
-      <text :x="x(props.high)" :y="BAND_Y + BAND_H + 22" text-anchor="middle" font-size="12" fill="#5d6b7c" style="font-variant-numeric: tabular-nums">
+      <text :x="x(props.high)" :y="BAND_Y + BAND_H + 22" text-anchor="middle" font-size="13" fill="#5d6b7c" style="font-variant-numeric: tabular-nums">
         {{ moneyCompact(props.high) }}
       </text>
-      <text :x="width / 2" :y="HEIGHT - 4" text-anchor="middle" font-size="10.5" fill="#8593a4">
+      <text :x="width / 2" :y="HEIGHT - 4" text-anchor="middle" font-size="11.5" fill="#8593a4">
         range we're 90% sure about
       </text>
     </svg>
 
     <details class="mt-1">
-      <summary class="cursor-pointer text-sm font-medium text-brand-600">
+      <summary class="cursor-pointer text-body-sm font-medium text-brand-600">
         See these numbers as a table
       </summary>
-      <table class="mt-2 w-full max-w-md text-left text-sm">
+      <table class="mt-2 w-full max-w-md text-left text-body-sm">
         <caption class="sr-only">Assessment versus model estimate</caption>
         <tbody>
           <tr class="border-b border-line-faint">

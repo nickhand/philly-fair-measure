@@ -24,6 +24,25 @@ const PHILLY_CENTER: [number, number] = [-75.16, 39.985]
 
 const router = useRouter()
 const container = ref<HTMLDivElement | null>(null)
+/** Which legend groups are visible; chips toggle these on/off. */
+const enabledLabels = ref<Set<string>>(new Set(legend.map((l) => l.label)))
+
+function applyDotFilter() {
+  const m = map.value
+  if (!m?.getLayer('fm-dots')) return
+  const flags = legend
+    .filter((l) => enabledLabels.value.has(l.label))
+    .flatMap((l) => [...l.flags])
+  m.setFilter('fm-dots', ['in', ['get', 'flag'], ['literal', flags]])
+}
+
+function toggleLegend(label: string) {
+  const next = new Set(enabledLabels.value)
+  if (next.has(label)) next.delete(label)
+  else next.add(label)
+  enabledLabels.value = next
+  applyDotFilter()
+}
 const map = shallowRef<maplibregl.Map | null>(null)
 const selected = ref<PropertyCore | null>(null)
 const zoomedOut = ref(true)
@@ -95,6 +114,7 @@ function ensureParcelLayer(m: maplibregl.Map) {
       data: { type: 'FeatureCollection', features: [] },
     })
     for (const layer of dotLayers('parcels')) m.addLayer({ ...layer, minzoom: MIN_PARCEL_ZOOM })
+    applyDotFilter()
     m.on('click', 'fm-dots', (e) => {
       const id = e.features?.[0]?.properties?.id as string | undefined
       if (id) openParcel(id)
@@ -155,34 +175,45 @@ onBeforeUnmount(() => {
       <AddressSearch compact @select="onSearchSelect" />
     </div>
 
-    <!-- legend: part of the map furniture, not a boxed panel -->
+    <!-- legend chips double as show/hide toggles for each dot type -->
     <div
-      class="absolute left-3 top-[66px] z-10 flex max-w-[300px] flex-wrap gap-1.5"
-      role="list"
-      aria-label="Map legend"
+      class="absolute left-3 top-[66px] z-10 flex max-w-[320px] flex-wrap gap-1.5"
+      role="group"
+      aria-label="Show or hide homes by result"
     >
-      <span
+      <button
         v-for="l in legend"
         :key="l.label"
-        role="listitem"
-        class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 text-[11.5px] font-semibold text-body shadow-float"
+        type="button"
+        :aria-pressed="enabledLabels.has(l.label)"
+        class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-caption font-semibold shadow-float transition-colors duration-[var(--duration-fast)]"
+        :class="
+          enabledLabels.has(l.label)
+            ? 'border-line-soft bg-white text-body'
+            : 'border-line bg-paper text-faint line-through'
+        "
+        @click="toggleLegend(l.label)"
       >
-        <span class="h-2 w-2 rounded-full" :style="{ background: l.hex }" aria-hidden="true"></span>
+        <span
+          class="h-2.5 w-2.5 rounded-full"
+          :style="{ background: enabledLabels.has(l.label) ? l.hex : '#c3ccd6' }"
+          aria-hidden="true"
+        ></span>
         {{ l.label }}
-      </span>
+      </button>
     </div>
 
     <!-- zoom hint -->
     <div
       v-if="zoomedOut"
-      class="pointer-events-none absolute left-1/2 top-[118px] z-10 -translate-x-1/2 rounded-full bg-[rgba(22,36,58,0.85)] px-3.5 py-1.5 text-[11.5px] font-semibold text-white"
+      class="pointer-events-none absolute left-1/2 top-[118px] z-10 -translate-x-1/2 rounded-full bg-[rgba(22,36,58,0.85)] px-3.5 py-1.5 text-caption font-semibold text-white"
       role="status"
     >
       Zoom in to see individual homes
     </div>
     <div
       v-if="loadError"
-      class="absolute inset-x-0 bottom-24 z-10 mx-auto w-fit rounded-full bg-over px-4 py-2 text-sm font-semibold text-white"
+      class="absolute inset-x-0 bottom-24 z-10 mx-auto w-fit rounded-full bg-over px-4 py-2 text-body-sm font-semibold text-white"
       role="alert"
     >
       Could not load homes for this area. Pan or zoom to retry.

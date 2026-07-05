@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
+import { SITE } from '@/config/site'
 </script>
 
 <template>
@@ -24,7 +25,7 @@ import { RouterLink, RouterView } from 'vue-router'
           <span class="mt-0.5 text-[9.5px] font-semibold uppercase tracking-[0.09em] text-muted">Philadelphia</span>
         </span>
       </RouterLink>
-      <div class="flex items-center gap-1 text-sm font-semibold sm:gap-2">
+      <div class="flex items-center gap-1 text-body-sm font-semibold sm:gap-2">
         <RouterLink
           to="/map"
           class="rounded-sm px-3 py-2 text-[#334155] hover:bg-brand-50"
@@ -46,14 +47,14 @@ import { RouterLink, RouterView } from 'vue-router'
   </main>
 
   <footer class="mt-12 border-t border-line bg-white">
-    <div class="mx-auto max-w-5xl space-y-3 px-4 py-8 text-sm text-muted">
+    <div class="mx-auto max-w-5xl space-y-3 px-4 py-8 text-body-sm text-muted">
       <div class="flex items-center gap-2">
         <svg width="22" height="14" viewBox="0 0 26 17" aria-hidden="true">
           <rect x="1" y="6" width="24" height="7" rx="3.5" fill="#b9d2ee" />
           <rect x="11" y="2" width="3.5" height="15" rx="1.2" fill="#0f4d90" />
           <circle cx="21" cy="3" r="2.6" fill="#f3c613" />
         </svg>
-        <span class="text-sm font-extrabold text-ink">Fair Measure</span>
+        <span class="text-body-sm font-extrabold text-ink">Fair Measure</span>
       </div>
       <p>
         <strong class="text-body">Fair Measure</strong> is a free, independent tool. It is not run by the
@@ -78,6 +79,24 @@ import { RouterLink, RouterView } from 'vue-router'
         <RouterLink to="/trust" class="font-semibold text-brand-600 underline"
           >why you can trust these numbers</RouterLink
         >.
+      </p>
+      <p>
+        Prefer the source? The
+        <a :href="SITE.githubUrl" rel="noopener" class="font-semibold text-brand-600 underline"
+          >code and data pipeline</a
+        >
+        and the
+        <a :href="SITE.modelDocsUrl" rel="noopener" class="font-semibold text-brand-600 underline"
+          >technical model documentation</a
+        >
+        are public.
+      </p>
+      <p class="border-t border-line-faint pt-3 text-caption text-faint">
+        Designed and built by
+        <a :href="SITE.creatorUrl" rel="noopener" class="font-semibold text-brand-600 underline"
+          >{{ SITE.creatorName }}</a
+        >
+        · Independent — not a City of Philadelphia product
       </p>
     </div>
   </footer>

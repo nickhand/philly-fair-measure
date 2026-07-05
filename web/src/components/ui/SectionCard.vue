@@ -7,8 +7,8 @@ defineProps<{ title: string; subtitle?: string }>()
 
 <template>
   <section class="rounded-lg border border-line-soft bg-white p-4 sm:p-5">
-    <h2 class="text-[15px] font-bold text-ink sm:text-[15.5px]">{{ title }}</h2>
-    <p v-if="subtitle" class="mt-0.5 text-[12.5px] leading-snug text-muted">{{ subtitle }}</p>
+    <h2 class="text-base font-bold text-ink sm:text-title">{{ title }}</h2>
+    <p v-if="subtitle" class="mt-0.5 text-caption leading-snug text-muted">{{ subtitle }}</p>
     <div class="mt-3">
       <slot />
     </div>

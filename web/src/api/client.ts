@@ -3,6 +3,7 @@
  * requests (the address search does this on every keystroke). */
 
 import type {
+  CompRow,
   LeaderRow,
   ParcelCollection,
   PropertyCore,
@@ -38,6 +39,10 @@ export const api = {
 
   report: (parcelId: string, signal?: AbortSignal) =>
     get<Report>(`/api/property/${encodeURIComponent(parcelId)}/report`, signal),
+
+  /** Slow (~seconds — the model recomputes leaf-node comps); load on demand. */
+  comps: (parcelId: string, signal?: AbortSignal) =>
+    get<CompRow[]>(`/api/property/${encodeURIComponent(parcelId)}/comps`, signal),
 
   parcels: (bbox: [number, number, number, number], signal?: AbortSignal) =>
     get<ParcelCollection>(

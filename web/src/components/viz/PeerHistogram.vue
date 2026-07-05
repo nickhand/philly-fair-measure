@@ -74,26 +74,33 @@ const ariaLabel = computed(
         :fill="i === youBin ? '#ffd9bd' : '#c9d9ec'"
       />
       <line :x1="x(peerMedian)" y1="24" :x2="x(peerMedian)" :y2="BASE" stroke="#0f4d90" stroke-width="2" />
-      <text :x="Math.min(x(peerMedian) - 5, width - 150)" y="14" text-anchor="start" font-size="11.5" font-weight="700" fill="#0f4d90">
+      <text
+        :x="Math.max(PAD - 14, Math.min(x(peerMedian) - 5, width - 175))"
+        y="14"
+        text-anchor="start"
+        font-size="12.5"
+        font-weight="700"
+        fill="#0f4d90"
+      >
         Similar homes' middle {{ pct(peerMedian) }}
       </text>
       <line :x1="x(you)" y1="34" :x2="x(you)" :y2="BASE" :stroke="youHex" stroke-width="2" stroke-dasharray="3 4" />
       <circle :cx="x(you)" cy="34" r="3.5" :fill="youHex" />
-      <text :x="x(you) + 9 > width - 70 ? x(you) - 9 : x(you) + 9" y="30" :text-anchor="x(you) + 9 > width - 70 ? 'end' : 'start'" font-size="11.5" font-weight="700" :fill="youHex">
+      <text :x="x(you) + 9 > width - 70 ? x(you) - 9 : x(you) + 9" y="30" :text-anchor="x(you) + 9 > width - 70 ? 'end' : 'start'" font-size="12.5" font-weight="700" :fill="youHex">
         You {{ pct(you) }}
       </text>
       <line :x1="PAD" :y1="BASE" :x2="width - PAD" :y2="BASE" stroke="#dfe5ec" stroke-width="1" />
-      <text v-for="t in ticks" :key="t" :x="x(t)" :y="BASE + 15" text-anchor="middle" font-size="10.5" fill="#8593a4" style="font-variant-numeric: tabular-nums">
+      <text v-for="t in ticks" :key="t" :x="x(t)" :y="BASE + 15" text-anchor="middle" font-size="11.5" fill="#8593a4" style="font-variant-numeric: tabular-nums">
         {{ Math.round(t * 100) }}%
       </text>
-      <text :x="width / 2" :y="HEIGHT - 4" text-anchor="middle" font-size="10.5" fill="#8593a4">
+      <text :x="width / 2" :y="HEIGHT - 4" text-anchor="middle" font-size="11.5" fill="#8593a4">
         assessment as % of our estimate
       </text>
     </svg>
 
     <details class="mt-1">
-      <summary class="cursor-pointer text-sm font-medium text-brand-600">See these numbers as a table</summary>
-      <table class="mt-2 w-full max-w-md text-left text-sm">
+      <summary class="cursor-pointer text-body-sm font-medium text-brand-600">See these numbers as a table</summary>
+      <table class="mt-2 w-full max-w-md text-left text-body-sm">
         <caption class="sr-only">Assessment ratio compared with similar homes</caption>
         <tbody>
           <tr class="border-b border-line-faint">

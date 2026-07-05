@@ -37,8 +37,9 @@ const ariaLabel = computed(() => {
         aria-hidden="true"
         class="grid grid-cols-[104px_1fr_52px] items-center gap-2 sm:grid-cols-[128px_1fr_52px] sm:gap-2.5"
       >
-        <span class="text-xs leading-tight text-body">{{ d.label }}</span>
-        <div class="relative h-2.5 rounded-[5px] bg-[#eef1f5]">
+        <span class="text-caption leading-tight text-body">{{ d.label }}</span>
+        <!-- track background removed (non-data ink); the hairline is the zero axis -->
+        <div class="relative h-2.5">
           <div class="absolute left-1/2 -top-[3px] -bottom-[3px] w-px bg-[#c6d0dc]"></div>
           <div
             v-if="d.dollars >= 0"
@@ -52,7 +53,7 @@ const ariaLabel = computed(() => {
           ></div>
         </div>
         <span
-          class="text-right text-xs font-bold tabular-nums"
+          class="text-right text-caption font-bold tabular-nums"
           :class="d.dollars >= 0 ? 'text-ink' : 'text-muted'"
         >
           {{ d.dollars >= 0 ? '+' : '−' }}{{ moneyCompact(Math.abs(d.dollars)) }}
@@ -61,8 +62,8 @@ const ariaLabel = computed(() => {
     </div>
 
     <details class="mt-2">
-      <summary class="cursor-pointer text-sm font-medium text-brand-600">See these numbers as a table</summary>
-      <table class="mt-2 w-full max-w-md text-left text-sm">
+      <summary class="cursor-pointer text-body-sm font-medium text-brand-600">See these numbers as a table</summary>
+      <table class="mt-2 w-full max-w-md text-left text-body-sm">
         <caption class="sr-only">Largest adjustments to the estimate</caption>
         <tbody>
           <tr v-for="d in sorted" :key="d.label" class="border-b border-line-faint">

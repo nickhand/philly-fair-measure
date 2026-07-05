@@ -106,6 +106,15 @@ export interface Report {
   screen_built: string | null
 }
 
+export interface CompRow {
+  address: string
+  sale_date: string
+  sale_price: number | null
+  price_adj_today: number | null
+  livable_area: number | null
+  distance_m: number | null
+}
+
 export interface Stats {
   properties: number
   within: number

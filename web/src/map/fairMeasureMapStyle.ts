@@ -82,9 +82,23 @@ export function dotLayers(sourceId: string, sourceLayer?: string): LayerSpecific
   ] as LayerSpecification[]
 }
 
-/** Legend entries — short semantic labels (headlines are too long for chips). */
+/** Legend entries — short semantic labels (headlines are too long for chips).
+ * `flags` lists the feature-flag values each chip controls, so the legend can
+ * double as a set of show/hide toggles. */
 export const legend = [
-  { hex: VERDICTS.over_assessed_candidate.hex, label: 'Above our range' },
-  { hex: VERDICTS.within_range.hex, label: 'Inside' },
-  { hex: VERDICTS.under_assessed_candidate.hex, label: 'Below' },
-]
+  {
+    hex: VERDICTS.over_assessed_candidate.hex,
+    label: 'Above our range',
+    flags: ['over_assessed_candidate'],
+  },
+  {
+    hex: VERDICTS.within_range.hex,
+    label: 'Inside',
+    flags: ['within_range', 'no_assessment'],
+  },
+  {
+    hex: VERDICTS.under_assessed_candidate.hex,
+    label: 'Below',
+    flags: ['under_assessed_candidate'],
+  },
+] as const

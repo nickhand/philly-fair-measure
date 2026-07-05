@@ -18,8 +18,10 @@ export function useSearch() {
     clearTimeout(timer)
     controller?.abort()
     error.value = null
+    // Stale results are cleared IMMEDIATELY (not after the debounce) so a fast
+    // typer hitting Enter can never select a match from the previous query.
+    hits.value = []
     if (q.trim().length < MIN_CHARS) {
-      hits.value = []
       loading.value = false
       return
     }

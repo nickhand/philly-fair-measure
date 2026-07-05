@@ -79,6 +79,37 @@ Python side `uv run pytest tests/test_api.py`.
 - **Basemap**: OpenFreeMap Positron (no key, ODbL attribution shown). For a
   production SLA, self-host the style or pin a paid tile provider.
 
+## Tufte pass (2026-07-05)
+
+A review of every page against Tufte's principles; what changed and what was
+deliberately kept:
+
+- **Show the data.** The verdict card now states the two headline figures as
+  text (City's value / Our estimate) above the IntervalStrip — the numbers
+  survive printing, screen readers, and screenshots without the chart.
+- **Maximize data-ink.** DriverBars' gray track backgrounds removed (the
+  center hairline is the zero axis; bars carry all information). Charts keep
+  no gridlines, no borders, ≤3 axis ticks, direct labels instead of legends
+  (HistorySpark labels each sale on the mark; PeerHistogram labels "You" and
+  the peer median in place).
+- **Label integrity.** All chart annotations clamp or flip at the plot edges
+  (no cut-off text) and resolve collisions when the city value and the
+  estimate sit close (IntervalStrip slides the estimate label off the city
+  drop-line; the map sheet staggers "City" onto a second row).
+- **Tabular numerals everywhere** money or ratios align vertically.
+- **Kept, with reasons:** the interval band's soft fill (it *is* data — the
+  90% range); the peer histogram's your-bin highlight (comparison is the
+  point); the gold sale diamonds (chart grammar: gold = a real-world event).
+
+## Product notes
+
+- `/admin` ("Leaderboards") is the review-worklist page — planned to move
+  behind a real paywall/admin login when the product tier ships; the current
+  passphrase is a placeholder only.
+- Site-wide links (creator credit → nickhand.dev, GitHub repo, technical model
+  docs) live in `web/src/config/site.ts`; the GitHub URLs are placeholders
+  until the repository is published.
+
 ## Security — MUST fix before public deploy
 
 - `/api/admin/*` endpoints are **unauthenticated**, and the `/admin` view's

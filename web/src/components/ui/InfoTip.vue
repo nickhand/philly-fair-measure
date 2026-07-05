@@ -14,7 +14,7 @@ withDefaults(defineProps<{ label?: string; variant?: 'azure' | 'gold' }>(), {
     :class="variant === 'gold' ? 'border-gold-border bg-gold-soft' : 'border-[#d8e4f2] bg-[#eef4fb]'"
   >
     <svg
-      width="15" height="15" viewBox="0 0 24 24" fill="none"
+      width="18" height="18" viewBox="0 0 24 24" fill="none"
       :stroke="variant === 'gold' ? '#8a6100' : '#0f4d90'"
       stroke-width="2" stroke-linecap="round" aria-hidden="true"
       class="mt-0.5 shrink-0"
@@ -23,7 +23,7 @@ withDefaults(defineProps<{ label?: string; variant?: 'azure' | 'gold' }>(), {
       <line x1="12" y1="11" x2="12" y2="16.5" />
       <circle cx="12" cy="7.5" r="0.6" :fill="variant === 'gold' ? '#8a6100' : '#0f4d90'" />
     </svg>
-    <div class="text-[12.5px] leading-relaxed text-body">
+    <div class="text-caption leading-relaxed text-body">
       <p v-if="label" class="font-bold" :class="variant === 'gold' ? 'text-gold-700' : 'text-brand-600'">
         {{ label }}
       </p>

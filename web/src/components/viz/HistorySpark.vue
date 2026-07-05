@@ -55,6 +55,21 @@ const path = computed(() =>
 )
 const last = computed(() => props.assessments[props.assessments.length - 1])
 
+/** Sale labels: flip the anchor near either edge so text never clips, and
+ * drop below the diamond when it would collide with the "today" label. */
+function saleAnchor(sx: number): 'start' | 'middle' | 'end' {
+  if (sx < PAD + 50) return 'start'
+  if (sx > width.value - PAD - 50) return 'end'
+  return 'middle'
+}
+function saleLabelY(sx: number, sy: number): number {
+  if (!last.value) return sy - 12
+  const lx = x.value(last.value.year)
+  const ly = y.value(last.value.value)
+  const collides = Math.abs(sx - lx) < 110 && Math.abs(sy - 12 - (ly - 8)) < 16
+  return collides ? sy + 22 : sy - 12
+}
+
 const ariaLabel = computed(() => {
   const first = props.assessments[0]
   if (!first || !last.value) return 'No assessment history available.'
@@ -72,7 +87,7 @@ const ariaLabel = computed(() => {
       <path :d="path" fill="none" stroke="#0f4d90" stroke-width="2.5" stroke-linecap="round" />
       <template v-if="last">
         <circle :cx="x(last.year)" :cy="y(last.value)" r="4" fill="#0f4d90" />
-        <text :x="x(last.year)" :y="y(last.value) - 8" text-anchor="end" font-size="11.5" font-weight="700" fill="#0f4d90" style="font-variant-numeric: tabular-nums">
+        <text :x="x(last.year)" :y="y(last.value) - 8" text-anchor="end" font-size="12.5" font-weight="700" fill="#0f4d90" style="font-variant-numeric: tabular-nums">
           {{ moneyCompact(last.value) }} today
         </text>
       </template>
@@ -82,12 +97,20 @@ const ariaLabel = computed(() => {
           fill="#ffffff" stroke="#8a6100" stroke-width="2"
           :transform="`rotate(45 ${x(s.year)} ${y(s.price as number)})`"
         />
-        <text :x="x(s.year)" :y="y(s.price as number) - 12" text-anchor="middle" font-size="11" font-weight="600" fill="#8a6100" style="font-variant-numeric: tabular-nums">
+        <text
+          :x="x(s.year)"
+          :y="saleLabelY(x(s.year), y(s.price as number))"
+          :text-anchor="saleAnchor(x(s.year))"
+          font-size="12"
+          font-weight="600"
+          fill="#8a6100"
+          style="font-variant-numeric: tabular-nums"
+        >
           Sold {{ moneyCompact(s.price as number) }}
         </text>
       </g>
-      <text :x="PAD" :y="BASE + 15" text-anchor="start" font-size="10.5" fill="#8593a4">{{ years[0] }}</text>
-      <text :x="width - PAD" :y="BASE + 15" text-anchor="end" font-size="10.5" fill="#8593a4">{{ years[1] }}</text>
+      <text :x="PAD" :y="BASE + 15" text-anchor="start" font-size="11.5" fill="#8593a4">{{ years[0] }}</text>
+      <text :x="width - PAD" :y="BASE + 15" text-anchor="end" font-size="11.5" fill="#8593a4">{{ years[1] }}</text>
     </svg>
   </div>
 </template>

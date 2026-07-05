@@ -89,7 +89,7 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
         class="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-[9px] border-[1.5px] border-[#b8c4d2] bg-white px-3.5 transition-colors duration-[var(--duration-fast)] focus-within:border-2 focus-within:border-brand-600 focus-within:ring-[3px] focus-within:ring-brand-100"
         :class="props.compact ? 'shadow-float border-transparent' : ''"
       >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5d6b7c" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" class="shrink-0"><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg>
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#5d6b7c" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" class="shrink-0"><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg>
         <input
           :id="`${baseId}-input`"
           ref="inputEl"
@@ -104,8 +104,8 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
           spellcheck="false"
           enterkeyhint="search"
           type="text"
-          placeholder="Enter your street address, like 1234 Market St"
-          class="w-full bg-transparent text-[15px] text-ink outline-none placeholder:text-faint"
+          placeholder="Enter your street address, like 1234 Maple St"
+          class="w-full bg-transparent text-base text-ink outline-none placeholder:text-faint"
           @input="onInput"
           @keydown="onKeydown"
           @focus="open = true"
@@ -115,7 +115,7 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
       <button
         v-if="!props.compact"
         type="button"
-        class="h-12 shrink-0 rounded-[9px] bg-brand-600 px-5 text-[15px] font-bold text-white hover:bg-brand-700"
+        class="h-12 shrink-0 rounded-[9px] bg-brand-600 px-5 text-base font-bold text-white hover:bg-brand-700"
         @click="onCheck"
       >
         Check
@@ -129,20 +129,20 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
       aria-label="Matching addresses"
       class="absolute left-0 right-0 top-[54px] z-20 max-h-80 overflow-auto rounded-[9px] border border-line bg-white shadow-popover"
     >
-      <li v-if="loading" class="px-4 py-3 text-sm text-muted" role="presentation">
+      <li v-if="loading" class="px-4 py-3 text-body-sm text-muted" role="presentation">
         Searching…
       </li>
-      <li v-else-if="error" class="px-4 py-3 text-sm text-over" role="presentation">
+      <li v-else-if="error" class="px-4 py-3 text-body-sm text-over" role="presentation">
         {{ error }}
       </li>
       <li v-else-if="hits.length === 0" class="p-4" role="presentation">
         <div class="flex items-start gap-2.5">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8593a4" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" class="mt-0.5 shrink-0"><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#8593a4" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" class="mt-0.5 shrink-0"><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg>
           <div>
-            <p class="text-sm font-bold text-ink">No matches yet.</p>
-            <p class="mt-1 text-[12.5px] leading-relaxed text-muted">
-              Use your street address, like “1234 Market St”. Leave out “St” or “Ave” if you’re
-              not sure.
+            <p class="text-body-sm font-bold text-ink">No matches yet.</p>
+            <p class="mt-1 text-caption leading-relaxed text-muted">
+              Use your house number and street name, like “1234 Maple St”. Leave out “St” or
+              “Ave” if you’re not sure.
             </p>
           </div>
         </div>
@@ -154,12 +154,12 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
         :key="hit.parcel_id"
         role="option"
         :aria-selected="i === active"
-        class="flex cursor-pointer items-center gap-2.5 border-t border-line-faint px-3.5 py-3 text-sm first:border-t-0"
+        class="flex cursor-pointer items-center gap-2.5 border-t border-line-faint px-3.5 py-3 text-body-sm first:border-t-0"
         :class="i === active ? 'bg-brand-50 text-ink' : 'text-body'"
         @mousedown.prevent="choose(hit)"
         @mousemove="active = i"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="i === active ? '#0f4d90' : '#8593a4'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0"><path d="M4 11 12 4l8 7" /><path d="M6 10v9h12v-9" /></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="i === active ? '#0f4d90' : '#8593a4'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0"><path d="M4 11 12 4l8 7" /><path d="M6 10v9h12v-9" /></svg>
         <span class="min-w-0 flex-1 truncate font-medium text-ink">
           <template v-if="prefixLen(hit.address)">
             <strong class="font-bold">{{ hit.address.slice(0, prefixLen(hit.address)) }}</strong
@@ -167,7 +167,7 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
           </template>
           <template v-else>{{ hit.address }}</template>
         </span>
-        <span class="shrink-0 text-[12.5px] tabular-nums text-muted">{{
+        <span class="shrink-0 text-caption tabular-nums text-muted">{{
           money(hit.opa_market_value)
         }}</span>
       </li>

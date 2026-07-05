@@ -6,6 +6,7 @@
  * mocks (what an assessment is, data sources, the no-people-data pledge, the
  * trust cross-link) are kept from the previous page. */
 import { computed, ref } from 'vue'
+import { SITE } from '@/config/site'
 
 const LEVELS = [50, 80, 90, 95] as const
 const level = ref<(typeof LEVELS)[number]>(90)
@@ -16,17 +17,17 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
 
 <template>
   <div class="mx-auto max-w-2xl px-4 py-6 sm:py-8">
-    <p class="text-[11px] font-bold uppercase tracking-[0.1em] text-brand-600">Methodology</p>
+    <p class="text-caption font-bold uppercase tracking-[0.1em] text-brand-600">Methodology</p>
     <h1 class="mt-2 font-display text-[28px] font-bold leading-tight text-ink sm:text-[34px]">How this works</h1>
-    <p class="mt-2.5 text-[14.5px] leading-relaxed text-body">
+    <p class="mt-2.5 text-base leading-relaxed text-body">
       We build an independent estimate of what each Philadelphia home is worth, using the same
       public records the city uses. Then we compare our estimate with the city’s assessment.
     </p>
 
     <!-- what an assessment is -->
     <section class="mt-5 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
-      <h2 class="text-[15.5px] font-bold text-ink">What a property assessment is</h2>
-      <p class="mt-1.5 text-[13.5px] leading-relaxed text-body">
+      <h2 class="text-title font-bold text-ink">What a property assessment is</h2>
+      <p class="mt-1.5 text-body-sm leading-relaxed text-body">
         Every year, Philadelphia’s Office of Property Assessment (OPA) estimates what your home is
         worth. Your property tax is about <strong>1.4%</strong> of that number. If the number is
         too high, you pay too much tax. If your neighbor’s is too low, they pay too little — and
@@ -36,14 +37,14 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
 
     <!-- where the numbers come from -->
     <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
-      <h2 class="text-[15.5px] font-bold text-ink">Where our numbers come from</h2>
-      <ul class="mt-1.5 list-disc space-y-1.5 pl-5 text-[13.5px] leading-relaxed text-body">
+      <h2 class="text-title font-bold text-ink">Where our numbers come from</h2>
+      <ul class="mt-1.5 list-disc space-y-1.5 pl-5 text-body-sm leading-relaxed text-body">
         <li><strong>More than 200,000 real home sales</strong> from city deed records (2016 to today).</li>
         <li><strong>City property records</strong> — size, age, style, condition on file.</li>
         <li><strong>City licenses and inspections</strong> — permits, complaints, violations, vacancy.</li>
         <li><strong>Public maps</strong> — parcel shapes, transit, parks.</li>
       </ul>
-      <p class="mt-2.5 text-[13.5px] leading-relaxed text-body">
+      <p class="mt-2.5 text-body-sm leading-relaxed text-body">
         A computer model learns from those sales — what did homes like this one actually sell for?
         — and estimates today’s value for every home in the city.
         <strong>What we never use:</strong> race, income, or anything about the people who live in
@@ -54,8 +55,8 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
 
     <!-- confidence widget -->
     <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
-      <h2 class="text-[15.5px] font-bold text-ink">What does “90% sure” mean?</h2>
-      <p class="mt-1 text-[13px] leading-relaxed text-muted">
+      <h2 class="text-title font-bold text-ink">What does “90% sure” mean?</h2>
+      <p class="mt-1 text-body-sm leading-relaxed text-muted">
         Each dot is a home like yours that sold. Pick a confidence level — the range grows or
         shrinks so that many dots land inside it.
       </p>
@@ -64,7 +65,7 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
           v-for="l in LEVELS"
           :key="l"
           type="button"
-          class="h-10 flex-1 rounded-md border-[1.5px] text-[13.5px] font-bold transition-colors duration-[var(--duration-fast)]"
+          class="h-10 flex-1 rounded-md border-[1.5px] text-body-sm font-bold transition-colors duration-[var(--duration-fast)]"
           :class="level === l ? 'border-brand-600 bg-brand-600 text-white' : 'border-[#b8c4d2] text-body hover:bg-brand-50'"
           :aria-pressed="level === l"
           @click="level = l"
@@ -85,11 +86,11 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
           aria-hidden="true"
         ></span>
       </div>
-      <p class="mt-3 text-center text-[12.5px] leading-normal text-body">
+      <p class="mt-3 text-center text-caption leading-normal text-body">
         <strong class="text-brand-600">{{ filled }} of {{ TOTAL }}</strong> sold inside the range —
         <span class="text-muted">open dots are the misses no honest model can avoid.</span>
       </p>
-      <p class="mt-2 text-center text-[12px] text-muted">
+      <p class="mt-2 text-center text-caption text-muted">
         We only flag an assessment when the city’s value falls <strong>outside</strong> the 90%
         range — and two different statistical methods have to agree first.
       </p>
@@ -97,11 +98,11 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
 
     <!-- fairness table (real measured figures) -->
     <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
-      <h2 class="text-[15.5px] font-bold text-ink">How our estimates hold up</h2>
-      <p class="mt-1 text-[12.5px] text-muted">
+      <h2 class="text-title font-bold text-ink">How our estimates hold up</h2>
+      <p class="mt-1 text-caption text-muted">
         Checked against ~19,500 real sales the model never saw (out-of-time test, 2026).
       </p>
-      <table class="mt-3 w-full text-left text-[13px]">
+      <table class="mt-3 w-full text-left text-body-sm">
         <caption class="sr-only">Model accuracy compared with city assessments</caption>
         <thead>
           <tr class="border-b border-line text-muted">
@@ -128,7 +129,7 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
           </tr>
         </tbody>
       </table>
-      <p class="mt-2.5 text-[12.5px] text-muted">
+      <p class="mt-2.5 text-caption text-muted">
         <RouterLink to="/trust" class="font-semibold text-brand-600 underline"
           >See the full head-to-head proof</RouterLink
         >
@@ -139,10 +140,10 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
     <!-- honesty section -->
     <section class="mt-4 rounded-xl border border-gold-border bg-gold-soft p-4 sm:p-5">
       <div class="flex items-start gap-2.5">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8a6100" stroke-width="2" stroke-linecap="round" aria-hidden="true" class="mt-0.5 shrink-0"><circle cx="12" cy="12" r="9.5" /><line x1="12" y1="11" x2="12" y2="16.5" /><circle cx="12" cy="7.5" r="0.6" fill="#8a6100" /></svg>
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#8a6100" stroke-width="2" stroke-linecap="round" aria-hidden="true" class="mt-0.5 shrink-0"><circle cx="12" cy="12" r="9.5" /><line x1="12" y1="11" x2="12" y2="16.5" /><circle cx="12" cy="7.5" r="0.6" fill="#8a6100" /></svg>
         <div>
-          <h2 class="text-[15.5px] font-bold text-gold-700">What we cannot see</h2>
-          <p class="mt-1.5 text-[13px] leading-relaxed text-[#4d4633]">
+          <h2 class="text-title font-bold text-gold-700">What we cannot see</h2>
+          <p class="mt-1.5 text-body-sm leading-relaxed text-[#4d4633]">
             Public records don’t show a renovated kitchen, a leaking roof, or anything else inside
             your walls. If the inside of your home differs a lot from its records, our estimate can
             be wrong — in either direction. That is why every report shows a range, and why the
@@ -154,15 +155,26 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
 
     <!-- who made this -->
     <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
-      <h2 class="text-[15.5px] font-bold text-ink">Who made this</h2>
-      <p class="mt-1.5 text-[13.5px] leading-relaxed text-body">
-        This is an independent, open project — not a city service. The full methodology, code, and
-        every measurement (including the ones that didn’t work) are documented in the project
-        repository. If you find a mistake, we want to know.
+      <h2 class="text-title font-bold text-ink">Who made this</h2>
+      <p class="mt-1.5 text-body-sm leading-relaxed text-body">
+        This is an independent, open project by
+        <a :href="SITE.creatorUrl" rel="noopener" class="font-semibold text-brand-600 underline"
+          >{{ SITE.creatorName }}</a
+        >
+        — not a city service. The full
+        <a :href="SITE.githubUrl" rel="noopener" class="font-semibold text-brand-600 underline"
+          >code and data pipeline</a
+        >
+        and the
+        <a :href="SITE.modelDocsUrl" rel="noopener" class="font-semibold text-brand-600 underline"
+          >technical model documentation</a
+        >
+        are public, including the measurements that didn’t work. If you find a mistake, we want to
+        know.
       </p>
     </section>
 
-    <p class="mt-4 text-[11.5px] leading-normal text-faint">
+    <p class="mt-4 text-caption leading-normal text-faint">
       Data updated 2026-07-04 · Model code and validation are public · Independent — not a City of
       Philadelphia site
     </p>

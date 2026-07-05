@@ -56,14 +56,17 @@
     'Segoe UI', Roboto, Arial, sans-serif;
   --font-display: 'Source Serif 4', Georgia, 'Times New Roman', serif;
 
-  /* Type scale (size / line-height) — see HANDOFF.md §Typography */
-  --text-caption: 0.75rem;      /* 12 — provenance, chart axes */
+  /* Type scale (size / line-height). Raised one step from the handoff values
+     (12/13/15/16) after user feedback that the site read small; every text
+     size in components uses these four tokens — no arbitrary px sizes. */
+  --text-caption: 0.78125rem;   /* 12.5 — provenance, chart axes, chips */
   --text-caption--line-height: 1.5;
-  --text-body-sm: 0.8125rem;    /* 13 — honesty notes, tables */
+  --text-body-sm: 0.875rem;     /* 14 — honesty notes, tables, secondary copy */
   --text-body-sm--line-height: 1.55;
-  --text-body: 0.9375rem;       /* 15 — body */
-  --text-body--line-height: 1.6;
-  --text-title: 1rem;           /* 16 — panel titles (700) */
+  /* Body size is `text-base` (1rem) with a calmer line-height. NOTE: the class
+     `text-body` is the COLOR utility (--color-body) — never use it for size. */
+  --text-base--line-height: 1.6;
+  --text-title: 1.0625rem;      /* 17 — panel titles (700) */
   --text-title--line-height: 1.3;
   --text-h1: 1.5rem;            /* 24 — address, mobile (800) */
   --text-h1--line-height: 1.2;
@@ -133,6 +136,12 @@ td, .money {
   outline: 3px solid var(--color-brand-600);
   outline-offset: 2px;
   border-radius: 4px;
+}
+/* The router moves focus to each page's h1 for screen readers (tabindex=-1).
+   That programmatic focus shouldn't paint a ring on a non-interactive heading
+   — only real keyboard targets get one. */
+[tabindex='-1']:focus-visible {
+  outline: none;
 }
 .on-dark :focus-visible,
 header.site-dark :focus-visible {

@@ -12,6 +12,8 @@ import { computed, ref, watch } from 'vue'
 import { api, ApiError } from '@/api/client'
 import type { PropertyCore, Report } from '@/api/types'
 import { money, num, pct } from '@/utils/format'
+import { opaInquiryUrl } from '@/config/site'
+import type { CompRow } from '@/api/types'
 import { verdictFor } from '@/utils/verdict'
 import IntervalStrip from '@/components/viz/IntervalStrip.vue'
 import DriverBars from '@/components/viz/DriverBars.vue'
@@ -27,11 +29,18 @@ const core = ref<PropertyCore | null>(null)
 const report = ref<Report | null>(null)
 const coreError = ref<string | null>(null)
 const reportLoading = ref(false)
+/** Comparable sales — loaded on demand (the endpoint recomputes model comps
+ * and takes a few seconds; no reason to pay that on every page view). */
+const comps = ref<CompRow[] | null>(null)
+const compsLoading = ref(false)
+const compsError = ref(false)
 
 async function load(id: string) {
   core.value = null
   report.value = null
   coreError.value = null
+  comps.value = null
+  compsError.value = false
   try {
     core.value = await api.property(id)
   } catch (err) {
@@ -91,6 +100,28 @@ const signalChips = computed(() => {
 const cityLink = computed(() =>
   core.value ? `https://property.phila.gov/?p=${core.value.parcel_id}` : '#',
 )
+const inquiryLink = computed(() =>
+  core.value ? opaInquiryUrl(core.value.parcel_id) : '#',
+)
+
+
+async function loadComps() {
+  compsLoading.value = true
+  compsError.value = false
+  try {
+    comps.value = await api.comps(props.parcelId)
+  } catch {
+    compsError.value = true
+  } finally {
+    compsLoading.value = false
+  }
+}
+
+function distMiles(m: number | null): string {
+  if (m == null) return '—'
+  const ft = m * 3.28084
+  return ft < 900 ? `${Math.round(ft / 10) * 10} ft` : `${(m / 1609.34).toFixed(1)} mi`
+}
 const liveUrl = computed(() => (typeof window === 'undefined' ? '' : window.location.href))
 
 function printPage() {
@@ -105,7 +136,7 @@ function printPage() {
     :data-updated="report?.screen_built"
     :data-url="liveUrl"
   >
-    <RouterLink to="/" class="no-print text-sm font-semibold text-brand-600">← New search</RouterLink>
+    <RouterLink to="/" class="no-print text-body-sm font-semibold text-brand-600">← New search</RouterLink>
 
     <!-- error -->
     <div v-if="coreError" class="mt-6 rounded-xl border border-[#f2c9ae] bg-white p-6 text-center">
@@ -129,7 +160,7 @@ function printPage() {
       <!-- header + verdict -->
       <div class="mt-4">
         <h1 class="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">{{ core.address }}</h1>
-        <p class="mt-1 text-sm text-muted">
+        <p class="mt-1 text-body-sm text-muted">
           Philadelphia · OPA #{{ core.parcel_id }} ·
           <a :href="cityLink" rel="noopener" class="font-semibold text-brand-600 underline"
             >city record</a
@@ -161,14 +192,31 @@ function printPage() {
               </h2>
               <p
                 v-if="deltaPill"
-                class="mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums"
+                class="mt-2 inline-block rounded-full px-2.5 py-0.5 text-caption font-bold tabular-nums"
                 :class="verdict.badgeClass"
               >
                 {{ deltaPill }}
               </p>
             </div>
           </div>
-          <p class="mt-3.5 max-w-2xl text-[14.5px] leading-relaxed text-body">{{ verdict.detail }}</p>
+          <p class="mt-3.5 max-w-2xl text-base leading-relaxed text-body">{{ verdict.detail }}</p>
+
+          <!-- the two numbers, as numbers (Tufte: show the data) — they also
+               survive printing and screen readers without the chart -->
+          <dl class="mt-4 flex flex-wrap items-end gap-x-8 gap-y-2">
+            <div>
+              <dt class="text-caption text-muted">City’s value</dt>
+              <dd class="money text-2xl font-extrabold tracking-tight" :class="verdict.textClass">
+                {{ money(core.opa_market_value) }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-caption text-muted">Our estimate</dt>
+              <dd class="money text-2xl font-extrabold tracking-tight text-brand-600">
+                {{ money(core.model_median) }}
+              </dd>
+            </div>
+          </dl>
 
           <div v-if="hasInterval" class="mt-4">
             <IntervalStrip
@@ -191,8 +239,8 @@ function printPage() {
           </div>
 
           <div class="mt-3.5 flex gap-2.5 rounded-md border border-gold-tint-border bg-gold-tint px-3.5 py-3">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a6100" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mt-0.5 shrink-0"><line x1="4" y1="12" x2="19" y2="12" /><path d="M13 6l6 6-6 6" /></svg>
-            <p class="text-[13.5px] font-semibold leading-normal text-body">{{ verdict.nextStep }}</p>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a6100" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mt-0.5 shrink-0"><line x1="4" y1="12" x2="19" y2="12" /><path d="M13 6l6 6-6 6" /></svg>
+            <p class="text-body-sm font-semibold leading-normal text-body">{{ verdict.nextStep }}</p>
           </div>
         </div>
       </div>
@@ -217,7 +265,7 @@ function printPage() {
               </InfoTip>
             </div>
           </template>
-          <p v-else class="text-sm text-muted">
+          <p v-else class="text-body-sm text-muted">
             We can’t break down the estimate for this property type yet.
           </p>
         </SectionCard>
@@ -234,7 +282,7 @@ function printPage() {
               :you="report.equity.ratio"
               :peer-median="report.equity.peer_median_ratio"
             />
-            <p class="mt-3 text-[13px] leading-relaxed text-body">
+            <p class="mt-3 text-body-sm leading-relaxed text-body">
               This home is assessed at <strong class="text-ink">{{ pct(report.equity.ratio) }}</strong> of our
               estimated value. The middle for {{ num(report.equity.peer_n) }} similar homes
               ({{ report.equity.peer_label }}) is
@@ -248,7 +296,7 @@ function printPage() {
               </InfoTip>
             </div>
           </template>
-          <p v-else class="text-sm text-muted">
+          <p v-else class="text-body-sm text-muted">
             Not enough similar homes nearby for a reliable comparison.
           </p>
         </SectionCard>
@@ -265,7 +313,7 @@ function printPage() {
               :assessments="report.assessment_history"
               :sales="report.sale_history"
             />
-            <details v-if="report.sale_history.length" class="mt-3 text-sm">
+            <details v-if="report.sale_history.length" class="mt-3 text-body-sm">
               <summary class="cursor-pointer font-medium text-brand-600">Recorded sales</summary>
               <ul class="mt-2 space-y-1 text-body">
                 <li v-for="s in report.sale_history" :key="s.date + (s.price ?? 0)">
@@ -277,7 +325,7 @@ function printPage() {
               </ul>
             </details>
           </template>
-          <p v-else class="text-sm text-muted">No assessment history available.</p>
+          <p v-else class="text-body-sm text-muted">No assessment history available.</p>
         </SectionCard>
 
         <!-- signals + uniformity -->
@@ -290,25 +338,25 @@ function printPage() {
             <li
               v-for="chip in signalChips"
               :key="chip"
-              class="rounded-full bg-chip px-3 py-1.5 text-xs font-semibold text-body"
+              class="rounded-full bg-chip px-3 py-1.5 text-caption font-semibold text-body"
             >
               {{ chip }}
             </li>
           </ul>
-          <p v-else class="text-sm text-muted">Nothing notable in the public records we track.</p>
+          <p v-else class="text-body-sm text-muted">Nothing notable in the public records we track.</p>
 
           <div v-if="core.twin_n && core.twin_ratio" class="mt-4 rounded-md border border-gold-border bg-gold-soft p-3.5">
             <div class="flex items-start gap-2.5">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8a6100" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mt-0.5 shrink-0"><line x1="12" y1="3" x2="12" y2="21" /><line x1="4" y1="6" x2="20" y2="6" /><path d="M6 6l-2.8 6a2.9 2.9 0 0 0 5.6 0Z" /><path d="M18 6l-2.8 6a2.9 2.9 0 0 0 5.6 0Z" /><line x1="8" y1="21" x2="16" y2="21" /></svg>
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#8a6100" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mt-0.5 shrink-0"><line x1="12" y1="3" x2="12" y2="21" /><line x1="4" y1="6" x2="20" y2="6" /><path d="M6 6l-2.8 6a2.9 2.9 0 0 0 5.6 0Z" /><path d="M18 6l-2.8 6a2.9 2.9 0 0 0 5.6 0Z" /><line x1="8" y1="21" x2="16" y2="21" /></svg>
               <div>
-                <h3 class="text-[13.5px] font-bold text-gold-700">Identical homes on your block</h3>
-                <p class="mt-1 text-[12.5px] leading-relaxed text-[#4d4633]">
+                <h3 class="text-body-sm font-bold text-gold-700">Identical homes on your block</h3>
+                <p class="mt-1 text-caption leading-relaxed text-[#4d4633]">
                   City records show <strong>{{ core.twin_n }}</strong> homes identical to this one in
                   every recorded way. This home’s assessment is
                   <strong>{{ pct(core.twin_ratio - 1, 1) }}</strong>
                   {{ core.twin_ratio >= 1 ? 'above' : 'below' }} their middle value.
                 </p>
-                <p class="mt-1.5 text-xs leading-relaxed text-[#6d6242]">
+                <p class="mt-1.5 text-caption leading-relaxed text-[#6d6242]">
                   Pennsylvania’s constitution requires uniform taxation: identical homes should get the
                   same assessment. A big gap against identical neighbors is strong appeal evidence.
                 </p>
@@ -318,6 +366,69 @@ function printPage() {
         </SectionCard>
       </div>
 
+      <!-- comparable sales: the market evidence behind the estimate -->
+      <SectionCard
+        class="mt-6"
+        title="Comparable sales nearby"
+        subtitle="Recent arms-length sales of homes the model considers most similar — the market evidence behind the estimate."
+      >
+        <div v-if="comps === null && !compsLoading" class="no-print">
+          <button
+            type="button"
+            class="min-h-11 rounded-md border border-line bg-white px-4 text-body-sm font-bold text-body hover:bg-paper"
+            :disabled="compsLoading"
+            @click="loadComps"
+          >
+            Show comparable sales
+          </button>
+          <p class="mt-1.5 text-caption text-faint">Takes a few seconds to compute.</p>
+        </div>
+        <SkeletonBlock v-else-if="compsLoading" />
+        <p v-else-if="compsError" class="text-body-sm text-over" role="alert">
+          Could not load comparable sales right now.
+          <button type="button" class="font-bold underline" @click="loadComps">Try again</button>
+        </p>
+        <template v-else-if="comps && comps.length">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-body-sm">
+              <caption class="sr-only">Comparable sales the model used near this home</caption>
+              <thead>
+                <tr class="border-b border-line text-muted">
+                  <th scope="col" class="py-2 pr-3 font-semibold">Address</th>
+                  <th scope="col" class="py-2 pr-3 font-semibold">Sold</th>
+                  <th scope="col" class="py-2 pr-3 text-right font-semibold">Price</th>
+                  <th scope="col" class="py-2 pr-3 text-right font-semibold">In today’s market</th>
+                  <th scope="col" class="py-2 pr-3 text-right font-semibold">Size</th>
+                  <th scope="col" class="py-2 text-right font-semibold">Away</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="c in comps" :key="c.address + c.sale_date" class="border-b border-line-faint">
+                  <th scope="row" class="py-2 pr-3 font-normal text-body">{{ c.address }}</th>
+                  <td class="py-2 pr-3 whitespace-nowrap">{{ c.sale_date }}</td>
+                  <td class="money py-2 pr-3 text-right">{{ money(c.sale_price) }}</td>
+                  <td class="money py-2 pr-3 text-right font-semibold text-ink">
+                    {{ money(c.price_adj_today) }}
+                  </td>
+                  <td class="money py-2 pr-3 text-right whitespace-nowrap">
+                    {{ c.livable_area ? `${num(c.livable_area)} sq ft` : '—' }}
+                  </td>
+                  <td class="money py-2 text-right whitespace-nowrap">{{ distMiles(c.distance_m) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-2 text-caption text-faint">
+            “In today’s market” adjusts each sale to current prices using our district price index.
+            These are the model’s comparables, not an appraiser’s — bring your own better ones if
+            you have them.
+          </p>
+        </template>
+        <p v-else class="text-body-sm text-muted">
+          No comparable sales available for this property type.
+        </p>
+      </SectionCard>
+
       <!-- appeal on-ramp -->
       <SectionCard
         class="mt-6"
@@ -325,7 +436,7 @@ function printPage() {
         subtitle="The city’s estimate rests on the facts it has on file. Wrong facts are the easiest thing to fix."
       >
         <template v-if="report?.drivers?.appeal_facts?.length">
-          <table class="w-full text-left text-sm">
+          <table class="w-full text-left text-body-sm">
             <caption class="sr-only">Recorded facts about this home and their effect on value</caption>
             <thead>
               <tr class="border-b border-line text-muted">
@@ -345,7 +456,7 @@ function printPage() {
                   {{ f.label }}
                   <svg
                     v-if="f.implausible"
-                    width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
+                    width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
                     role="img" aria-label="Looks unusual — double-check this one"
                     class="-mt-0.5 ml-0.5 inline-block"
                   ><path d="M12 3.5 21.5 20h-19Z" /><line x1="12" y1="10" x2="12" y2="14" /><circle cx="12" cy="17" r="0.5" fill="#c2410c" /></svg>
@@ -357,23 +468,27 @@ function printPage() {
               </tr>
             </tbody>
           </table>
-          <p class="mt-2 text-xs text-faint">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="-mt-0.5 inline-block"><path d="M12 3.5 21.5 20h-19Z" /><line x1="12" y1="10" x2="12" y2="14" /><circle cx="12" cy="17" r="0.5" fill="#c2410c" /></svg>
+          <p class="mt-2 text-caption text-faint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="-mt-0.5 inline-block"><path d="M12 3.5 21.5 20h-19Z" /><line x1="12" y1="10" x2="12" y2="14" /><circle cx="12" cy="17" r="0.5" fill="#c2410c" /></svg>
             = this recorded value looks unusual for Philadelphia homes — double-check it.
           </p>
         </template>
-        <p v-else class="text-sm text-muted">
-          Compare the city’s recorded facts (size, condition, year built) with reality at
-          <a :href="cityLink" rel="noopener" class="font-semibold text-brand-600 underline"
-            >property.phila.gov</a
-          >.
+        <p v-else class="text-body-sm text-muted">
+          Compare the city’s recorded facts (size, condition, year built) with reality —
+          <a :href="inquiryLink" rel="noopener" class="font-semibold text-brand-600 underline"
+            >the city’s record for this home</a
+          >
+          shows everything OPA has on file.
         </p>
 
-        <div class="mt-5 rounded-lg bg-brand-50 p-4 text-sm text-[#2c3a4d]">
-          <h3 class="text-sm font-extrabold text-brand-900">How to act on this (all free)</h3>
+        <div class="mt-5 rounded-lg bg-brand-50 p-4 text-body-sm text-[#2c3a4d]">
+          <h3 class="text-body-sm font-extrabold text-brand-900">How to act on this (all free)</h3>
           <ol class="mt-2 list-decimal space-y-1.5 pl-5">
             <li>
-              Wrong facts on file? Ask OPA for a review — this is called a
+              Wrong facts on file?
+              <a :href="inquiryLink" rel="noopener" class="font-bold text-brand-600 underline"
+                >See exactly what the city has recorded for your home</a
+              >, then ask OPA for a review — this is called a
               <strong>First Level Review</strong> and takes one form.
             </li>
             <li>
@@ -395,7 +510,7 @@ function printPage() {
         </div>
 
         <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <p class="text-xs leading-relaxed text-faint">
+          <p class="text-caption leading-relaxed text-faint">
             This report is public information, not legal or appraisal advice. Estimates come from a
             statistical model and can be wrong for any single home — that’s why we show the range and
             the facts, not just a number.
@@ -403,10 +518,10 @@ function printPage() {
           </p>
           <button
             type="button"
-            class="no-print inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md border border-line bg-white px-4 text-sm font-bold text-body hover:bg-paper"
+            class="no-print inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md border border-line bg-white px-4 text-body-sm font-bold text-body hover:bg-paper"
             @click="printPage"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6" /><path d="M6 18H4.5A1.5 1.5 0 0 1 3 16.5v-5A1.5 1.5 0 0 1 4.5 10h15a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H18" /><rect x="6" y="14" width="12" height="7" rx="0.5" /></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6" /><path d="M6 18H4.5A1.5 1.5 0 0 1 3 16.5v-5A1.5 1.5 0 0 1 4.5 10h15a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H18" /><rect x="6" y="14" width="12" height="7" rx="0.5" /></svg>
             Print this report
           </button>
         </div>
