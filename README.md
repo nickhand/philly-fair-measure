@@ -28,6 +28,10 @@ uv run philly screen-assessments  # flag OPA values outside each property's pred
 uv run philly comps "108 ELFRETHS ALY"  # comparable sales for a property (parcel id or address)
 uv run philly freshness         # heartbeat: exit 1 if snapshots are missing/stale
 
+# The public dashboard (see docs/frontend.md): API + Vue app
+uv run philly api                      # JSON API on :8000
+(cd web && npm install && npm run dev) # front door on :5173
+
 # See what's on disk, then query it (views: raw_<dataset>, stg_<table>, mart_<table>)
 uv run philly catalog
 uv run philly sql "
@@ -58,9 +62,12 @@ src/philly_assessments/
   features/            # model-ready feature marts (see docs/features.md)
   models/              # LightGBM/Bayesian models, scoring, IAAO ratio metrics
   catalog.py           # DuckDB views over raw snapshots + staged/mart tables
+  api.py               # FastAPI backing the public dashboard (docs/frontend.md)
   cli.py               # `philly` command-line entry point
+web/                   # public dashboard: Vue 3 + TS + Tailwind + MapLibre
 docs/
   model.md             # model architecture, methodology, and results
+  frontend.md          # public dashboard + API architecture and deploy notes
   vertical-equity-report-card.md  # our metrics vs OPA vs IAAO bands (full + trimmed)
   historical-redistribution.md    # what OPA's regressivity shifted, 2016-2025, in $
   features.md          # input feature registry

@@ -174,6 +174,16 @@ def _fmt_value(value: object) -> str:
     return str(value)
 
 
+def display_value(feature: str, value: object) -> str | None:
+    """Homeowner-facing rendering of a driver's recorded value ("1,120 sq ft"),
+    or None when the raw number is model-internal (log surfaces, tract codes,
+    epoch days) — the _VALUE_UNITS gate. Consumers outside plain_language (the
+    dashboard API) must use this rather than str(raw_value)."""
+    if value is None or feature not in _VALUE_UNITS:
+        return None
+    return f"{_fmt_value(value)} {_VALUE_UNITS[feature]}".strip()
+
+
 @dataclass(frozen=True)
 class Driver:
     """One feature's signed effect on a property's estimated value."""

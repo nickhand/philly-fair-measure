@@ -1,0 +1,58 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Civic palette — colorblind-safe verdict pair (blue vs orange), navy brand. */
+  --color-brand-50: #eff4fb;
+  --color-brand-100: #dbe6f6;
+  --color-brand-600: #1e56a0;
+  --color-brand-700: #163e75;
+  --color-brand-900: #0e2a52;
+  --color-over: #c2410c; /* city value above our range */
+  --color-over-soft: #ffedd5;
+  --color-under: #1d4ed8; /* city value below our range */
+  --color-under-soft: #dbeafe;
+  --color-fair: #334155; /* inside the range */
+  --color-fair-soft: #e2e8f0;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+}
+
+/* ---- base ---- */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+  font-family: var(--font-sans);
+}
+
+/* Keyboard users always get a visible focus ring. */
+:focus-visible {
+  outline: 3px solid var(--color-brand-600);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Skip link: hidden until focused. */
+.skip-link {
+  @apply absolute top-2 left-2 z-50 -translate-y-16 rounded bg-white px-4 py-2 font-semibold text-brand-700 shadow transition-transform;
+}
+.skip-link:focus {
+  @apply translate-y-0;
+}

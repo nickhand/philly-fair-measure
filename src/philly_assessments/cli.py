@@ -540,6 +540,15 @@ def _cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_api(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from philly_assessments.api import create_app
+
+    uvicorn.run(create_app(args.data_dir), host=args.host, port=args.port)
+    return 0
+
+
 def _cmd_leaderboard(args: argparse.Namespace) -> int:
     from philly_assessments.report import build_property_report, leaderboards
 
@@ -963,6 +972,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     leaderboard.add_argument("--data-dir", type=Path)
     leaderboard.set_defaults(func=_cmd_leaderboard)
+
+    api = subparsers.add_parser(
+        "api", help="serve the public-dashboard JSON API (backs the web/ front door)"
+    )
+    api.add_argument("--host", default="127.0.0.1")
+    api.add_argument("--port", type=int, default=8000)
+    api.add_argument("--data-dir", type=Path)
+    api.set_defaults(func=_cmd_api)
 
     comps = subparsers.add_parser(
         "comps", help="comparable sales for a property (parcel id or address fragment)"
