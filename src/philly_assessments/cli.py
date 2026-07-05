@@ -540,6 +540,48 @@ def _cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_leaderboard(args: argparse.Namespace) -> int:
+    from philly_assessments.report import build_property_report, leaderboards
+
+    boards = leaderboards(args.data_dir, n=args.n)
+    titles = {
+        "over_assessed": "MOST OVER-ASSESSED  (OPA above the model)",
+        "under_assessed": "MOST UNDER-ASSESSED  (OPA below the model)",
+        "non_uniform_block": "LEAST UNIFORM BLOCKS  (a home vs its identical twins)",
+    }
+    which = {
+        "all": list(boards),
+        "over": ["over_assessed"],
+        "under": ["under_assessed"],
+        "nonuniform": ["non_uniform_block"],
+    }[args.kind]
+
+    parcels: list[str] = []
+    for key in which:
+        print(f"\n{titles[key]}")
+        for r in boards[key].iter_rows(named=True):
+            parcels.append(str(r["parcel_id"]))
+            addr = str(r["address"] or "")[:34]
+            if key == "non_uniform_block":
+                gap = (r["opa_vs_twin_median"] - 1) * 100
+                print(f"  {r['parcel_id']}  {addr:<34} ${r['opa_market_value']:>10,.0f}  "
+                      f"{gap:+.0f}% vs {int(r['twin_n'])} identical twins")
+            else:
+                print(f"  {r['parcel_id']}  {addr:<34} OPA ${r['opa_market_value']:>10,.0f}  "
+                      f"model ${r['model_median']:>10,.0f}  {r['opa_vs_model_ratio']:.2f}x")
+
+    if args.reports:
+        made = 0
+        for pid in dict.fromkeys(parcels):  # dedup, preserve order
+            try:
+                build_property_report(pid, args.data_dir)
+                made += 1
+            except Exception as exc:  # noqa: BLE001 — skip a bad parcel, keep the rest
+                print(f"  (report failed for {pid}: {exc})")
+        print(f"\n{made} reports written under data/reports/")
+    return 0
+
+
 def _cmd_comps(args: argparse.Namespace) -> int:
     import polars as pl
 
@@ -898,6 +940,20 @@ def main(argv: list[str] | None = None) -> int:
     report.add_argument("--out", type=Path, help="output directory (default data/reports/)")
     report.add_argument("--data-dir", type=Path)
     report.set_defaults(func=_cmd_report)
+
+    leaderboard = subparsers.add_parser(
+        "leaderboard",
+        help="rank the most over-/under-assessed properties and least-uniform blocks",
+    )
+    leaderboard.add_argument(
+        "--kind", choices=("all", "over", "under", "nonuniform"), default="all"
+    )
+    leaderboard.add_argument("--n", type=int, default=20, help="rows per list (default 20)")
+    leaderboard.add_argument(
+        "--reports", action="store_true", help="also render the HTML report for each listed parcel"
+    )
+    leaderboard.add_argument("--data-dir", type=Path)
+    leaderboard.set_defaults(func=_cmd_leaderboard)
 
     comps = subparsers.add_parser(
         "comps", help="comparable sales for a property (parcel id or address fragment)"

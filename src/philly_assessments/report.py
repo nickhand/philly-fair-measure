@@ -26,6 +26,7 @@ import polars as pl
 
 from philly_assessments import config
 from philly_assessments.ingest.manifests import read_derived_manifest
+from philly_assessments.vocab import AssessmentFlag
 
 if TYPE_CHECKING:
     from philly_assessments.equity_context import EquityContext
@@ -600,3 +601,39 @@ def build_property_report(
     path.write_text(render_html(data))
     logger.info("report -> %s", path)
     return path
+
+
+_MIN_TWINS = 5  # only blocks with this many identical homes count for uniformity
+
+
+def leaderboards(data_dir: Path | None = None, *, n: int = 25) -> dict[str, pl.DataFrame]:
+    """Review/appeal worklists from the assessment screen: the most over- and
+    under-assessed flagged properties (OPA vs model, dual-model-gated) and the
+    least-uniform blocks (a home vs its identical twins' median). A $30k value
+    floor drops the glitch tail; verify any single row against its report, which
+    surfaces data errors."""
+    root = data_dir if data_dir is not None else config.data_dir()
+    s = pl.read_parquet(root / "marts" / "assessment_screen.parquet").filter(
+        (pl.col("opa_market_value") > 30_000) & (pl.col("model_median") > 30_000)
+    )
+    cols = ["parcel_id", "address", "opa_market_value", "model_median", "opa_vs_model_ratio"]
+    over = (
+        s.filter(pl.col("assessment_flag") == AssessmentFlag.OVER)
+        .sort("opa_vs_model_ratio", descending=True)
+        .head(n)
+        .select(cols)
+    )
+    under = (
+        s.filter(pl.col("assessment_flag") == AssessmentFlag.UNDER)
+        .sort("opa_vs_model_ratio")
+        .head(n)
+        .select(cols)
+    )
+    non_uniform = (
+        s.filter((pl.col("twin_n") >= _MIN_TWINS) & pl.col("opa_vs_twin_median").is_not_null())
+        .with_columns((pl.col("opa_vs_twin_median") - 1.0).abs().alias("twin_gap"))
+        .sort("twin_gap", descending=True)
+        .head(n)
+        .select("parcel_id", "address", "opa_market_value", "twin_n", "opa_vs_twin_median")
+    )
+    return {"over_assessed": over, "under_assessed": under, "non_uniform_block": non_uniform}

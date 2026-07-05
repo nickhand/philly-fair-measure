@@ -167,6 +167,42 @@ def test_render_html_includes_equity_panel():
     assert "does not prove the assessment unfair" in out  # honesty caveat
 
 
+def test_leaderboards_rank_over_under_and_nonuniform(tmp_path):
+    from philly_assessments.ingest.derived import write_derived_table
+    from philly_assessments.ingest.manifests import InputRef
+    from philly_assessments.report import leaderboards
+
+    rows = [
+        {"parcel_id": f"w{i}", "address": f"{i} MAIN ST", "opa_market_value": 200_000.0,
+         "model_median": 200_000.0, "opa_vs_model_ratio": 1.0, "assessment_flag": "within_range",
+         "twin_n": 6, "opa_vs_twin_median": 1.0}
+        for i in range(15)
+    ]
+    rows += [
+        {"parcel_id": "over_big", "address": "1 HIGH ST", "opa_market_value": 300_000.0,
+         "model_median": 150_000.0, "opa_vs_model_ratio": 2.0,
+         "assessment_flag": "over_assessed_candidate", "twin_n": 6, "opa_vs_twin_median": 1.0},
+        {"parcel_id": "over_small", "address": "2 HIGH ST", "opa_market_value": 180_000.0,
+         "model_median": 150_000.0, "opa_vs_model_ratio": 1.2,
+         "assessment_flag": "over_assessed_candidate", "twin_n": 6, "opa_vs_twin_median": 1.0},
+        {"parcel_id": "under_big", "address": "1 LOW ST", "opa_market_value": 100_000.0,
+         "model_median": 300_000.0, "opa_vs_model_ratio": 0.33,
+         "assessment_flag": "under_assessed_candidate", "twin_n": 6, "opa_vs_twin_median": 1.0},
+        {"parcel_id": "odd_twin", "address": "9 SAME ST", "opa_market_value": 350_000.0,
+         "model_median": 200_000.0, "opa_vs_model_ratio": 1.0, "assessment_flag": "within_range",
+         "twin_n": 8, "opa_vs_twin_median": 1.5},
+    ]
+    write_derived_table(
+        pl.DataFrame(rows), tmp_path, "marts", "assessment_screen",
+        [InputRef(dataset="t", fetched_at="t")],
+    )
+    boards = leaderboards(tmp_path, n=5)
+
+    assert boards["over_assessed"]["parcel_id"][0] == "over_big"  # highest ratio first
+    assert boards["under_assessed"]["parcel_id"][0] == "under_big"  # lowest ratio first
+    assert boards["non_uniform_block"]["parcel_id"][0] == "odd_twin"  # biggest twin gap
+
+
 def test_render_html_minimal_condo():
     data = ReportData(
         parcel_id="888080493",
