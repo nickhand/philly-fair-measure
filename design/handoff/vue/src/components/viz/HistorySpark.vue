@@ -1,16 +1,17 @@
 <script setup lang="ts">
 /** HistorySpark — the city's value over time, with real sales as gold
  * diamonds (gold = a real-world event, per the chart grammar).
- * Handoff template on our real types (YearValue[], SaleRow[]); the parent
- * guards for assessments.length > 1 before rendering. */
+ * Prop contract inferred from PropertyView.vue usage
+ * (`:assessments="report.assessment_history" :sales="report.sale_history"`);
+ * assumed shapes { year: number; value: number }[] and
+ * { date: string; price: number | null; validity?: string }[] — verify. */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { scaleLinear } from 'd3-scale'
 import { moneyCompact } from '@/utils/format'
-import type { SaleRow, YearValue } from '@/api/types'
 
 const props = defineProps<{
-  assessments: YearValue[]
-  sales: SaleRow[]
+  assessments: { year: number; value: number }[]
+  sales: { date: string; price: number | null; validity?: string }[]
 }>()
 
 const wrapper = ref<HTMLDivElement | null>(null)
@@ -32,7 +33,7 @@ const BASE = 90
 
 const pricedSales = computed(() =>
   props.sales
-    .filter((s) => s.price != null && s.price > 0)
+    .filter((s) => s.price != null)
     .map((s) => ({ ...s, year: Number(s.date.slice(0, 4)) })),
 )
 const years = computed(() => {
@@ -40,27 +41,21 @@ const years = computed(() => {
   return [Math.min(...ys), Math.max(...ys)] as const
 })
 const values = computed(() => {
-  const vs = props.assessments
-    .map((a) => a.value)
-    .concat(pricedSales.value.map((s) => s.price as number))
+  const vs = props.assessments.map((a) => a.value).concat(pricedSales.value.map((s) => s.price as number))
   return [Math.min(...vs), Math.max(...vs)] as const
 })
 const x = computed(() => scaleLinear().domain(years.value).range([PAD, width.value - PAD]))
 const y = computed(() => scaleLinear().domain(values.value).range([BASE - 8, TOP + 4]))
 
 const path = computed(() =>
-  props.assessments
-    .map((a, i) => `${i === 0 ? 'M' : 'L'} ${x.value(a.year)} ${y.value(a.value)}`)
-    .join(' '),
+  props.assessments.map((a, i) => `${i === 0 ? 'M' : 'L'} ${x.value(a.year)} ${y.value(a.value)}`).join(' '),
 )
 const last = computed(() => props.assessments[props.assessments.length - 1])
 
 const ariaLabel = computed(() => {
   const first = props.assessments[0]
-  if (!first || !last.value) return 'No assessment history available.'
   let s = `The city's assessment went from ${moneyCompact(first.value)} in ${first.year} to ${moneyCompact(last.value.value)} in ${last.value.year}.`
-  for (const sale of pricedSales.value)
-    s += ` The home sold for ${moneyCompact(sale.price as number)} in ${sale.year}.`
+  for (const sale of pricedSales.value) s += ` The home sold for ${moneyCompact(sale.price as number)} in ${sale.year}.`
   return s
 })
 </script>
@@ -70,12 +65,10 @@ const ariaLabel = computed(() => {
     <svg :width="width" :height="HEIGHT" :viewBox="`0 0 ${width} ${HEIGHT}`" role="img" :aria-label="ariaLabel" class="block w-full font-sans">
       <line :x1="PAD" :y1="BASE" :x2="width - PAD" :y2="BASE" stroke="#dfe5ec" stroke-width="1" />
       <path :d="path" fill="none" stroke="#0f4d90" stroke-width="2.5" stroke-linecap="round" />
-      <template v-if="last">
-        <circle :cx="x(last.year)" :cy="y(last.value)" r="4" fill="#0f4d90" />
-        <text :x="x(last.year)" :y="y(last.value) - 8" text-anchor="end" font-size="11.5" font-weight="700" fill="#0f4d90" style="font-variant-numeric: tabular-nums">
-          {{ moneyCompact(last.value) }} today
-        </text>
-      </template>
+      <circle :cx="x(last.year)" :cy="y(last.value)" r="4" fill="#0f4d90" />
+      <text :x="x(last.year)" :y="y(last.value) - 8" text-anchor="end" font-size="11.5" font-weight="700" fill="#0f4d90" style="font-variant-numeric: tabular-nums">
+        {{ moneyCompact(last.value) }} today
+      </text>
       <g v-for="s in pricedSales" :key="s.date">
         <rect
           :x="x(s.year) - 4.5" :y="y(s.price as number) - 4.5" width="9" height="9"

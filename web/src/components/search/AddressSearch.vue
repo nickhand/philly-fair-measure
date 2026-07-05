@@ -2,9 +2,9 @@
 /** Address autocomplete following the WAI-ARIA combobox pattern:
  * role=combobox input + role=listbox popup, full keyboard support,
  * aria-activedescendant tracking, results announced via aria-live.
- * (Design pass restyled classes/icons only — behavior and ARIA untouched.) */
+ * SCRIPT IS TESTED — the design pass (handoff) ports classes/markup only;
+ * behavior, ids, and ARIA structure are unchanged. */
 import { computed, ref, useId } from 'vue'
-import { House, Search } from 'lucide-vue-next'
 import { useSearch } from '@/composables/useSearch'
 import { money } from '@/utils/format'
 import type { SearchHit } from '@/api/types'
@@ -83,19 +83,13 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
 
 <template>
   <div class="relative">
-    <label
-      :for="`${baseId}-input`"
-      :class="props.compact ? 'sr-only' : 'mb-2 block font-semibold text-ink'"
-    >
-      Search your street address
-    </label>
+    <label :for="`${baseId}-input`" class="sr-only">Search your street address</label>
     <div class="flex gap-2">
-      <div class="relative min-w-0 flex-1">
-        <Search
-          aria-hidden="true"
-          :size="18"
-          class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted"
-        />
+      <div
+        class="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-[9px] border-[1.5px] border-[#b8c4d2] bg-white px-3.5 transition-colors duration-[var(--duration-fast)] focus-within:border-2 focus-within:border-brand-600 focus-within:ring-[3px] focus-within:ring-brand-100"
+        :class="props.compact ? 'shadow-float border-transparent' : ''"
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5d6b7c" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" class="shrink-0"><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg>
         <input
           :id="`${baseId}-input`"
           ref="inputEl"
@@ -110,8 +104,8 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
           spellcheck="false"
           enterkeyhint="search"
           type="text"
-          placeholder="Try “1234 Market St”"
-          class="h-12 w-full rounded-md border-[1.5px] border-[#b8c4d2] bg-white pr-3 pl-10 text-body text-ink placeholder:text-faint focus:border-2 focus:border-brand-600 focus:ring-[3px] focus:ring-brand-100 focus:outline-none"
+          placeholder="Enter your street address, like 1234 Market St"
+          class="w-full bg-transparent text-[15px] text-ink outline-none placeholder:text-faint"
           @input="onInput"
           @keydown="onKeydown"
           @focus="open = true"
@@ -121,7 +115,7 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
       <button
         v-if="!props.compact"
         type="button"
-        class="h-12 shrink-0 rounded-md bg-brand-600 px-5 font-bold text-white hover:bg-brand-700"
+        class="h-12 shrink-0 rounded-[9px] bg-brand-600 px-5 text-[15px] font-bold text-white hover:bg-brand-700"
         @click="onCheck"
       >
         Check
@@ -133,19 +127,25 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
       :id="listboxId"
       role="listbox"
       aria-label="Matching addresses"
-      class="absolute z-20 mt-2 max-h-80 w-full overflow-auto rounded-md border border-line-soft bg-white py-1 shadow-popover"
+      class="absolute left-0 right-0 top-[54px] z-20 max-h-80 overflow-auto rounded-[9px] border border-line bg-white shadow-popover"
     >
-      <li v-if="loading" class="px-4 py-3 text-body-sm text-muted" role="presentation">
+      <li v-if="loading" class="px-4 py-3 text-sm text-muted" role="presentation">
         Searching…
       </li>
-      <li v-else-if="error" class="px-4 py-3 text-body-sm text-over" role="presentation">
+      <li v-else-if="error" class="px-4 py-3 text-sm text-over" role="presentation">
         {{ error }}
       </li>
-      <li v-else-if="hits.length === 0" class="px-4 py-4" role="presentation">
-        <p class="font-bold text-ink">No matches yet.</p>
-        <p class="mt-0.5 text-body-sm text-muted">
-          Use your street address, like “1234 Market St”.
-        </p>
+      <li v-else-if="hits.length === 0" class="p-4" role="presentation">
+        <div class="flex items-start gap-2.5">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8593a4" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" class="mt-0.5 shrink-0"><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg>
+          <div>
+            <p class="text-sm font-bold text-ink">No matches yet.</p>
+            <p class="mt-1 text-[12.5px] leading-relaxed text-muted">
+              Use your street address, like “1234 Market St”. Leave out “St” or “Ave” if you’re
+              not sure.
+            </p>
+          </div>
+        </div>
       </li>
       <li
         v-for="(hit, i) in hits"
@@ -154,12 +154,12 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
         :key="hit.parcel_id"
         role="option"
         :aria-selected="i === active"
-        class="flex cursor-pointer items-center gap-2.5 px-3.5 py-3"
-        :class="i === active ? 'bg-brand-50' : 'hover:bg-paper'"
+        class="flex cursor-pointer items-center gap-2.5 border-t border-line-faint px-3.5 py-3 text-sm first:border-t-0"
+        :class="i === active ? 'bg-brand-50 text-ink' : 'text-body'"
         @mousedown.prevent="choose(hit)"
         @mousemove="active = i"
       >
-        <House aria-hidden="true" :size="16" class="shrink-0 text-muted" />
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="i === active ? '#0f4d90' : '#8593a4'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0"><path d="M4 11 12 4l8 7" /><path d="M6 10v9h12v-9" /></svg>
         <span class="min-w-0 flex-1 truncate font-medium text-ink">
           <template v-if="prefixLen(hit.address)">
             <strong class="font-bold">{{ hit.address.slice(0, prefixLen(hit.address)) }}</strong
@@ -167,7 +167,7 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
           </template>
           <template v-else>{{ hit.address }}</template>
         </span>
-        <span class="money shrink-0 text-body-sm text-muted">{{
+        <span class="shrink-0 text-[12.5px] tabular-nums text-muted">{{
           money(hit.opa_market_value)
         }}</span>
       </li>

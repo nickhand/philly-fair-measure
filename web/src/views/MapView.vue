@@ -1,26 +1,26 @@
 <script setup lang="ts">
-/** Citywide map. Homes appear as dots colored by verdict once you zoom to
- * street level (the API serves the current viewport; a PMTiles vector layer
- * is the drop-in replacement for static deploys — see docs/frontend.md).
- * The address search is the accessible alternative to map interaction. */
+/** Citywide map. Homes appear as verdict-colored dots at street zoom (the API
+ * serves the current viewport; a PMTiles vector layer is the drop-in
+ * replacement for static deploys — see docs/frontend.md).
+ *
+ * Handoff design (fairMeasureMapStyle paint overrides, dot layers + selected
+ * highlight, legend chips) merged onto our tested wiring: layer setup is
+ * `styledata`-based and idempotent (`load` never fires in some embedded
+ * browsers and stalls on slow glyph CDNs), and `moveend` refreshes the
+ * viewport parcels independent of style readiness. The address search is the
+ * accessible alternative to map interaction. */
 import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { api } from '@/api/client'
 import type { PropertyCore, SearchHit } from '@/api/types'
-import { VERDICTS } from '@/utils/verdict'
+import { applyFairMeasurePaint, dotLayers, legend } from '@/map/fairMeasureMapStyle'
 import AddressSearch from '@/components/search/AddressSearch.vue'
 import PropertySheet from '@/components/map/PropertySheet.vue'
 
 const MIN_PARCEL_ZOOM = 14.5
 const PHILLY_CENTER: [number, number] = [-75.16, 39.985]
-
-const legendChips = [
-  { hex: VERDICTS.over_assessed_candidate.hex, label: 'Above our range' },
-  { hex: VERDICTS.within_range.hex, label: 'Inside' },
-  { hex: VERDICTS.under_assessed_candidate.hex, label: 'Below' },
-]
 
 const router = useRouter()
 const container = ref<HTMLDivElement | null>(null)
@@ -30,6 +30,7 @@ const zoomedOut = ref(true)
 const loadError = ref(false)
 
 let controller: AbortController | undefined
+let painted = false
 
 async function refreshParcels() {
   const m = map.value
@@ -58,9 +59,15 @@ async function refreshParcels() {
 async function openParcel(parcelId: string) {
   try {
     selected.value = await api.property(parcelId)
+    map.value?.setFilter('fm-dot-selected', ['==', ['get', 'id'], parcelId])
   } catch {
     selected.value = null
   }
+}
+
+function closeSheet() {
+  selected.value = null
+  map.value?.setFilter('fm-dot-selected', ['==', ['get', 'id'], ''])
 }
 
 async function onSearchSelect(hit: SearchHit) {
@@ -73,43 +80,27 @@ async function onSearchSelect(hit: SearchHit) {
   }
 }
 
-/** Add the parcel source/layer as soon as the style can accept them.
- * Deliberately NOT gated on the `load` event: `load` waits for every glyph
- * and sprite, which can stall on slow CDNs (and never fires in some embedded
- * browsers). `styledata` fires early and repeatedly; wiring is idempotent. */
+/** Add paint overrides + the parcel source/layers as soon as the style can
+ * accept them. Deliberately NOT gated on the `load` event; `styledata` fires
+ * early and repeatedly, and this wiring is idempotent. */
 function ensureParcelLayer(m: maplibregl.Map) {
+  if (!painted && m.isStyleLoaded()) {
+    applyFairMeasurePaint(m)
+    painted = true
+  }
   if (m.getSource('parcels')) return
   try {
     m.addSource('parcels', {
       type: 'geojson',
       data: { type: 'FeatureCollection', features: [] },
     })
-    m.addLayer({
-      id: 'parcel-dots',
-      type: 'circle',
-      source: 'parcels',
-      paint: {
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 14.5, 3.5, 18, 9],
-        'circle-color': [
-          'match',
-          ['get', 'flag'],
-          'over_assessed_candidate',
-          VERDICTS.over_assessed_candidate.hex,
-          'under_assessed_candidate',
-          VERDICTS.under_assessed_candidate.hex,
-          /* within/other */ VERDICTS.within_range.hex,
-        ],
-        'circle-opacity': 0.85,
-        'circle-stroke-width': 1,
-        'circle-stroke-color': '#ffffff',
-      },
-    })
-    m.on('click', 'parcel-dots', (e) => {
+    for (const layer of dotLayers('parcels')) m.addLayer({ ...layer, minzoom: MIN_PARCEL_ZOOM })
+    m.on('click', 'fm-dots', (e) => {
       const id = e.features?.[0]?.properties?.id as string | undefined
       if (id) openParcel(id)
     })
-    m.on('mouseenter', 'parcel-dots', () => (m.getCanvas().style.cursor = 'pointer'))
-    m.on('mouseleave', 'parcel-dots', () => (m.getCanvas().style.cursor = ''))
+    m.on('mouseenter', 'fm-dots', () => (m.getCanvas().style.cursor = 'pointer'))
+    m.on('mouseleave', 'fm-dots', () => (m.getCanvas().style.cursor = ''))
     refreshParcels()
   } catch {
     // style not ready for layers yet — the next styledata event retries
@@ -145,57 +136,58 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="relative h-[calc(100vh-8rem)] min-h-[480px]">
+  <div class="relative h-[calc(100dvh-118px)] min-h-[420px]">
     <h1 class="sr-only">Assessment map of Philadelphia</h1>
-
-    <!-- search overlay -->
-    <div class="absolute inset-x-0 top-3 z-20 mx-auto w-[min(92%,28rem)]">
-      <div class="rounded-[10px] bg-white p-1.5 shadow-float">
-        <AddressSearch compact @select="onSearchSelect" />
-      </div>
-    </div>
 
     <div
       ref="container"
-      class="h-full w-full"
+      class="absolute inset-0"
       role="region"
       aria-label="Map of Philadelphia homes colored by assessment check result. Use the address search above the map if you prefer not to use the map."
     ></div>
 
+    <!-- floating search -->
+    <div class="absolute inset-x-3 top-3 z-10 mx-auto max-w-[560px]">
+      <AddressSearch compact @select="onSearchSelect" />
+    </div>
+
+    <!-- legend: part of the map furniture, not a boxed panel -->
+    <div
+      class="absolute left-3 top-[66px] z-10 flex max-w-[300px] flex-wrap gap-1.5"
+      role="list"
+      aria-label="Map legend"
+    >
+      <span
+        v-for="l in legend"
+        :key="l.label"
+        role="listitem"
+        class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 text-[11.5px] font-semibold text-body shadow-float"
+      >
+        <span class="h-2 w-2 rounded-full" :style="{ background: l.hex }" aria-hidden="true"></span>
+        {{ l.label }}
+      </span>
+    </div>
+
     <!-- zoom hint -->
     <div
       v-if="zoomedOut"
-      class="pointer-events-none absolute inset-x-0 bottom-24 z-10 mx-auto w-fit rounded-full bg-[rgba(22,36,58,0.85)] px-4 py-2 text-body-sm font-semibold text-white"
+      class="pointer-events-none absolute left-1/2 top-[118px] z-10 -translate-x-1/2 rounded-full bg-[rgba(22,36,58,0.85)] px-3.5 py-1.5 text-[11.5px] font-semibold text-white"
       role="status"
     >
-      Zoom in to street level to see homes
+      Zoom in to see individual homes
     </div>
     <div
       v-if="loadError"
-      class="absolute inset-x-0 bottom-24 z-10 mx-auto w-fit rounded-full bg-over px-4 py-2 text-body-sm font-semibold text-white"
+      class="absolute inset-x-0 bottom-24 z-10 mx-auto w-fit rounded-full bg-over px-4 py-2 text-sm font-semibold text-white"
       role="alert"
     >
       Could not load homes for this area. Pan or zoom to retry.
     </div>
 
-    <!-- legend: pill chips, part of the map furniture -->
-    <div
-      class="absolute top-[4.5rem] left-3 z-10 flex flex-col gap-1.5 sm:top-auto sm:bottom-8 sm:flex-row"
-      role="img"
-      aria-label="Legend: orange means the city value is above our range, blue means below, gray means it looks fair."
-    >
-      <span
-        v-for="chip in legendChips"
-        :key="chip.label"
-        aria-hidden="true"
-        class="inline-flex w-fit items-center gap-1.5 rounded-full border border-line-soft bg-white/95 px-2.5 py-1 text-caption font-semibold text-body shadow-sm"
-      >
-        <span class="h-2.5 w-2.5 rounded-full" :style="{ background: chip.hex }"></span>
-        {{ chip.label }}
-      </span>
+    <!-- bottom sheet -->
+    <div v-if="selected" class="absolute inset-x-0 bottom-0 z-20 mx-auto max-w-[560px]">
+      <PropertySheet :property="selected" @close="closeSheet" />
     </div>
-
-    <PropertySheet v-if="selected" :property="selected" @close="selected = null" />
   </div>
 </template>
 

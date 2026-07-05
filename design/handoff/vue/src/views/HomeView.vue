@@ -1,39 +1,15 @@
 <script setup lang="ts">
 /** Home — hero + search, three promise cards, citywide counters, honesty note.
- * Handoff SFC wired to real citywide figures from /api/stats (the mocks used
- * sample numbers; "1 in 5 may be over-assessed" did NOT survive contact with
- * the data and was replaced by the real flagged count). */
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+ * TODO before ship: replace the three counter values with real figures from
+ * the API/build step (the mocks used sample numbers). */
 import AddressSearch from '@/components/search/AddressSearch.vue'
-import { api } from '@/api/client'
-import { num } from '@/utils/format'
-import type { SearchHit, Stats } from '@/api/types'
 
-const router = useRouter()
-const stats = ref<Stats | null>(null)
-
-onMounted(async () => {
-  try {
-    stats.value = await api.stats()
-  } catch {
-    stats.value = null // the hero still works without the counters
-  }
-})
-
-function goToProperty(hit: SearchHit) {
-  router.push({ name: 'property', params: { parcelId: hit.parcel_id } })
-}
-
-const counters = computed(() =>
-  stats.value
-    ? [
-        { value: num(stats.value.properties), label: 'homes checked citywide' },
-        { value: num(stats.value.over + stats.value.under), label: 'flagged for a closer look' },
-        { value: '$0', label: 'to check or appeal' },
-      ]
-    : null,
-)
+// TODO: wire to real citywide stats endpoint if available.
+const counters = [
+  { value: '579,000', label: 'homes checked citywide' },
+  { value: '1 in 5', label: 'may be over-assessed' },
+  { value: '$0', label: 'to check or appeal' },
+]
 
 const promises = [
   {
@@ -65,7 +41,7 @@ const promises = [
         Type your address. See how the city’s value compares with an independent estimate — free, no sign-up.
       </p>
       <div class="mx-auto mt-4 max-w-[560px] text-left sm:mt-5">
-        <AddressSearch @select="goToProperty" />
+        <AddressSearch />
       </div>
     </div>
 
@@ -90,10 +66,7 @@ const promises = [
 
     <!-- counters + honesty -->
     <div class="mx-auto mt-4 grid max-w-5xl gap-3 px-4 sm:grid-cols-[1.1fr_1fr] sm:gap-4">
-      <div
-        v-if="counters"
-        class="flex items-center justify-between gap-3 rounded-lg border border-line-soft bg-white px-4 py-3.5 text-center sm:px-5"
-      >
+      <div class="flex items-center justify-between gap-3 rounded-lg border border-line-soft bg-white px-4 py-3.5 text-center sm:px-5">
         <template v-for="(c, i) in counters" :key="c.label">
           <div v-if="i > 0" class="w-px self-stretch bg-line-soft" aria-hidden="true"></div>
           <div>
@@ -107,9 +80,7 @@ const promises = [
         <p class="text-[12.5px] leading-relaxed text-body">
           We are independent — not run by the City of Philadelphia. Everything here is built from the
           city’s own open data, and we show our work.
-          <RouterLink to="/methodology" class="font-semibold text-brand-600 underline">Read exactly how this works</RouterLink>
-          or see
-          <RouterLink to="/trust" class="font-semibold text-brand-600 underline">why you can trust these numbers</RouterLink>.
+          <RouterLink to="/methodology" class="font-semibold text-brand-600 underline">Read exactly how this works</RouterLink>.
         </p>
       </div>
     </div>

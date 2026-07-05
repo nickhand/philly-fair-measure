@@ -3,11 +3,9 @@
  * Loads the fast core first (verdict renders immediately), then the heavier
  * report (drivers/equity/history) fills in progressively.
  *
- * DESIGN PASS (handoff SFC): all copy, data flow, ARIA and <details> fallbacks
- * preserved. Verdict-card anatomy (top bar, icon chip, serif headline,
- * computed delta pill) per the mocks. Local additions kept on top of the
- * handoff version: `.print-compact` + `data-url` (print.css contract), the
- * error-state retry button, and the print button. */
+ * DESIGN PASS: all copy, data flow, ARIA and <details> fallbacks preserved
+ * from the original. Added: verdict-card anatomy (top bar, icon chip, serif
+ * headline, computed delta pill), print hooks (.report-root/.no-print). */
 import { computed, ref, watch } from 'vue'
 import { api, ApiError } from '@/api/client'
 import type { PropertyCore, Report } from '@/api/types'
@@ -28,30 +26,32 @@ const report = ref<Report | null>(null)
 const coreError = ref<string | null>(null)
 const reportLoading = ref(false)
 
-async function load(id: string) {
-  core.value = null
-  report.value = null
-  coreError.value = null
-  try {
-    core.value = await api.property(id)
-  } catch (err) {
-    coreError.value =
-      err instanceof ApiError && err.status === 404
-        ? 'We could not find that property. Try searching again from the home page.'
-        : 'Something went wrong loading this property. Please try again.'
-    return
-  }
-  reportLoading.value = true
-  try {
-    report.value = await api.report(id)
-  } catch {
-    report.value = null // panels degrade individually below
-  } finally {
-    reportLoading.value = false
-  }
-}
-
-watch(() => props.parcelId, load, { immediate: true })
+watch(
+  () => props.parcelId,
+  async (id) => {
+    core.value = null
+    report.value = null
+    coreError.value = null
+    try {
+      core.value = await api.property(id)
+    } catch (err) {
+      coreError.value =
+        err instanceof ApiError && err.status === 404
+          ? 'We could not find that property. Try searching again from the home page.'
+          : 'Something went wrong loading this property. Please try again.'
+      return
+    }
+    reportLoading.value = true
+    try {
+      report.value = await api.report(id)
+    } catch {
+      report.value = null // panels degrade individually below
+    } finally {
+      reportLoading.value = false
+    }
+  },
+  { immediate: true },
+)
 
 const verdict = computed(() => (core.value ? verdictFor(core.value.flag) : null))
 const hasInterval = computed(
@@ -91,19 +91,13 @@ const signalChips = computed(() => {
 const cityLink = computed(() =>
   core.value ? `https://property.phila.gov/?p=${core.value.parcel_id}` : '#',
 )
-const liveUrl = computed(() => (typeof window === 'undefined' ? '' : window.location.href))
-
-function printPage() {
-  window.print()
-}
 </script>
 
 <template>
   <div
-    class="report-root print-compact mx-auto max-w-5xl px-4 py-6 sm:py-8"
+    class="report-root mx-auto max-w-5xl px-4 py-6 sm:py-8"
     :data-parcel-id="core?.parcel_id"
     :data-updated="report?.screen_built"
-    :data-url="liveUrl"
   >
     <RouterLink to="/" class="no-print text-sm font-semibold text-brand-600">← New search</RouterLink>
 
@@ -113,13 +107,6 @@ function printPage() {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 21.5 20h-19Z" /><line x1="12" y1="9.5" x2="12" y2="14" /><circle cx="12" cy="17" r="0.5" fill="#c2410c" /></svg>
       </div>
       <h1 class="mt-3 text-base font-bold text-ink">{{ coreError }}</h1>
-      <button
-        type="button"
-        class="mt-4 min-h-11 rounded-md bg-brand-600 px-5 font-bold text-white hover:bg-brand-700"
-        @click="load(props.parcelId)"
-      >
-        Try again
-      </button>
     </div>
 
     <!-- loading core -->
@@ -207,15 +194,13 @@ function printPage() {
           <SkeletonBlock v-if="reportLoading" />
           <template v-else-if="report?.drivers">
             <DriverBars :drivers="report.drivers.drivers" />
-            <div class="no-print">
-              <InfoTip>
-                Our model starts from a typical home (about
-                {{ money(report.drivers.base_value) }}) and adjusts for this home’s facts — size,
-                location, condition signals, and recent sales nearby. These bars show the largest
-                adjustments. They explain the estimate; they do not judge whether the city’s value is
-                fair.
-              </InfoTip>
-            </div>
+            <InfoTip>
+              Our model starts from a typical home (about
+              {{ money(report.drivers.base_value) }}) and adjusts for this home’s facts — size,
+              location, condition signals, and recent sales nearby. These bars show the largest
+              adjustments. They explain the estimate; they do not judge whether the city’s value is
+              fair.
+            </InfoTip>
           </template>
           <p v-else class="text-sm text-muted">
             We can’t break down the estimate for this property type yet.
@@ -241,12 +226,10 @@ function printPage() {
               <strong class="text-ink">{{ pct(report.equity.peer_median_ratio) }}</strong
               >. It sits above {{ pct(report.equity.percentile / 100) }} of them.
             </p>
-            <div class="no-print">
-              <InfoTip>
-                100% means the city’s value equals our estimate. Being above your neighbors does not
-                prove the assessment is unfair — but a big gap is a reason to look closer.
-              </InfoTip>
-            </div>
+            <InfoTip>
+              100% means the city’s value equals our estimate. Being above your neighbors does not
+              prove the assessment is unfair — but a big gap is a reason to look closer.
+            </InfoTip>
           </template>
           <p v-else class="text-sm text-muted">
             Not enough similar homes nearby for a reliable comparison.
@@ -393,23 +376,12 @@ function printPage() {
             >
           </p>
         </div>
-
-        <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <p class="text-xs leading-relaxed text-faint">
-            This report is public information, not legal or appraisal advice. Estimates come from a
-            statistical model and can be wrong for any single home — that’s why we show the range and
-            the facts, not just a number.
-            <span v-if="report?.screen_built">Data updated {{ report.screen_built }}.</span>
-          </p>
-          <button
-            type="button"
-            class="no-print inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md border border-line bg-white px-4 text-sm font-bold text-body hover:bg-paper"
-            @click="printPage"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6" /><path d="M6 18H4.5A1.5 1.5 0 0 1 3 16.5v-5A1.5 1.5 0 0 1 4.5 10h15a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H18" /><rect x="6" y="14" width="12" height="7" rx="0.5" /></svg>
-            Print this report
-          </button>
-        </div>
+        <p class="mt-4 text-xs leading-relaxed text-faint">
+          This report is public information, not legal or appraisal advice. Estimates come from a
+          statistical model and can be wrong for any single home — that’s why we show the range and
+          the facts, not just a number.
+          <span v-if="report?.screen_built">Data updated {{ report.screen_built }}.</span>
+        </p>
       </SectionCard>
     </template>
   </div>

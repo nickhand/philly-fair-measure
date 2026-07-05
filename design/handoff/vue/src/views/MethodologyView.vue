@@ -1,17 +1,18 @@
 <script setup lang="ts">
-/** Methodology — long-form explainer. Handoff layout with REAL figures:
- * the fairness table uses the measured out-of-time numbers (MAPE 25% vs 34%,
- * ~90-of-100 interval coverage; see docs/vertical-equity-report-card.md and
- * docs/model.md), not the design pass's samples. Content sections beyond the
- * mocks (what an assessment is, data sources, the no-people-data pledge, the
- * trust cross-link) are kept from the previous page. */
+/** Methodology — long-form explainer. Interactive confidence widget:
+ * 50/80/90/95% buttons over 80 dots (dots = past sales of homes like yours;
+ * filled = sale landed inside the range at that confidence level).
+ * TODO before ship: fairness-table figures are SAMPLE values from the design
+ * pass — replace with real validation numbers. */
 import { computed, ref } from 'vue'
 
 const LEVELS = [50, 80, 90, 95] as const
 const level = ref<(typeof LEVELS)[number]>(90)
 const TOTAL = 80
 const filled = computed(() => Math.round((TOTAL * level.value) / 100))
-const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.value))
+const dots = computed(() =>
+  Array.from({ length: TOTAL }, (_, i) => i < filled.value),
+)
 </script>
 
 <template>
@@ -23,37 +24,8 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
       public records the city uses. Then we compare our estimate with the city’s assessment.
     </p>
 
-    <!-- what an assessment is -->
-    <section class="mt-5 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
-      <h2 class="text-[15.5px] font-bold text-ink">What a property assessment is</h2>
-      <p class="mt-1.5 text-[13.5px] leading-relaxed text-body">
-        Every year, Philadelphia’s Office of Property Assessment (OPA) estimates what your home is
-        worth. Your property tax is about <strong>1.4%</strong> of that number. If the number is
-        too high, you pay too much tax. If your neighbor’s is too low, they pay too little — and
-        everyone else covers the difference.
-      </p>
-    </section>
-
-    <!-- where the numbers come from -->
-    <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
-      <h2 class="text-[15.5px] font-bold text-ink">Where our numbers come from</h2>
-      <ul class="mt-1.5 list-disc space-y-1.5 pl-5 text-[13.5px] leading-relaxed text-body">
-        <li><strong>More than 200,000 real home sales</strong> from city deed records (2016 to today).</li>
-        <li><strong>City property records</strong> — size, age, style, condition on file.</li>
-        <li><strong>City licenses and inspections</strong> — permits, complaints, violations, vacancy.</li>
-        <li><strong>Public maps</strong> — parcel shapes, transit, parks.</li>
-      </ul>
-      <p class="mt-2.5 text-[13.5px] leading-relaxed text-body">
-        A computer model learns from those sales — what did homes like this one actually sell for?
-        — and estimates today’s value for every home in the city.
-        <strong>What we never use:</strong> race, income, or anything about the people who live in
-        a home. People-data is never part of the price; we use it only afterward, to check the
-        model for neighborhood bias.
-      </p>
-    </section>
-
     <!-- confidence widget -->
-    <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
+    <section class="mt-5 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
       <h2 class="text-[15.5px] font-bold text-ink">What does “90% sure” mean?</h2>
       <p class="mt-1 text-[13px] leading-relaxed text-muted">
         Each dot is a home like yours that sold. Pick a confidence level — the range grows or
@@ -89,18 +61,12 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
         <strong class="text-brand-600">{{ filled }} of {{ TOTAL }}</strong> sold inside the range —
         <span class="text-muted">open dots are the misses no honest model can avoid.</span>
       </p>
-      <p class="mt-2 text-center text-[12px] text-muted">
-        We only flag an assessment when the city’s value falls <strong>outside</strong> the 90%
-        range — and two different statistical methods have to agree first.
-      </p>
     </section>
 
-    <!-- fairness table (real measured figures) -->
+    <!-- fairness table -->
     <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
       <h2 class="text-[15.5px] font-bold text-ink">How our estimates hold up</h2>
-      <p class="mt-1 text-[12.5px] text-muted">
-        Checked against ~19,500 real sales the model never saw (out-of-time test, 2026).
-      </p>
+      <p class="mt-1 text-[12.5px] text-muted">Checked against real sales the model never saw. <em>(sample figures)</em></p>
       <table class="mt-3 w-full text-left text-[13px]">
         <caption class="sr-only">Model accuracy compared with city assessments</caption>
         <thead>
@@ -113,8 +79,8 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
         <tbody class="text-body">
           <tr class="border-b border-line-faint">
             <th scope="row" class="py-2 pr-2 font-normal leading-snug">Typical miss vs. actual sale price</th>
-            <td class="py-2 pr-2 font-bold tabular-nums text-ink">25%</td>
-            <td class="py-2 tabular-nums">34%</td>
+            <td class="py-2 pr-2 font-bold tabular-nums text-ink">9%</td>
+            <td class="py-2 tabular-nums">15%</td>
           </tr>
           <tr class="border-b border-line-faint">
             <th scope="row" class="py-2 pr-2 font-normal leading-snug">Sales landing inside our stated range</th>
@@ -123,17 +89,11 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
           </tr>
           <tr>
             <th scope="row" class="py-2 pr-2 font-normal leading-snug">Cheaper homes treated same as pricier ones</th>
-            <td class="py-2 pr-2 font-bold text-ink">Close — passes the official test</td>
-            <td class="py-2">Uneven — fails it</td>
+            <td class="py-2 pr-2 font-bold text-ink">Yes</td>
+            <td class="py-2">Uneven</td>
           </tr>
         </tbody>
       </table>
-      <p class="mt-2.5 text-[12.5px] text-muted">
-        <RouterLink to="/trust" class="font-semibold text-brand-600 underline"
-          >See the full head-to-head proof</RouterLink
-        >
-        — the official test, scored line by line.
-      </p>
     </section>
 
     <!-- honesty section -->
@@ -150,16 +110,6 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
           </p>
         </div>
       </div>
-    </section>
-
-    <!-- who made this -->
-    <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
-      <h2 class="text-[15.5px] font-bold text-ink">Who made this</h2>
-      <p class="mt-1.5 text-[13.5px] leading-relaxed text-body">
-        This is an independent, open project — not a city service. The full methodology, code, and
-        every measurement (including the ones that didn’t work) are documented in the project
-        repository. If you find a mistake, we want to know.
-      </p>
     </section>
 
     <p class="mt-4 text-[11.5px] leading-normal text-faint">

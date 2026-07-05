@@ -73,10 +73,6 @@ import { RouterLink, RouterView } from 'vue-router'
         We do not track you. No ads, no cookies, no analytics.
         <RouterLink to="/methodology" class="font-semibold text-brand-600 underline"
           >Read exactly how this works</RouterLink
-        >
-        or see
-        <RouterLink to="/trust" class="font-semibold text-brand-600 underline"
-          >why you can trust these numbers</RouterLink
         >.
       </p>
     </div>

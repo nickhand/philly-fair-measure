@@ -1,23 +1,19 @@
 <script setup lang="ts">
 /** PeerHistogram — assessment ratio vs. similar homes.
- * Chart grammar: azure = peers/our model (solid median line); the orange
- * treatment marks *your* position (dashed line + dot) and your bin.
- * Handoff template merged onto our real bin contract (HistBin {x0,x1,n});
- * `youHex` kept as an optional prop (defaults to the mock's orange). */
+ * Chart grammar: azure = peers/our model (solid median line), verdict-ish
+ * orange treatment marks *your* position (dashed line + dot) and your bin.
+ * Prop contract inferred from PropertyView.vue usage
+ * (`:histogram :you :peer-median`); assumed bin shape
+ * { from: number; to: number; count: number }[] — verify against api/types.ts. */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { scaleLinear } from 'd3-scale'
 import { pct } from '@/utils/format'
-import type { HistBin } from '@/api/types'
 
-const props = withDefaults(
-  defineProps<{
-    histogram: HistBin[]
-    you: number
-    peerMedian: number
-    youHex?: string
-  }>(),
-  { youHex: '#c2410c' },
-)
+const props = defineProps<{
+  histogram: { from: number; to: number; count: number }[]
+  you: number
+  peerMedian: number
+}>()
 
 const wrapper = ref<HTMLDivElement | null>(null)
 const width = ref(343)
@@ -37,21 +33,24 @@ const BASE = 88
 const MAXBAR = 60
 
 const domain = computed(() => {
-  const lo = Math.min(...props.histogram.map((b) => b.x0), props.you)
-  const hi = Math.max(...props.histogram.map((b) => b.x1), props.you)
+  const lo = Math.min(...props.histogram.map((b) => b.from), props.you)
+  const hi = Math.max(...props.histogram.map((b) => b.to), props.you)
   return [lo, hi] as const
 })
 const x = computed(() =>
   scaleLinear().domain(domain.value).range([PAD, width.value - PAD]),
 )
-const maxCount = computed(() => Math.max(1, ...props.histogram.map((b) => b.n)))
+const maxCount = computed(() => Math.max(1, ...props.histogram.map((b) => b.count)))
 const barH = (c: number) => (c / maxCount.value) * MAXBAR
 const youBin = computed(() =>
-  props.histogram.findIndex((b) => props.you >= b.x0 && props.you < b.x1),
+  props.histogram.findIndex((b) => props.you >= b.from && props.you < b.to),
 )
-const ticks = computed(() =>
-  [0.7, 1.0, 1.3].filter((t) => t >= domain.value[0] && t <= domain.value[1]),
-)
+const ticks = computed(() => {
+  const [lo, hi] = domain.value
+  const t: number[] = []
+  for (let v = Math.ceil(lo * 10) / 10; v <= hi; v = Math.round((v + 0.3) * 10) / 10) t.push(v)
+  return t.slice(0, 3)
+})
 
 const ariaLabel = computed(
   () =>
@@ -65,11 +64,11 @@ const ariaLabel = computed(
     <svg :width="width" :height="HEIGHT" :viewBox="`0 0 ${width} ${HEIGHT}`" role="img" :aria-label="ariaLabel" class="block w-full font-sans">
       <rect
         v-for="(b, i) in histogram"
-        :key="b.x0"
-        :x="x(b.x0) + 2"
-        :y="BASE - barH(b.n)"
-        :width="Math.max(2, x(b.x1) - x(b.x0) - 4)"
-        :height="barH(b.n)"
+        :key="b.from"
+        :x="x(b.from) + 2"
+        :y="BASE - barH(b.count)"
+        :width="Math.max(2, x(b.to) - x(b.from) - 4)"
+        :height="barH(b.count)"
         rx="1.5"
         :fill="i === youBin ? '#ffd9bd' : '#c9d9ec'"
       />
@@ -77,9 +76,9 @@ const ariaLabel = computed(
       <text :x="Math.min(x(peerMedian) - 5, width - 150)" y="14" text-anchor="start" font-size="11.5" font-weight="700" fill="#0f4d90">
         Similar homes' middle {{ pct(peerMedian) }}
       </text>
-      <line :x1="x(you)" y1="34" :x2="x(you)" :y2="BASE" :stroke="youHex" stroke-width="2" stroke-dasharray="3 4" />
-      <circle :cx="x(you)" cy="34" r="3.5" :fill="youHex" />
-      <text :x="x(you) + 9 > width - 70 ? x(you) - 9 : x(you) + 9" y="30" :text-anchor="x(you) + 9 > width - 70 ? 'end' : 'start'" font-size="11.5" font-weight="700" :fill="youHex">
+      <line :x1="x(you)" y1="34" :x2="x(you)" :y2="BASE" stroke="#c2410c" stroke-width="2" stroke-dasharray="3 4" />
+      <circle :cx="x(you)" cy="34" r="3.5" fill="#c2410c" />
+      <text :x="x(you) + 9 > width - 70 ? x(you) - 9 : x(you) + 9" y="30" :text-anchor="x(you) + 9 > width - 70 ? 'end' : 'start'" font-size="11.5" font-weight="700" fill="#c2410c">
         You {{ pct(you) }}
       </text>
       <line :x1="PAD" :y1="BASE" :x2="width - PAD" :y2="BASE" stroke="#dfe5ec" stroke-width="1" />
