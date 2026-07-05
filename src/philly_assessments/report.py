@@ -29,7 +29,7 @@ from philly_assessments.ingest.manifests import read_derived_manifest
 
 if TYPE_CHECKING:
     from philly_assessments.equity_context import EquityContext
-    from philly_assessments.models.explain import Explanation
+    from philly_assessments.models.explain import AppealPoint, Explanation
 
 logger = logging.getLogger(__name__)
 
@@ -360,6 +360,29 @@ def _render_equity(ctx: EquityContext) -> list[str]:
     ]
 
 
+def _render_appeal(points: list[AppealPoint]) -> list[str]:
+    """The appeal on-ramp: correctable recorded facts to verify, suspect ones first."""
+    out = [
+        "<h2>Facts to check — your appeal points</h2>",
+        "<p class='note'>OPA values your home from the recorded facts below — the "
+        "same records this model uses. Verify each against your home; a wrong entry "
+        "is a specific, documentable correction to request in an appeal. Values "
+        "marked ⚠ look unusual and are worth checking first.</p><table>"
+        "<tr><th>Recorded fact</th><th class='num'>As recorded</th>"
+        "<th class='num'>Effect on estimate</th></tr>",
+    ]
+    for p in points[:8]:
+        flag = " ⚠" if p.implausible else ""
+        sign = "+" if p.dollar_effect >= 0 else "−"
+        out.append(
+            f"<tr><td>{html.escape(p.label)}{flag}</td>"
+            f"<td class='num'>{_fmt(p.recorded_value)}</td>"
+            f"<td class='num'>{sign}{_fmt_money(abs(p.dollar_effect))}</td></tr>"
+        )
+    out.append("</table>")
+    return out
+
+
 def render_html(data: ReportData) -> str:
     s = data.screen
     c = data.characteristics
@@ -394,6 +417,12 @@ def render_html(data: ReportData) -> str:
         parts += _render_explanation(data.explanation)
     if data.equity is not None:
         parts += _render_equity(data.equity)
+    if data.explanation is not None and c:
+        from philly_assessments.models.explain import appeal_points
+
+        points = appeal_points(data.explanation, c)
+        if points:
+            parts += _render_appeal(points)
     if s.get("retail_value") is not None:
         parts += [
             "<h2>Two value conventions</h2><div class='kv'>",

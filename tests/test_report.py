@@ -126,6 +126,27 @@ def test_render_html_includes_driver_panel():
     assert "not whether the assessment is fair" in out  # honesty caveat kept
 
 
+def test_render_html_includes_appeal_panel():
+    from philly_assessments.models.explain import Driver, Explanation
+
+    exp = Explanation(
+        value=200_000.0, base_value=249_000.0,
+        drivers=[
+            Driver("char_livable_area", "living area", "Home characteristics",
+                   420.0, -0.4, -80_000.0),
+        ],
+    )
+    data = ReportData(
+        parcel_id="052174500", screen=_screen_row(),
+        characteristics={"char_livable_area": 420.0},
+        explanation=exp, provenance={"generated": "2026-07-03"},
+    )
+    out = render_html(data)
+    assert "Facts to check" in out
+    assert "living area ⚠" in out  # implausible flag rendered
+    assert "documentable correction" in out
+
+
 def test_render_html_includes_equity_panel():
     from philly_assessments.equity_context import EquityContext
 

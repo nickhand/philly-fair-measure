@@ -1,6 +1,30 @@
 import numpy as np
 
 
+def test_appeal_points_filters_correctable_and_flags_implausible():
+    from philly_assessments.models.explain import Driver, Explanation, appeal_points
+
+    exp = Explanation(
+        value=200_000.0,
+        base_value=249_000.0,
+        drivers=[
+            Driver("char_livable_area", "living area", "Home characteristics",
+                   420.0, -0.4, -80_000.0),
+            Driver("mkt_knn_log_ppsf", "nearby recent sale prices", "Recent nearby sales",
+                   None, 0.2, 40_000.0),
+            Driver("char_beds", "bedrooms", "Home characteristics", 3.0, 0.05, 9_000.0),
+        ],
+    )
+    pts = appeal_points(exp, {"char_livable_area": 420.0, "char_beds": 3.0})
+
+    features = [p.feature for p in pts]
+    assert "mkt_knn_log_ppsf" not in features  # market signal isn't a correctable fact
+    assert set(features) == {"char_livable_area", "char_beds"}
+    # implausible 420 sqft sorts first and is flagged; a normal bed count is not
+    assert pts[0].feature == "char_livable_area" and pts[0].implausible
+    assert not pts[1].implausible
+
+
 def test_explain_is_faithful_ranked_and_readable(tmp_path):
     from philly_assessments.ingest.derived import write_derived_table
     from philly_assessments.ingest.manifests import InputRef

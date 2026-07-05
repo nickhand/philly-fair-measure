@@ -256,6 +256,68 @@ def explain(run_dir: Path, df: pl.DataFrame) -> list[Explanation]:
     return out
 
 
+# Recorded characteristics a homeowner can contest — the appeal grounds. Location,
+# market, parcel-geometry and event-record features are excluded: they aren't
+# "facts about my house" an owner corrects (and OPA's own record is the source).
+CORRECTABLE = frozenset({
+    "char_livable_area", "char_lot_area", "char_beds", "char_baths", "char_rooms",
+    "char_stories", "char_year_built", "char_garage_spaces", "char_fireplaces",
+    "char_exterior_condition", "char_interior_condition", "char_basement",
+    "char_central_air", "char_construction", "char_quality_grade_raw",
+})
+
+# "Looks unusual, verify first" bounds for numeric characteristics — deliberately
+# generous; outside → flagged for the owner to check, not asserted as wrong.
+_PLAUSIBLE: dict[str, tuple[float, float]] = {
+    "char_livable_area": (500.0, 15000.0),
+    "char_lot_area": (300.0, 100000.0),
+    "char_beds": (1.0, 12.0),
+    "char_baths": (1.0, 12.0),
+    "char_rooms": (1.0, 30.0),
+    "char_stories": (1.0, 6.0),
+    "char_year_built": (1820.0, 2026.0),
+}
+
+
+@dataclass(frozen=True)
+class AppealPoint:
+    """A recorded characteristic worth verifying for an appeal."""
+
+    feature: str
+    label: str
+    recorded_value: object
+    dollar_effect: float  # the recorded value's effect on the estimate vs typical
+    implausible: bool  # recorded value falls outside the generous plausible range
+
+
+def _is_implausible(feature: str, value: object) -> bool:
+    bounds = _PLAUSIBLE.get(feature)
+    if bounds is None or not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    lo, hi = bounds
+    return not lo <= value <= hi
+
+
+def appeal_points(
+    explanation: Explanation, characteristics: dict[str, object]
+) -> list[AppealPoint]:
+    """Correctable recorded facts that drive the estimate, most-suspect first
+    (implausible values, then largest effect). The appeal on-ramp: a wrong entry
+    here is a specific, documentable correction to request."""
+    points = []
+    for d in explanation.drivers:
+        if d.feature not in CORRECTABLE:
+            continue
+        value = characteristics.get(d.feature, d.raw_value)
+        points.append(
+            AppealPoint(
+                d.feature, d.label, value, d.dollar_effect, _is_implausible(d.feature, value)
+            )
+        )
+    points.sort(key=lambda p: (not p.implausible, -abs(p.dollar_effect)))
+    return points
+
+
 def plain_language(explanation: Explanation, n: int = 5) -> list[str]:
     """The top ``n`` drivers as lay-readable sentences."""
     lines = []
