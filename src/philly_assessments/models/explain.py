@@ -184,6 +184,12 @@ def _fmt_value(value: object) -> str:
     return str(value)
 
 
+_SINGULAR_UNITS: dict[str, str] = {
+    "beds": "bed", "baths": "bath", "rooms": "room", "stories": "story",
+    "fireplaces": "fireplace", "garage spaces": "garage space",
+}
+
+
 def display_value(feature: str, value: object) -> str | None:
     """Homeowner-facing rendering of a driver's recorded value ("1,120 sq ft"),
     or None when the raw number is model-internal (log surfaces, tract codes,
@@ -193,7 +199,50 @@ def display_value(feature: str, value: object) -> str | None:
         return None
     if feature == "char_year_built" and isinstance(value, (int, float)):
         return str(int(value))  # a year, not a quantity — no thousands separator
-    return f"{_fmt_value(value)} {_VALUE_UNITS[feature]}".strip()
+    unit = _VALUE_UNITS[feature]
+    if isinstance(value, (int, float)) and float(value) == 1.0:
+        unit = _SINGULAR_UNITS.get(unit, unit)  # "1 bath", not "1 baths"
+    return f"{_fmt_value(value)} {unit}".strip()
+
+
+# OPA's published code meanings (OPA data dictionary, opa_properties_public).
+# Only codes the city documents are decoded — everything else stays raw rather
+# than risk an invented meaning on a civic site.
+_CONDITION_CODES: dict[str, str] = {
+    "0": "not applicable", "1": "newer construction", "2": "rehabilitated",
+    "3": "above average", "4": "average", "5": "below average",
+    "6": "vacant", "7": "sealed / structurally compromised",
+}
+_BASEMENT_CODES: dict[str, str] = {
+    "0": "none", "A": "full, finished", "B": "full, semi-finished",
+    "C": "full, unfinished", "D": "full, unknown finish",
+    "E": "partial, finished", "F": "partial, semi-finished",
+    "G": "partial, unfinished", "H": "partial, unknown finish",
+    "I": "unknown size, finished", "J": "unknown size, unfinished",
+}
+_YES_NO = {"Y": "yes", "N": "no", "1": "yes", "0": "no"}
+
+RECORDED_CODES: dict[str, dict[str, str]] = {
+    "char_exterior_condition": _CONDITION_CODES,
+    "char_interior_condition": _CONDITION_CODES,
+    "char_basement": _BASEMENT_CODES,
+    "char_central_air": _YES_NO,
+}
+
+
+def decode_recorded(feature: str, value: object) -> str | None:
+    """City-code translation for a recorded fact ("4" -> "average (code 4)"),
+    or None when the code isn't in OPA's published dictionary."""
+    if value is None:
+        return None
+    raw = str(int(value)) if isinstance(value, float) and value.is_integer() else str(value)
+    raw = raw.strip().upper()
+    meaning = RECORDED_CODES.get(feature, {}).get(raw)
+    if meaning is None:
+        return None
+    if feature == "char_central_air":
+        return meaning
+    return f"{meaning} (code {raw})"
 
 
 @dataclass(frozen=True)

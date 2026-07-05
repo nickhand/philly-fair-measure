@@ -6,29 +6,24 @@
  * per-race dollar claim — on the defensible (financed) sample that story
  * reverses, so it stays in the technical docs with its full caveats. */
 import { SITE } from '@/config/site'
+/** All figures come from web/src/data/siteStats.json — regenerate with
+ * `philly export-web-stats` after every retrain (never hand-edit). */
+import stats from '@/data/siteStats.json'
 
-/** Assessment level as % of real sale prices, by home-value group
- * (mortgage-financed sales, out-of-time test). */
+const t = stats.tiers_financed
 const tiers = [
-  { group: 'Cheapest fifth of homes', city: 126, ours: 103 },
-  { group: 'Priciest fifth of homes', city: 88, ours: 94 },
+  { group: 'Cheapest fifth of homes', city: t.q1.opa_pct, ours: t.q1.model_pct },
+  { group: 'Priciest fifth of homes', city: t.q5.opa_pct, ours: t.q5.model_pct },
 ]
 
-/** Tax burden shifted from lower- to higher-value homes, $M per year
- * (financed benchmark; the stricter all-sales benchmark is ~$650M total). */
-const shifted = [
-  { year: 2016, m: 55 },
-  { year: 2017, m: 59 },
-  { year: 2018, m: 57 },
-  { year: 2019, m: 30 },
-  { year: 2020, m: 15 },
-  { year: 2021, m: 1 },
-  { year: 2022, m: -2 },
-  { year: 2023, m: 38 },
-  { year: 2024, m: 38 },
-  { year: 2025, m: 64 },
-]
-const SHIFT_MAX = 70
+const redis = stats.redistribution
+/** Full years only for the chart (the partial current year would mislead). */
+const shifted = redis.years.filter((y) => !y.partial).map((y) => ({ year: y.year, m: y.millions }))
+const SHIFT_MAX = Math.max(...shifted.map((s) => Math.abs(s.m)), 1) * 1.1
+
+const cash = stats.cash
+const cashAllOf10 = Math.round(cash.share_all_pct / 10)
+const cashQ1Of10 = Math.round(cash.share_q1_pct / 10)
 
 function barW(pct: number): number {
   return (pct / 140) * 100
@@ -57,8 +52,9 @@ function colH(m: number): number {
       </h2>
       <p class="mt-1.5 text-body-sm leading-relaxed text-body">
         100% means the city’s value matches what homes really sell for. The cheapest fifth of
-        Philadelphia homes is assessed at <strong>126%</strong> — owners pay tax on more value than
-        their homes have. The priciest fifth sits at <strong>88%</strong>. Economists call this
+        Philadelphia homes is assessed at <strong>{{ t.q1.opa_pct }}%</strong> — owners pay tax on
+        more value than their homes have. The priciest fifth sits at
+        <strong>{{ t.q5.opa_pct }}%</strong>. Economists call this
         <em>regressivity</em>; in plain terms, it quietly shifts tax from expensive homes onto
         cheap ones.
       </p>
@@ -100,9 +96,11 @@ function colH(m: number): number {
       <p class="mt-1.5 text-body-sm leading-relaxed text-body">
         Property tax is a fixed pie: every dollar the bottom over-pays, the top under-pays.
         Comparing each year’s roll to a fair one, lower-value homes over-paid about
-        <strong>$357 million</strong> from 2016 to 2025 (about $226 per Philadelphian) — roughly
-        <strong>$300–350 a year per lower-value home</strong> in the worst years. On a stricter
-        all-sales benchmark the total is closer to <strong>$650 million</strong>.
+        <strong>${{ redis.total_financed_musd }} million</strong> from
+        {{ redis.year_span.replace('–', ' to ') }} (about ${{ redis.per_resident_usd }} per
+        Philadelphian) — roughly <strong>$300–350 a year per lower-value home</strong> in the
+        worst years. On a stricter all-sales benchmark the total is closer to
+        <strong>${{ redis.total_raw_musd }} million</strong>.
       </p>
 
       <div class="mt-4" role="img" aria-label="Tax burden shifted from lower to higher value homes, by year, in millions: 55 in 2016, 59 in 2017, 57 in 2018, 30 in 2019, 15 in 2020, 1 in 2021, minus 2 in 2022, 38 in 2023, 38 in 2024, 64 in 2025.">
@@ -136,10 +134,11 @@ function colH(m: number): number {
       <p class="text-caption font-bold text-brand-600">FINDING 3</p>
       <h2 class="mt-1 text-title font-bold text-ink">Philadelphia has two housing markets.</h2>
       <p class="mt-1.5 text-body-sm leading-relaxed text-body">
-        About <strong>4 in 10</strong> Philadelphia home sales are all-cash — investors and
-        wholesalers, concentrated in disinvested neighborhoods — and those homes sell for roughly
-        <strong>40% less</strong> than similar financed homes. In the cheapest fifth of the market,
-        <strong>6 in 10</strong> sales are cash.
+        About <strong>{{ cashAllOf10 }} in 10</strong> Philadelphia home sales are all-cash —
+        investors and wholesalers, concentrated in disinvested neighborhoods — and those homes
+        sell for roughly <strong>{{ Math.abs(cash.discount_pct ?? 0) }}% less</strong> than
+        financed homes in the same district. In the cheapest fifth of recent sales,
+        <strong>{{ cashQ1Of10 }} in 10</strong> are cash.
       </p>
       <p class="mt-2 text-body-sm leading-relaxed text-body">
         This complicates the story honestly: measured against regular mortgage-financed sales, the
@@ -181,7 +180,9 @@ function colH(m: number): number {
     </section>
 
     <p class="mt-4 text-caption leading-normal text-faint">
-      Measured on Philadelphia deed records 2016–2025; model run 20260705T015912Z. Full methods,
+      Measured on Philadelphia deed records {{ redis.year_span }}; model run
+      {{ stats.meta.model_run_id }}, regenerated {{ stats.meta.generated_at }} via
+      <code>philly export-web-stats</code>. Full methods,
       caveats, and the analyses we deliberately do not headline (including why per-group dollar
       claims need care) are in the
       <a :href="SITE.modelDocsUrl" rel="noopener" class="font-semibold text-brand-600 underline"

@@ -296,6 +296,7 @@ def _peer_histogram(frame: pl.DataFrame, s: dict[str, Any]) -> list[HistBin]:
 def _drivers(root: Path, parcel_id: str, s: dict[str, Any]) -> Drivers | None:
     from philly_assessments.models.explain import (
         appeal_points,
+        decode_recorded,
         display_value,
         explain,
         plain_language,
@@ -337,7 +338,8 @@ def _drivers(root: Path, parcel_id: str, s: dict[str, Any]) -> Drivers | None:
         appeal_facts=[
             AppealFact(
                 label=p.label,
-                recorded=display_value(p.feature, p.recorded_value)
+                recorded=decode_recorded(p.feature, p.recorded_value)
+                or display_value(p.feature, p.recorded_value)
                 or ("—" if p.recorded_value is None else str(p.recorded_value)),
                 dollars=round(p.dollar_effect),
                 implausible=p.implausible,

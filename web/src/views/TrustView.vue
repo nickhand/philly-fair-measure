@@ -14,54 +14,67 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import { SITE } from '@/config/site'
 import InfoTip from '@/components/ui/InfoTip.vue'
 
-/** IAAO-standard basis (time-adjusted, 3×IQR-trimmed) — the official convention. */
+/** All figures come from web/src/data/siteStats.json — regenerate with
+ * `philly export-web-stats` after every retrain (never hand-edit). */
+import stats from '@/data/siteStats.json'
+
+const iaao = stats.iaao_card
+const full = stats.full_card
+const meta = stats.meta
+
+const fmt = (v: number, digits = 3) => v.toFixed(digits)
+
+/** IAAO-standard basis (financed sales, time-adjusted, 3×IQR-trimmed). */
 const officialCard = [
   {
     q: 'Is the overall level right?',
     stat: 'Median ratio',
     target: '0.90 – 1.10',
-    city: '0.94',
-    cityPass: true,
-    ours: '0.97',
-    oursPass: true,
+    city: fmt(iaao.opa.median_ratio, 2),
+    cityPass: iaao.opa.median_ratio >= 0.9 && iaao.opa.median_ratio <= 1.1,
+    ours: fmt(iaao.model.median_ratio, 2),
+    oursPass: iaao.model.median_ratio >= 0.9 && iaao.model.median_ratio <= 1.1,
   },
   {
     q: 'Do similar homes get similar values?',
     stat: 'COD (uniformity)',
     target: '≤ 15',
-    city: '25.4',
-    cityPass: false,
-    ours: '17.0',
-    oursPass: false,
-    oursNote: 'just above — within IAAO tolerance for old rowhome stock',
+    city: fmt(iaao.opa.cod, 1),
+    cityPass: iaao.opa.cod <= 15,
+    ours: fmt(iaao.model.cod, 1),
+    oursPass: iaao.model.cod <= 15,
+    oursNote:
+      iaao.model.cod > 15 && iaao.model.cod <= 20
+        ? 'above the strict target — within IAAO tolerance for old rowhome stock'
+        : undefined,
   },
   {
     q: 'Are cheap homes over-valued vs expensive ones?',
     stat: 'PRD (vertical equity)',
     target: '0.98 – 1.03',
-    city: '1.115',
-    cityPass: false,
-    ours: '1.029',
-    oursPass: true,
+    city: fmt(iaao.opa.prd),
+    cityPass: iaao.opa.prd >= 0.98 && iaao.opa.prd <= 1.03,
+    ours: fmt(iaao.model.prd),
+    oursPass: iaao.model.prd >= 0.98 && iaao.model.prd <= 1.03,
   },
   {
     q: 'Same question, the preferred test',
     stat: 'PRB (vertical equity)',
     target: 'within ±0.05',
-    city: '−0.148',
-    cityPass: false,
-    ours: '−0.022',
-    oursPass: true,
+    city: fmt(iaao.opa.prb),
+    cityPass: Math.abs(iaao.opa.prb) <= 0.05,
+    ours: fmt(iaao.model.prb),
+    oursPass: Math.abs(iaao.model.prb) <= 0.05,
   },
 ]
 
-/** Full-sample basis (no trim) — what every homeowner actually experiences. */
+/** Full-sample basis (every arms-length sale, no trim). */
 const fullCard = [
-  { stat: 'Median ratio', target: '0.90 – 1.10', city: '0.983', ours: '0.975' },
-  { stat: 'COD', target: '≤ 15', city: '34.5', ours: '25.9' },
-  { stat: 'PRD', target: '0.98 – 1.03', city: '1.190', ours: '1.071' },
-  { stat: 'PRB', target: '±0.05', city: '−0.234', ours: '−0.060' },
-  { stat: 'Typical error (MAPE)', target: '—', city: '34.0%', ours: '25.4%' },
+  { stat: 'Median ratio', target: '0.90 – 1.10', city: fmt(full.opa.median_ratio), ours: fmt(full.model.median_ratio) },
+  { stat: 'COD', target: '≤ 15', city: fmt(full.opa.cod, 1), ours: fmt(full.model.cod, 1) },
+  { stat: 'PRD', target: '0.98 – 1.03', city: fmt(full.opa.prd), ours: fmt(full.model.prd) },
+  { stat: 'PRB', target: '±0.05', city: fmt(full.opa.prb), ours: fmt(full.model.prb) },
+  { stat: 'Typical error (MAPE)', target: '—', city: `${full.opa.mape_pct}%`, ours: `${full.model.mape_pct}%` },
 ]
 </script>
 
@@ -119,7 +132,7 @@ const fullCard = [
     <!-- the head-to-head -->
     <SectionCard
       title="The official test, head to head"
-      subtitle="The IAAO ratio study compares values to what homes actually sold for. Here is the city's roll and our model on the exact same sales, scored the official way."
+      subtitle="The IAAO ratio study compares values to what homes actually sold for — on mortgage-financed sales, the standard's own market-value definition. Same homes, same sales, official scoring."
     >
       <div class="space-y-3">
         <div
@@ -161,9 +174,9 @@ const fullCard = [
         </div>
       </div>
       <p class="mt-3 text-body-sm text-body">
-        <strong>The bottom line:</strong> our model passes both fairness-across-price tests; the
-        city’s roll fails all three of the strict tests. Both were scored on the same homes and
-        the same sales.
+        <strong>The bottom line:</strong> our model passes the level test and both
+        fairness-across-price tests; the city’s roll fails every one. Both were scored on the
+        same homes and the same sales.
       </p>
       <InfoTip label="What these tests mean, in plain words">
         “Median ratio” asks whether values are centered on real prices. “COD” asks whether similar
@@ -330,9 +343,10 @@ const fullCard = [
       </details>
 
       <p class="mt-4 text-caption text-faint">
-        Source: out-of-time test slice of model run 20260705T015912Z, n ≈ 19,500 arms-length
-        Philadelphia sales; the sale-chasing check uses the assesspy implementation across
-        TY2025–2026. Every figure is reproducible from the
+        Source: out-of-time test slice of model run {{ meta.model_run_id }}, n =
+        {{ meta.n_test.toLocaleString() }} arms-length Philadelphia sales (regenerated
+        {{ meta.generated_at }} via <code>philly export-web-stats</code>); the sale-chasing check
+        uses the assesspy implementation across TY2025–2026. Every figure is reproducible from the
         <a :href="SITE.githubUrl" rel="noopener" class="font-semibold text-brand-600 underline"
           >open-source pipeline</a
         >

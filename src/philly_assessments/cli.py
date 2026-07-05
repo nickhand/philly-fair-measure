@@ -540,6 +540,15 @@ def _cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_export_web_stats(args: argparse.Namespace) -> int:
+    from philly_assessments.web_stats import export_web_stats
+
+    stats = export_web_stats(args.data_dir, args.out)
+    meta = stats["meta"]
+    print(f"web stats -> {args.out} (run {meta['model_run_id']}, n_test {meta['n_test']:,})")
+    return 0
+
+
 def _cmd_api(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -980,6 +989,16 @@ def main(argv: list[str] | None = None) -> int:
     api.add_argument("--port", type=int, default=8000)
     api.add_argument("--data-dir", type=Path)
     api.set_defaults(func=_cmd_api)
+
+    web_stats = subparsers.add_parser(
+        "export-web-stats",
+        help="recompute the dashboard's headline stats into web/src/data/siteStats.json",
+    )
+    web_stats.add_argument(
+        "--out", type=Path, default=Path("web/src/data/siteStats.json")
+    )
+    web_stats.add_argument("--data-dir", type=Path)
+    web_stats.set_defaults(func=_cmd_export_web_stats)
 
     comps = subparsers.add_parser(
         "comps", help="comparable sales for a property (parcel id or address fragment)"

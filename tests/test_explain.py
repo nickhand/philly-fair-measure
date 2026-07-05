@@ -82,3 +82,15 @@ def test_display_value_gates_and_formats_for_residents():
     assert display_value("mkt_knn_log_ppsf", 6.2306) is None
     assert display_value("loc_census_tract_raw", 1.0) is None
     assert display_value("char_livable_area", None) is None
+
+
+def test_decode_recorded_translates_published_city_codes():
+    from philly_assessments.models.explain import decode_recorded
+
+    assert decode_recorded("char_interior_condition", "4") == "average (code 4)"
+    assert decode_recorded("char_exterior_condition", 4.0) == "average (code 4)"
+    assert decode_recorded("char_basement", "A") == "full, finished (code A)"
+    assert decode_recorded("char_central_air", "N") == "no"
+    # undocumented codes stay untranslated rather than risk invented meanings
+    assert decode_recorded("char_construction", "A") is None
+    assert decode_recorded("char_interior_condition", "9") is None

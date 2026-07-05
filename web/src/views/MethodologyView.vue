@@ -7,6 +7,11 @@
  * trust cross-link) are kept from the previous page. */
 import { computed, ref } from 'vue'
 import { SITE } from '@/config/site'
+import stats from '@/data/siteStats.json'
+
+const mapeModel = Math.round(stats.full_card.model.mape_pct)
+const mapeOpa = Math.round(stats.full_card.opa.mape_pct)
+const nTest = stats.meta.n_test
 
 const LEVELS = [50, 80, 90, 95] as const
 const level = ref<(typeof LEVELS)[number]>(90)
@@ -100,7 +105,8 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
     <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
       <h2 class="text-title font-bold text-ink">How our estimates hold up</h2>
       <p class="mt-1 text-caption text-muted">
-        Checked against ~19,500 real sales the model never saw (out-of-time test, 2026).
+        Checked against {{ nTest.toLocaleString() }} real sales the model never saw (out-of-time
+        test, {{ stats.meta.generated_at.slice(0, 4) }}).
       </p>
       <table class="mt-3 w-full text-left text-body-sm">
         <caption class="sr-only">Model accuracy compared with city assessments</caption>
@@ -114,8 +120,8 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
         <tbody class="text-body">
           <tr class="border-b border-line-faint">
             <th scope="row" class="py-2 pr-2 font-normal leading-snug">Typical miss vs. actual sale price</th>
-            <td class="py-2 pr-2 font-bold tabular-nums text-ink">25%</td>
-            <td class="py-2 tabular-nums">34%</td>
+            <td class="py-2 pr-2 font-bold tabular-nums text-ink">{{ mapeModel }}%</td>
+            <td class="py-2 tabular-nums">{{ mapeOpa }}%</td>
           </tr>
           <tr class="border-b border-line-faint">
             <th scope="row" class="py-2 pr-2 font-normal leading-snug">Sales landing inside our stated range</th>

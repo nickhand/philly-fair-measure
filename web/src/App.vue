@@ -63,58 +63,45 @@ import TaxYearBanner from '@/components/ui/TaxYearBanner.vue'
   </main>
 
   <footer class="mt-12 border-t border-line bg-white">
-    <div class="mx-auto max-w-5xl space-y-3 px-4 py-8 text-body-sm text-muted">
-      <div class="flex items-center gap-2">
-        <svg width="22" height="14" viewBox="0 0 26 17" aria-hidden="true">
+    <div class="mx-auto max-w-5xl px-4 py-7">
+      <!-- about: one paragraph, not five stacked lines -->
+      <div class="flex items-start gap-2.5">
+        <svg width="22" height="14" viewBox="0 0 26 17" aria-hidden="true" class="mt-1 shrink-0">
           <rect x="1" y="6" width="24" height="7" rx="3.5" fill="#b9d2ee" />
           <rect x="11" y="2" width="3.5" height="15" rx="1.2" fill="#0f4d90" />
           <circle cx="21" cy="3" r="2.6" fill="#f3c613" />
         </svg>
-        <span class="text-body-sm font-extrabold text-ink">Fair Measure</span>
+        <p class="max-w-3xl text-body-sm leading-relaxed text-muted">
+          <strong class="text-ink">Fair Measure</strong> is a free, independent tool built only
+          from the City of Philadelphia’s own open data — it is not run by the city. Our estimates
+          are not appraisals, and nothing here is legal or tax advice; before you act, check the
+          city’s records at
+          <a
+            href="https://property.phila.gov"
+            class="font-semibold text-brand-600 underline"
+            rel="noopener"
+            >property.phila.gov</a
+          >.
+        </p>
       </div>
-      <p>
-        <strong class="text-body">Fair Measure</strong> is a free, independent tool. It is not run by the
-        City of Philadelphia. It is built only from the city’s own open data.
-      </p>
-      <p>
-        Our estimates are not appraisals. This site is not legal or tax advice. Before you act,
-        check the city’s records at
-        <a
-          href="https://property.phila.gov"
-          class="font-semibold text-brand-600 underline"
-          rel="noopener"
-          >property.phila.gov</a
-        >.
-      </p>
-      <p>
-        No ads and no cookies. We collect anonymous usage statistics to improve the site.
-        <RouterLink to="/methodology" class="font-semibold text-brand-600 underline"
-          >Read exactly how this works</RouterLink
-        >,
-        <RouterLink to="/findings" class="font-semibold text-brand-600 underline"
-          >see what we found citywide</RouterLink
-        >, or check
-        <RouterLink to="/trust" class="font-semibold text-brand-600 underline"
-          >why you can trust these numbers</RouterLink
-        >.
-      </p>
-      <p>
-        The
-        <a :href="SITE.githubUrl" rel="noopener" class="font-semibold text-brand-600 underline"
-          >code and data pipeline</a
-        >
-        and the
-        <a :href="SITE.modelDocsUrl" rel="noopener" class="font-semibold text-brand-600 underline"
-          >technical model documentation</a
-        >
-        are public.
-      </p>
-      <p class="border-t border-line-faint pt-3 text-caption text-faint">
+
+      <!-- link row -->
+      <nav aria-label="Footer" class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-body-sm font-semibold">
+        <RouterLink to="/findings" class="text-brand-600 underline">What we found</RouterLink>
+        <RouterLink to="/methodology" class="text-brand-600 underline">How it works</RouterLink>
+        <RouterLink to="/trust" class="text-brand-600 underline">Why trust these numbers</RouterLink>
+        <a :href="SITE.githubUrl" rel="noopener" class="text-brand-600 underline">Code &amp; data pipeline</a>
+        <a :href="SITE.modelDocsUrl" rel="noopener" class="text-brand-600 underline">Model documentation</a>
+      </nav>
+
+      <!-- fine print -->
+      <p class="mt-4 border-t border-line-faint pt-3 text-caption text-faint">
         Designed and built by
         <a :href="SITE.creatorUrl" rel="noopener" class="font-semibold text-brand-600 underline"
           >{{ SITE.creatorName }}</a
         >
-        · Independent — not a City of Philadelphia product
+        · No ads, no cookies — anonymous usage statistics only · Independent, not a City of
+        Philadelphia product
       </p>
     </div>
   </footer>
