@@ -56,6 +56,8 @@ def test_explain_is_faithful_ranked_and_readable(tmp_path):
     for e in exps:
         assert e.value > 0 and e.base_value > 0
         assert e.drivers  # a model with signal attributes something
+        # mortgage-history features stay in the model but not in the lay panels
+        assert not any(d.feature.startswith("fin_") for d in e.drivers)
         # drivers are ranked by absolute contribution, largest first
         mags = [abs(d.contribution) for d in e.drivers]
         assert mags == sorted(mags, reverse=True)

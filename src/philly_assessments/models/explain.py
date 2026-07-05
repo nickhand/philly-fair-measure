@@ -123,11 +123,18 @@ FEATURE_LABELS: dict[str, tuple[str, str]] = {
     "evt_n_vacant_complaints_5y_before": ("vacancy complaints", _DISTRESS),
     "ten_rental_license_at_sale": ("rental license", _HOME),
     "ten_rental_units": ("rental units", _HOME),
-    "fin_n_mortgages_5y_before": ("recent mortgage activity", _SALES),
-    "fin_hard_money_5y_before": ("hard-money lending nearby", _DISTRESS),
+    # fin_ (mortgage-history) features are intentionally not surfaced — see
+    # _SUPPRESSED_PREFIXES.
 }
 
 _PREFIXES = ("char_", "mkt_", "loc_", "prox_", "dist_", "evt_", "ten_", "fin_", "shp_")
+
+# Feature families kept in the model but NOT surfaced as personal value drivers.
+# Mortgage-history signals (fin_) are entangled with credit access — the very
+# channel the cash/financed equity work identified behind the regressive pattern
+# — so "days since your last mortgage adds $X to your value" is both opaque and
+# ethically fraught to show a homeowner, even though it's a valid market input.
+_SUPPRESSED_PREFIXES = ("fin_",)
 
 # Only features whose raw value is self-explanatory to a homeowner get shown with
 # a value; everything else (log price surfaces, tract codes, encoded conditions)
@@ -244,7 +251,7 @@ def explain(run_dir: Path, df: pl.DataFrame) -> list[Explanation]:
         drivers = []
         for j, feat in enumerate(features):
             contribution = float(contribs[i, j])
-            if contribution == 0.0:
+            if contribution == 0.0 or feat.startswith(_SUPPRESSED_PREFIXES):
                 continue
             label, group = _label(feat)
             raw = df[feat][i] if feat in present else None
