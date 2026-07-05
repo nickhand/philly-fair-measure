@@ -195,7 +195,9 @@ def _cmd_build_proximity(args: argparse.Namespace) -> int:
 def _cmd_screen_assessments(args: argparse.Namespace) -> int:
     from philly_assessments.validation.opa import build_assessment_screen
 
-    result = build_assessment_screen(args.data_dir, chunk_size=args.chunk_size)
+    result = build_assessment_screen(
+        args.data_dir, chunk_size=args.chunk_size, allow_stale=args.allow_stale
+    )
     print(f"{result.manifest.row_count:,} rows -> {result.path}")
     for flag in sorted(result.flag_counts):
         print(f"  {flag:<26} {result.flag_counts[flag]:>9,}")
@@ -870,6 +872,12 @@ def main(argv: list[str] | None = None) -> int:
         "Bayesian predictive interval",
     )
     screen.add_argument("--chunk-size", type=int, default=50_000)
+    screen.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help="build even if a model run predates the feature mart (downgrades "
+        "the coherence refusal to a warning; the flags may be garbage)",
+    )
     screen.add_argument("--data-dir", type=Path)
     screen.set_defaults(func=_cmd_screen_assessments)
 

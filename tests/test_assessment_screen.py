@@ -199,3 +199,34 @@ def test_finalize_screen_flags_and_ranking():
     assert row["assessment_flag"] == "over_assessed_candidate"
     assert row["bldg_n_units"] == 42
     assert out2.filter(pl.col("model_family") == "residential")["bldg_n_units"].is_null().all()
+
+
+def test_screen_refuses_stale_runs(tmp_path):
+    # a run older than the mart it scores must refuse (relearned market areas
+    # relabel geography under the model — measured 10x false-flag explosion),
+    # unless the caller explicitly opts into staleness
+    from philly_assessments.ingest.manifests import DerivedManifest, write_derived_manifest
+    from philly_assessments.validation.opa import StaleRunError, _require_coherent
+
+    run_dir = tmp_path / "run_id=20260101T000000Z-bayesian"
+    run_dir.mkdir()
+
+    def manifest(built_at):
+        return DerivedManifest(
+            layer="models",
+            table="test",
+            built_at=built_at,
+            row_count=1,
+            inputs=[],
+            package_version="0",
+        )
+
+    write_derived_manifest(manifest(datetime(2026, 1, 1)), run_dir / "run.parquet")
+
+    stale_marts = (("sale_features", datetime(2026, 2, 1)),)
+    with pytest.raises(StaleRunError, match="train-bayesian"):
+        _require_coherent(run_dir, stale_marts, allow_stale=False)
+    # explicit opt-out downgrades to a warning
+    _require_coherent(run_dir, stale_marts, allow_stale=True)
+    # a run newer than the mart passes silently
+    _require_coherent(run_dir, (("sale_features", datetime(2025, 12, 1)),), allow_stale=False)

@@ -61,6 +61,49 @@ logger = logging.getLogger(__name__)
 _Z_SCALE = 3.29  # log-width of a 90% interval in standard-normal units (2 * 1.645)
 
 
+class StaleRunError(RuntimeError):
+    """A scoring run predates the feature mart it would score against."""
+
+
+_RETRAIN_HINTS = {
+    "baseline": "philly train-baseline",
+    "bayesian": "philly train-bayesian",
+    "retail": "philly retail-market",
+    "condo": "philly train-condo",
+    "bayesian-condo": "philly train-bayesian --family condo",
+}
+
+
+def _require_coherent(
+    run_dir: Path,
+    marts: tuple[tuple[str, datetime], ...],
+    *,
+    allow_stale: bool,
+) -> None:
+    """Refuse to score with a run older than the mart it scores against.
+
+    Rebuilding features (especially relearning market areas) relabels the
+    geography a run's effects are indexed by — a stale run then prices ~every
+    parcel with some other neighborhood's premium and the screen fills with
+    false flags (measured twice: 4x in July 2026 planning, 10x on 2026-07-05).
+    `allow_stale` downgrades the refusal to a warning for deliberate use."""
+    run_built = read_derived_manifest(run_dir / "run.parquet").built_at
+    for name, built in marts:
+        if run_built >= built:
+            continue
+        kind = run_dir.name.removeprefix("run_id=").split("-", 1)[-1]
+        hint = _RETRAIN_HINTS.get(kind, "retrain the model")
+        message = (
+            f"{run_dir.name} predates the current {name} mart "
+            f"({run_built} < {built}); its learned geography no longer matches "
+            f"the features, so the screen would be full of false flags. "
+            f"Retrain first (`{hint}`), or pass --allow-stale to build anyway."
+        )
+        if not allow_stale:
+            raise StaleRunError(message)
+        logger.warning("%s (building anyway: --allow-stale)", message)
+
+
 def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     """Pure classification/ranking step; expects prediction columns to be present."""
     has_assessment = (pl.col("opa_market_value").fill_null(0) > 0) & (pl.col("model_median") > 0)
@@ -158,6 +201,7 @@ def build_assessment_screen(
     *,
     valuation_date: datetime | None = None,
     chunk_size: int = 50_000,
+    allow_stale: bool = False,
 ) -> ScreenResult:
     root = data_dir if data_dir is not None else config.data_dir()
     if valuation_date is None:
@@ -175,6 +219,20 @@ def build_assessment_screen(
     for path in paths.values():
         if not path.exists():
             raise FileNotFoundError(f"{path} missing; run the pipeline first")
+
+    # coherence gate BEFORE the expensive feature assembly: models trained on
+    # an older feature mart are incoherent with fresh features (relearned
+    # market-area labels shift under the model), so refuse fast, not after
+    # five minutes of work
+    baseline_run = latest_run_dir("baseline", data_dir)
+    bayesian_run = latest_run_dir("bayesian", data_dir)
+    try:
+        retail_run: Path | None = latest_run_dir("retail", data_dir)
+    except FileNotFoundError:
+        retail_run = None
+    mart_built = read_derived_manifest(root / "marts" / "sale_features.parquet").built_at
+    for run_dir in (baseline_run, bayesian_run, *([retail_run] if retail_run else [])):
+        _require_coherent(run_dir, (("sale_features", mart_built),), allow_stale=allow_stale)
 
     optional = {}
     for name in (
@@ -222,21 +280,6 @@ def build_assessment_screen(
     )
     logger.info("assessment features persisted -> %s", features_path)
 
-    baseline_run = latest_run_dir("baseline", data_dir)
-    bayesian_run = latest_run_dir("bayesian", data_dir)
-    # models trained on an older feature mart are incoherent with fresh
-    # features (e.g. relearned market-area labels shift under the model)
-    mart_built = read_derived_manifest(root / "marts" / "sale_features.parquet").built_at
-    for run_dir in (baseline_run, bayesian_run):
-        run_manifest = read_derived_manifest(run_dir / "run.parquet")
-        if run_manifest.built_at < mart_built:
-            logger.warning(
-                "%s predates the current sale_features mart (%s < %s): retrain before "
-                "trusting this screen",
-                run_dir.name,
-                run_manifest.built_at,
-                mart_built,
-            )
     pred_lgb = score_lightgbm(baseline_run, features)
     if run_params(baseline_run).get("time_adjusted"):
         # ref-month estimates -> valuation-date estimates
@@ -280,10 +323,6 @@ def build_assessment_screen(
     # both value conventions (docs/equity-diagnostics.md): retail value from a
     # financed-only model, cash-market value via the published channel discount.
     # Optional — added only when a retail run exists; no propensity proxy.
-    try:
-        retail_run = latest_run_dir("retail", data_dir)
-    except FileNotFoundError:
-        retail_run = None
     if retail_run is not None:
         from philly_assessments.diagnostics.channel import (
             cash_market_value,
@@ -314,7 +353,9 @@ def build_assessment_screen(
 
     frames = [residential]
     condo_runs: list[Path] = []
-    condo = _condo_screen_frame(root, data_dir, valuation_date, paths, mart_built)
+    condo = _condo_screen_frame(
+        root, data_dir, valuation_date, paths, mart_built, allow_stale=allow_stale
+    )
     if condo is not None:
         frame, runs = condo
         frames.append(frame)
@@ -356,6 +397,8 @@ def _condo_screen_frame(
     valuation_date: datetime,
     paths: dict[str, Path],
     residential_mart_built: datetime,
+    *,
+    allow_stale: bool = False,
 ) -> tuple[pl.DataFrame, list[Path]] | None:
     """Condo rows for the screen, or None when the condo model isn't built.
 
@@ -385,17 +428,7 @@ def _condo_screen_frame(
         ("sale_features", residential_mart_built),
     )
     for run_dir in (condo_run, *([bayes_run] if bayes_run is not None else [])):
-        run_built = read_derived_manifest(run_dir / "run.parquet").built_at
-        for name, built in marts:
-            if run_built < built:
-                logger.warning(
-                    "%s predates the current %s mart (%s < %s): retrain before "
-                    "trusting condo screen rows",
-                    run_dir.name,
-                    name,
-                    run_built,
-                    built,
-                )
+        _require_coherent(run_dir, marts, allow_stale=allow_stale)
 
     proximity_path = root / "marts" / "proximity.parquet"
     features = assemble_condo_assessment_features(
