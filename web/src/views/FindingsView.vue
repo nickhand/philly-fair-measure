@@ -44,11 +44,11 @@ function colH(m: number): number {
       findings matter most — including one in the city’s favor.
     </p>
 
-    <!-- Finding 1: regressivity -->
+    <!-- Finding 1: regressivity is real — and fixable -->
     <section class="mt-5 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
       <p class="text-caption font-bold text-brand-600">FINDING 1</p>
       <h2 class="mt-1 text-title font-bold text-ink">
-        Cheaper homes are over-assessed. Pricier homes are under-assessed.
+        Cheaper homes are over-assessed — and it doesn’t have to be that way.
       </h2>
       <p class="mt-1.5 text-body-sm leading-relaxed text-body">
         100% means the city’s value matches what homes really sell for. The cheapest fifth of
@@ -59,9 +59,13 @@ function colH(m: number): number {
         cheap ones.
       </p>
 
-      <div class="mt-4" role="img" aria-label="Assessment level by home-value group. Cheapest fifth: city 126 percent, our model 103 percent. Priciest fifth: city 88 percent, our model 94 percent. 100 percent is fair.">
-        <div v-for="t in tiers" :key="t.group" class="mb-3" aria-hidden="true">
-          <p class="text-body-sm font-semibold text-ink">{{ t.group }}</p>
+      <div
+        class="mt-4"
+        role="img"
+        :aria-label="`Assessment level by home-value group. Cheapest fifth: city ${t.q1.opa_pct} percent, our model ${t.q1.model_pct} percent. Priciest fifth: city ${t.q5.opa_pct} percent, our model ${t.q5.model_pct} percent. 100 percent is fair.`"
+      >
+        <div v-for="tier in tiers" :key="tier.group" class="mb-3" aria-hidden="true">
+          <p class="text-body-sm font-semibold text-ink">{{ tier.group }}</p>
           <div class="relative mt-1.5 space-y-1">
             <!-- fair line at 100% -->
             <div
@@ -69,21 +73,27 @@ function colH(m: number): number {
               :style="{ left: `${barW(100)}%` }"
             ></div>
             <div class="flex items-center gap-2">
-              <div class="h-4 rounded-r-sm bg-[#9db1c7]" :style="{ width: `${barW(t.city)}%` }"></div>
-              <span class="money shrink-0 text-caption font-bold text-muted">City {{ t.city }}%</span>
+              <div class="h-4 rounded-r-sm bg-[#9db1c7]" :style="{ width: `${barW(tier.city)}%` }"></div>
+              <span class="money shrink-0 text-caption font-bold text-muted">City {{ tier.city }}%</span>
             </div>
             <div class="flex items-center gap-2">
-              <div class="h-4 rounded-r-sm bg-brand-600" :style="{ width: `${barW(t.ours)}%` }"></div>
-              <span class="money shrink-0 text-caption font-bold text-brand-600">Ours {{ t.ours }}%</span>
+              <div class="h-4 rounded-r-sm bg-brand-600" :style="{ width: `${barW(tier.ours)}%` }"></div>
+              <span class="money shrink-0 text-caption font-bold text-brand-600">Ours {{ tier.ours }}%</span>
             </div>
           </div>
         </div>
         <p class="text-caption text-faint" aria-hidden="true">dashed line = 100% (fair)</p>
       </div>
-      <p class="mt-2 text-caption text-muted">
-        Mortgage-financed sales the model never trained on. Our model isn’t perfect — but it cuts
-        the unfairness roughly in half and passes the official fairness tests.
+      <p class="mt-2 text-body-sm leading-relaxed text-body">
+        The blue bars are the point: this pattern is not a foregone conclusion. Using only the
+        city’s own open data, our model puts the same groups at
+        <strong>{{ t.q1.model_pct }}%</strong> and <strong>{{ t.q5.model_pct }}%</strong> on the
+        same sales — most of the gap is gone. Regressive assessments are a modeling problem, and
+        modeling problems can be fixed.
         <RouterLink to="/trust" class="font-semibold text-brand-600 underline">See the proof</RouterLink>.
+      </p>
+      <p class="mt-2 text-caption text-muted">
+        Measured on mortgage-financed sales the model never trained on.
       </p>
     </section>
 
@@ -161,7 +171,8 @@ function colH(m: number): number {
           <strong>Almost every city has this pattern.</strong> Research covering ~26 million U.S.
           sales finds the cheapest homes assessed at roughly twice the rate of the most expensive,
           nearly everywhere. Philadelphia isn’t uniquely bad — it sits inside a structural,
-          nationwide failure.
+          nationwide failure. (Which is also why Finding 1 matters: the fix is a method, not a
+          miracle.)
         </li>
       </ul>
     </section>

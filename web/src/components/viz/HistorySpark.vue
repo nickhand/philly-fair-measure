@@ -106,13 +106,46 @@ const ariaLabel = computed(() => {
     s += ` The home sold for ${moneyCompact(sale.price as number)} in ${sale.year}.`
   return s
 })
+
+/** Hover/touch readout: snap to the nearest assessment year and show its
+ * value (plus the sale, if one happened that year). Purely transient — the
+ * aria description and the "Recorded sales" list carry the non-visual path. */
+const hover = ref<{ year: number; value: number; sale: number | null; sx: number; sy: number } | null>(
+  null,
+)
+
+function onMove(e: PointerEvent) {
+  const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect()
+  const yr = x.value.invert(e.clientX - rect.left)
+  let best: YearValue | undefined
+  for (const a of props.assessments)
+    if (!best || Math.abs(a.year - yr) < Math.abs(best.year - yr)) best = a
+  if (!best) return
+  const b = best
+  const sale = pricedSales.value.find((s) => s.year === b.year)
+  hover.value = {
+    year: b.year,
+    value: b.value,
+    sale: sale ? (sale.price as number) : null,
+    sx: x.value(b.year),
+    sy: y.value(b.value),
+  }
+}
 </script>
 
 <template>
-  <div ref="wrapper" class="w-full">
-    <svg :width="width" :height="HEIGHT" :viewBox="`0 0 ${width} ${HEIGHT}`" role="img" :aria-label="ariaLabel" class="block w-full font-sans">
+  <div ref="wrapper" class="relative w-full">
+    <svg
+      :width="width" :height="HEIGHT" :viewBox="`0 0 ${width} ${HEIGHT}`" role="img"
+      :aria-label="ariaLabel" class="block w-full touch-none font-sans"
+      @pointermove="onMove" @pointerdown="onMove" @pointerleave="hover = null"
+    >
       <line :x1="PAD" :y1="BASE" :x2="width - PAD" :y2="BASE" stroke="#dfe5ec" stroke-width="1" />
       <path :d="path" fill="none" stroke="#0f4d90" stroke-width="2.5" stroke-linecap="round" />
+      <template v-if="hover">
+        <line :x1="hover.sx" :y1="TOP" :x2="hover.sx" :y2="BASE" stroke="#c6d0dc" stroke-width="1" aria-hidden="true" />
+        <circle :cx="hover.sx" :cy="hover.sy" r="3.5" fill="#ffffff" stroke="#0f4d90" stroke-width="2" aria-hidden="true" />
+      </template>
       <template v-if="last">
         <circle :cx="x(last.year)" :cy="y(last.value)" r="4" fill="#0f4d90" />
         <text :x="x(last.year)" :y="Math.max(11, y(last.value) - 8)" text-anchor="end" font-size="12.5" font-weight="700" fill="#0f4d90" style="font-variant-numeric: tabular-nums">
@@ -140,5 +173,20 @@ const ariaLabel = computed(() => {
       <text :x="PAD" :y="BASE + 15" text-anchor="start" font-size="11.5" fill="#8593a4">{{ years[0] }}</text>
       <text :x="width - PAD" :y="BASE + 15" text-anchor="end" font-size="11.5" fill="#8593a4">{{ years[1] }}</text>
     </svg>
+    <div
+      v-if="hover"
+      aria-hidden="true"
+      class="pointer-events-none absolute z-10 -translate-x-1/2 whitespace-nowrap rounded-md border border-line bg-white px-2 py-1 text-caption shadow-popover"
+      :style="{
+        left: `${Math.min(Math.max(hover.sx, 72), width - 72)}px`,
+        top: `${Math.max(0, hover.sy - 34)}px`,
+      }"
+    >
+      <span class="font-bold text-ink tabular-nums">{{ hover.year }}</span>
+      <span class="text-body tabular-nums"> · assessed {{ moneyCompact(hover.value) }}</span>
+      <span v-if="hover.sale != null" class="font-semibold text-[#8a6100] tabular-nums">
+        · sold {{ moneyCompact(hover.sale) }}</span
+      >
+    </div>
   </div>
 </template>

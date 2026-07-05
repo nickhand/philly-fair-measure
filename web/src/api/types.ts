@@ -59,6 +59,8 @@ export interface AppealFact {
   recorded: string
   dollars: number
   implausible: boolean
+  /** The city has no value on file; the model substituted a typical value. */
+  missing: boolean
 }
 
 export interface Drivers {

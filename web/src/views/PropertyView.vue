@@ -465,13 +465,23 @@ function printPage() {
                     class="-mt-0.5 ml-0.5 inline-block"
                   ><path d="M12 3.5 21.5 20h-19Z" /><line x1="12" y1="10" x2="12" y2="14" /><circle cx="12" cy="17" r="0.5" fill="#c2410c" /></svg>
                 </th>
-                <td class="py-2 pr-3 text-body">{{ f.recorded }}</td>
+                <td class="py-2 pr-3" :class="f.missing ? 'italic text-muted' : 'text-body'">
+                  {{ f.recorded }}
+                </td>
                 <td class="py-2 text-right font-semibold tabular-nums text-ink">
                   {{ f.dollars >= 0 ? '+' : '−' }}{{ money(Math.abs(f.dollars)) }}
                 </td>
               </tr>
             </tbody>
           </table>
+          <p
+            v-if="report.drivers.appeal_facts.some((f) => f.missing)"
+            class="mt-2 text-caption text-faint"
+          >
+            “Not on file” means the city has no value recorded, so our model used a typical value
+            instead — that stand-in is what the dollar effect reflects. Getting a missing fact
+            onto the record can change the estimate.
+          </p>
           <p class="mt-2 text-caption text-faint">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="-mt-0.5 inline-block"><path d="M12 3.5 21.5 20h-19Z" /><line x1="12" y1="10" x2="12" y2="14" /><circle cx="12" cy="17" r="0.5" fill="#c2410c" /></svg>
             = this recorded value looks unusual for Philadelphia homes — double-check it.

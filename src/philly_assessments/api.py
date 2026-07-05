@@ -110,6 +110,9 @@ class AppealFact(BaseModel):
     recorded: str
     dollars: float
     implausible: bool
+    # the city has no value on file; the model used a typical value instead,
+    # and that substitution is what the dollar effect reflects
+    missing: bool = False
 
 
 class Drivers(BaseModel):
@@ -334,9 +337,10 @@ def _drivers(root: Path, parcel_id: str, s: dict[str, Any]) -> Drivers | None:
                 label=p.label,
                 recorded=decode_recorded(p.feature, p.recorded_value)
                 or display_value(p.feature, p.recorded_value)
-                or ("—" if p.recorded_value is None else str(p.recorded_value)),
+                or ("Not on file" if p.recorded_value is None else str(p.recorded_value)),
                 dollars=round(p.dollar_effect),
                 implausible=p.implausible,
+                missing=p.recorded_value is None,
             )
             for p in appeal_points(exp, characteristics)
         ],

@@ -64,14 +64,15 @@ import TaxYearBanner from '@/components/ui/TaxYearBanner.vue'
 
   <footer class="mt-12 border-t border-line bg-white">
     <div class="mx-auto max-w-5xl px-4 py-7">
-      <!-- about: one paragraph, not five stacked lines -->
-      <div class="flex items-start gap-2.5">
-        <svg width="22" height="14" viewBox="0 0 26 17" aria-hidden="true" class="mt-1 shrink-0">
+      <!-- about: one paragraph, not five stacked lines; the whole footer is a
+           centered colophon (glyph, paragraph, links, fine print) -->
+      <div class="flex flex-col items-center text-center">
+        <svg width="22" height="14" viewBox="0 0 26 17" aria-hidden="true" class="shrink-0">
           <rect x="1" y="6" width="24" height="7" rx="3.5" fill="#b9d2ee" />
           <rect x="11" y="2" width="3.5" height="15" rx="1.2" fill="#0f4d90" />
           <circle cx="21" cy="3" r="2.6" fill="#f3c613" />
         </svg>
-        <p class="max-w-3xl text-body-sm leading-relaxed text-muted">
+        <p class="mt-2 max-w-3xl text-body-sm leading-relaxed text-muted">
           <strong class="text-ink">Fair Measure</strong> is a free, independent tool built only
           from the City of Philadelphia’s own open data — it is not run by the city. Our estimates
           are not appraisals, and nothing here is legal or tax advice; before you act, check the

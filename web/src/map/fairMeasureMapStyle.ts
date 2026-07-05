@@ -93,12 +93,12 @@ export const legend = [
   },
   {
     hex: VERDICTS.within_range.hex,
-    label: 'Inside',
+    label: 'Inside our range',
     flags: ['within_range', 'no_assessment'],
   },
   {
     hex: VERDICTS.under_assessed_candidate.hex,
-    label: 'Below',
+    label: 'Below our range',
     flags: ['under_assessed_candidate'],
   },
 ] as const
