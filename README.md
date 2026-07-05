@@ -62,6 +62,7 @@ src/philly_assessments/
 docs/
   model.md             # model architecture, methodology, and results
   vertical-equity-report-card.md  # our metrics vs OPA vs IAAO bands (full + trimmed)
+  historical-redistribution.md    # what OPA's regressivity shifted, 2016-2025, in $
   features.md          # input feature registry
   source_inventory.md  # verified dataset inventory (Milestone 1)
   ccao-lessons.md      # patterns adopted from ccao-data
