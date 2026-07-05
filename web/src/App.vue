@@ -86,7 +86,10 @@ import TaxYearBanner from '@/components/ui/TaxYearBanner.vue'
       </div>
 
       <!-- link row -->
-      <nav aria-label="Footer" class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-body-sm font-semibold">
+      <nav
+        aria-label="Footer"
+        class="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 text-body-sm font-semibold"
+      >
         <RouterLink to="/findings" class="text-brand-600 underline">What we found</RouterLink>
         <RouterLink to="/methodology" class="text-brand-600 underline">How it works</RouterLink>
         <RouterLink to="/trust" class="text-brand-600 underline">Why trust these numbers</RouterLink>
@@ -95,7 +98,7 @@ import TaxYearBanner from '@/components/ui/TaxYearBanner.vue'
       </nav>
 
       <!-- fine print -->
-      <p class="mt-4 border-t border-line-faint pt-3 text-caption text-faint">
+      <p class="mt-4 border-t border-line-faint pt-3 text-center text-caption text-faint">
         Designed and built by
         <a :href="SITE.creatorUrl" rel="noopener" class="font-semibold text-brand-600 underline"
           >{{ SITE.creatorName }}</a

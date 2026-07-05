@@ -19,9 +19,10 @@ Two model families share the mart, distinguished by `model_family` +
                  (interval_method="bayesian_posterior")
     condo        88-prefix residential condo units (250-12,000 sqft); point
                  estimate from the latest condo LightGBM run, interval from
-                 spatially weighted conformal offsets around it
-                 (interval_method="conformal_knn") — the condo model has no
-                 Bayesian arm
+                 the condo Bayesian run's posterior predictive when one
+                 exists (interval_method="bayesian_posterior"), else from
+                 spatially weighted conformal offsets around the LightGBM
+                 prediction (interval_method="conformal_knn")
 
 `screen_z` expresses the disagreement in predictive-uncertainty units
 (log(OPA/median) scaled by the interval's log-width / 3.29, i.e. ~standard
@@ -62,9 +63,7 @@ _Z_SCALE = 3.29  # log-width of a 90% interval in standard-normal units (2 * 1.6
 
 def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     """Pure classification/ranking step; expects prediction columns to be present."""
-    has_assessment = (pl.col("opa_market_value").fill_null(0) > 0) & (
-        pl.col("model_median") > 0
-    )
+    has_assessment = (pl.col("opa_market_value").fill_null(0) > 0) & (pl.col("model_median") > 0)
     flag = (
         pl.when(~has_assessment)
         .then(pl.lit(AssessmentFlag.NONE))
@@ -140,8 +139,7 @@ def twin_uniformity(features: pl.DataFrame, *, min_set: int = 5) -> pl.DataFrame
         .filter(pl.col("twin_n") >= min_set)
         .with_columns(
             (
-                pl.col("opa_market_value")
-                / pl.col("opa_market_value").median().over("_twin_key")
+                pl.col("opa_market_value") / pl.col("opa_market_value").median().over("_twin_key")
             ).alias("opa_vs_twin_median")
         )
         .select("parcel_id", "twin_n", "opa_vs_twin_median")
@@ -163,8 +161,9 @@ def build_assessment_screen(
 ) -> ScreenResult:
     root = data_dir if data_dir is not None else config.data_dir()
     if valuation_date is None:
-        valuation_date = datetime.now(UTC).replace(tzinfo=None, hour=0, minute=0, second=0,
-                                                   microsecond=0)
+        valuation_date = datetime.now(UTC).replace(
+            tzinfo=None, hour=0, minute=0, second=0, microsecond=0
+        )
     paths = {
         "opa": root / "staged" / "opa_properties.parquet",
         "sales": root / "marts" / "sale_validity.parquet",
@@ -317,9 +316,9 @@ def build_assessment_screen(
     condo_runs: list[Path] = []
     condo = _condo_screen_frame(root, data_dir, valuation_date, paths, mart_built)
     if condo is not None:
-        frame, condo_run = condo
+        frame, runs = condo
         frames.append(frame)
-        condo_runs.append(condo_run)
+        condo_runs.extend(runs)
     screen = finalize_screen(pl.concat(frames, how="diagonal"))
 
     inputs = []
@@ -357,43 +356,46 @@ def _condo_screen_frame(
     valuation_date: datetime,
     paths: dict[str, Path],
     residential_mart_built: datetime,
-) -> tuple[pl.DataFrame, Path] | None:
+) -> tuple[pl.DataFrame, list[Path]] | None:
     """Condo rows for the screen, or None when the condo model isn't built.
 
-    Point estimate from the latest condo LightGBM run; 90% interval from
-    spatially weighted conformal offsets calibrated on the run's validation
-    slice (models/conformal.py) — frame-invariant log offsets, so they apply
-    at the valuation date exactly like the prediction."""
+    Point estimate from the latest condo LightGBM run. The 90% interval comes
+    from the condo Bayesian run when one exists — the same dual-model gate the
+    residential screen uses — falling back to spatially weighted conformal
+    offsets calibrated on the LightGBM run's validation slice
+    (models/conformal.py)."""
     from philly_assessments.features.condo_features import assemble_condo_assessment_features
-    from philly_assessments.models.conformal import (
-        calibration_from_run,
-        conformal_offsets,
-        xy_district,
-    )
 
     try:
         condo_run = latest_run_dir("condo", data_dir)
     except FileNotFoundError:
         logger.info("no condo run found; screening residential only")
         return None
+    try:
+        bayes_run: Path | None = latest_run_dir("bayesian-condo", data_dir)
+    except FileNotFoundError:
+        bayes_run = None
+        logger.info("no bayesian-condo run found; condo intervals fall back to conformal")
     condo_mart = root / "marts" / "condo_sale_features.parquet"
     if not condo_mart.exists():
         logger.info("condo mart missing; screening residential only")
         return None
-    condo_run_built = read_derived_manifest(condo_run / "run.parquet").built_at
-    for name, built in (
+    marts = (
         ("condo_sale_features", read_derived_manifest(condo_mart).built_at),
         ("sale_features", residential_mart_built),
-    ):
-        if condo_run_built < built:
-            logger.warning(
-                "%s predates the current %s mart (%s < %s): retrain before "
-                "trusting condo screen rows",
-                condo_run.name,
-                name,
-                condo_run_built,
-                built,
-            )
+    )
+    for run_dir in (condo_run, *([bayes_run] if bayes_run is not None else [])):
+        run_built = read_derived_manifest(run_dir / "run.parquet").built_at
+        for name, built in marts:
+            if run_built < built:
+                logger.warning(
+                    "%s predates the current %s mart (%s < %s): retrain before "
+                    "trusting condo screen rows",
+                    run_dir.name,
+                    name,
+                    run_built,
+                    built,
+                )
 
     proximity_path = root / "marts" / "proximity.parquet"
     features = assemble_condo_assessment_features(
@@ -417,19 +419,33 @@ def _condo_screen_frame(
 
     pred = score_lightgbm(condo_run, features)
     if run_params(condo_run).get("time_adjusted"):
-        pred = pred * np.exp(
-            -features["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy()
-        )
+        pred = pred * np.exp(-features["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy())
     condo_calibration = lightgbm_median_ratio(condo_run, model="condo_lightgbm")
-    cal = calibration_from_run(condo_run, data_dir)
-    xy, district = xy_district(features)
-    lo_off, hi_off = conformal_offsets(cal, xy, district, method="knn")
+
+    if bayes_run is not None:
+        median, pi_low, pi_high = score_bayesian_intervals(bayes_run, features)
+        interval_method = IntervalMethod.BAYESIAN
+    else:
+        from philly_assessments.models.conformal import (
+            calibration_from_run,
+            conformal_offsets,
+            xy_district,
+        )
+
+        cal = calibration_from_run(condo_run, data_dir)
+        xy, district = xy_district(features)
+        lo_off, hi_off = conformal_offsets(cal, xy, district, method="knn")
+        # the conformal residuals are measured around the isotonic-calibrated
+        # prediction, so that prediction anchors the interval and the flags
+        median = pred
+        pi_low, pi_high = pred * np.exp(lo_off), pred * np.exp(hi_off)
+        interval_method = IntervalMethod.CONFORMAL
 
     frame = features.select(
         "parcel_id",
-        pl.concat_str(
-            [pl.col("address"), pl.col("unit").fill_null("")], separator=" #"
-        ).alias("address"),
+        pl.concat_str([pl.col("address"), pl.col("unit").fill_null("")], separator=" #").alias(
+            "address"
+        ),
         "char_category",
         pl.col("char_unit_area").alias("char_livable_area"),
         "char_year_built",
@@ -442,13 +458,11 @@ def _condo_screen_frame(
     ).with_columns(
         pl.Series("pred_lightgbm", pred),
         pl.Series("pred_lightgbm_calibrated", pred / condo_calibration),
-        # the conformal residuals are measured around the isotonic-calibrated
-        # prediction, so that prediction anchors the interval and the flags
-        pl.Series("model_median", pred),
-        pl.Series("model_pi_low_90", pred * np.exp(lo_off)),
-        pl.Series("model_pi_high_90", pred * np.exp(hi_off)),
+        pl.Series("model_median", median),
+        pl.Series("model_pi_low_90", pi_low),
+        pl.Series("model_pi_high_90", pi_high),
         pl.lit(ModelFamily.CONDO).alias("model_family"),
-        pl.lit(IntervalMethod.CONFORMAL).alias("interval_method"),
+        pl.lit(interval_method).alias("interval_method"),
         pl.lit(valuation_date).alias("valuation_date"),
     )
-    return frame, condo_run
+    return frame, [condo_run, *([bayes_run] if bayes_run is not None else [])]

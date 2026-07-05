@@ -5,9 +5,11 @@ import pytest
 from philly_assessments.ingest.derived import write_derived_table
 from philly_assessments.ingest.manifests import InputRef
 from philly_assessments.models.bayesian import (
+    CONDO_SPEC,
     CovariateEncoder,
     GeoIndex,
     RBFBasis,
+    _sigma_design,
     train_bayesian,
 )
 from tests.test_baseline import _synthetic_mart
@@ -57,6 +59,42 @@ def test_covariate_encoder_survives_float_nan():
     encoder = CovariateEncoder.fit(df)
     x = encoder.transform(df)
     assert np.isfinite(x).all()
+
+
+def test_condo_family_spec_encoder_and_sigma():
+    df = pl.DataFrame(
+        {
+            "char_unit_area": [700.0, 1200.0, None],
+            "mkt_bldg_roll_mean_price": [300_000.0, None, 500_000.0],
+            "mkt_bldg_roll_ppsf": [350.0, None, 420.0],
+            "bldg_n_units": [24.0, 8.0, 150.0],
+            "char_beds": [1.0, 2.0, 2.0],
+            "char_baths": [1.0, 2.0, None],
+            "char_year_built": [1985.0, 2005.0, 1920.0],
+            "char_floor": [3.0, None, 12.0],
+            "unit_area_share": [0.02, 0.1, None],
+            "mkt_knn_log_ppsf": [5.8, 6.0, None],
+            "mkt_area_level_log_ppsf": [0.2, -0.1, 0.0],
+            "mkt_knn_mean_dist_m": [60.0, 200.0, None],
+            "char_exterior_condition": ["4", None, "3"],
+            "char_interior_condition": ["4", "3", None],
+        }
+    )
+    encoder = CovariateEncoder.fit(df, CONDO_SPEC)
+    assert encoder.family == "condo"
+    # one trailing missing indicator: the building roll (no prev-price analog)
+    assert encoder.feature_names[-1] == "bldg_roll_missing"
+    assert "log_unit_area" in encoder.feature_names
+    x = encoder.transform(df)
+    assert x.shape == (3, len(encoder.feature_names))
+    assert np.isfinite(x).all()
+    assert x[:, encoder.feature_names.index("bldg_roll_missing")].tolist() == [0.0, 1.0, 0.0]
+    # condo sigma design: evidence terms only, no style dummies
+    z = _sigma_design(df, "condo")
+    assert z.shape == (3, len(CONDO_SPEC.sigma_terms))
+    assert np.isfinite(z).all()
+    # runs persisted before families existed load as residential
+    assert CovariateEncoder(names=[], medians={}, means={}, stds={}).family == "residential"
 
 
 def test_parcel_index_repeats_only_and_leakage_safe():

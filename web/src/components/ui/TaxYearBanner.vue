@@ -29,9 +29,8 @@ function dismiss() {
       <p class="text-body-sm leading-relaxed text-body">
         <strong class="text-ink">The new Tax Year {{ SITE.assessmentTaxYear }} assessments are
         out.</strong>
-        If yours looks wrong, the free review and appeal windows are open now — formal appeals are
-        due by {{ SITE.appealDeadlineText }}.
-        <RouterLink to="/" class="font-semibold text-brand-600 underline">Check your home</RouterLink>.
+        If yours looks wrong, free First Level Reviews are due by
+        {{ SITE.flrDeadlineText }}, and formal appeals by {{ SITE.appealDeadlineText }}.
       </p>
       <button
         type="button"

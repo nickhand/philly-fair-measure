@@ -121,8 +121,14 @@ isotonic-calibrated) with condo features: unit characteristics,
 `unit_area_share` (the public-data stand-in for declared % ownership), and
 building-level leave-one-out rolling means. `building_id` itself is not a
 feature (~9k mostly-singleton levels would overfit); the rolling mean carries
-the building signal. Intervals come from the conformal engine (§5.6), not a
-Bayesian arm.
+the building signal. The condo family also has a Bayesian arm — the §5.4
+hierarchy retrained on the condo mart with condo covariates (unit area,
+building rolls, floor, `unit_area_share`, building size) and an evidence-only
+σ design (condo units have no style; the district effect carries
+geography-conditional width). Measured on the out-of-time condo test slice
+(n=1,868): 90% interval coverage 0.887, COD 23.8, R²(log) 0.78. The screen
+uses this posterior for condo intervals when a `bayesian-condo` run exists,
+falling back to conformal offsets (§5.6) otherwise.
 
 ### 5.6 Conformal intervals — frequentist cross-check
 Split-conformal intervals around the LightGBM point model, sharing **nothing**

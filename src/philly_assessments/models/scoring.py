@@ -19,9 +19,17 @@ logger = logging.getLogger(__name__)
 
 
 def latest_run_dir(kind: RunKind, data_dir: Path | None = None) -> Path:
-    """Newest run directory of a given kind."""
+    """Newest run directory of a given kind.
+
+    Exact kind match, not a suffix glob: run ids are <stamp>-<kind> where the
+    stamp has no dash, and one kind can be a suffix of another ("condo" vs
+    "bayesian-condo")."""
     root = data_dir if data_dir is not None else config.data_dir()
-    runs = sorted((root / "models").glob(f"run_id=*-{kind}"))
+    runs = sorted(
+        p
+        for p in (root / "models").glob("run_id=*")
+        if p.name.removeprefix("run_id=").split("-", 1)[-1] == kind
+    )
     if not runs:
         raise FileNotFoundError(f"no {kind} runs under {root / 'models'}; train first")
     return runs[-1]
@@ -82,7 +90,7 @@ def score_bayesian_intervals(
     x = encoder.transform(df)
     area, district = geo.indices(df)
     b = basis.transform(_xy(df)) if basis is not None else None
-    z = _sigma_design(df)
+    z = _sigma_design(df, encoder.family)
     parcel = parcels.seen(df) if parcels is not None else None
     if run_params(run_dir).get("time_adjusted") and "time_adj_log" in df.columns:
         adj = df["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy()

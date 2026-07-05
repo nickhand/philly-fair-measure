@@ -505,8 +505,8 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                         "properties": {
                             "id": r["parcel_id"],
                             "flag": r["assessment_flag"],
-                            # condo flags come from the conformal-only engine and
-                            # are weaker evidence; the map lets users separate them
+                            # condo flags come from the condo-unit model and
+                            # cluster in towers; the map lets users separate them
                             "family": r["model_family"],
                         },
                     }

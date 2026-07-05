@@ -78,40 +78,105 @@ PI_LOW, PI_HIGH = 0.05, 0.95
 N_RBF_CENTERS = 64
 MIN_DISTRICT_SEGMENT_N = 200
 
-_LOG1P_COVARIATES = {
-    "char_livable_area": "log_livable_area",
-    "char_lot_area": "log_lot_area",
-    "mkt_block_roll_mean_price": "log_block_roll",
-    "mkt_block_roll_ppsf": "log_block_roll_ppsf",
+
+@dataclass(frozen=True)
+class FamilySpec:
+    """Per-family covariate and sigma design. The hierarchy, likelihood, and
+    scoring machinery are shared between property families; only the inputs
+    differ (rowhomes have lots and styles, condo units have buildings)."""
+
+    name: str
+    mart: str  # marts/<mart>.parquet
+    log1p: dict[str, str]  # source column -> encoded name
+    linear: list[str]
+    ordinals: list[str]
+    missing: list[tuple[str, str]]  # (source column, indicator name)
+    sigma_terms: list[str]
+
+
+RESIDENTIAL_SPEC = FamilySpec(
+    name="residential",
+    mart="sale_features",
+    log1p={
+        "char_livable_area": "log_livable_area",
+        "char_lot_area": "log_lot_area",
+        "mkt_block_roll_mean_price": "log_block_roll",
+        "mkt_block_roll_ppsf": "log_block_roll_ppsf",
+    },
+    linear=[
+        "char_beds",
+        "char_baths",
+        "char_year_built",
+        "mkt_knn_log_ppsf",
+        "mkt_area_level_log_ppsf",
+        "mkt_knn_mean_dist_m",
+        # repeat-sales carry-forward: the parcel's previous sale price in the
+        # index reference frame — a direct prior estimate of y for the 62% of
+        # sales that are repeats. Paired with a missing indicator so non-repeats
+        # aren't imputed to a misleading "average previous price".
+        "mkt_parcel_prev_log_price_ref",
+    ],
+    ordinals=["char_exterior_condition", "char_interior_condition"],
+    missing=[
+        ("mkt_block_roll_mean_price", "block_roll_missing"),
+        ("mkt_parcel_prev_log_price_ref", "prev_price_missing"),
+    ],
+    sigma_terms=[
+        "block_roll_missing",
+        "knn_dist",
+        "style_twin",
+        "style_detached",
+        "style_other",
+    ],
+)
+
+CONDO_SPEC = FamilySpec(
+    name="condo",
+    mart="condo_sale_features",
+    log1p={
+        "char_unit_area": "log_unit_area",
+        "mkt_bldg_roll_mean_price": "log_bldg_roll",
+        "mkt_bldg_roll_ppsf": "log_bldg_roll_ppsf",
+        "bldg_n_units": "log_n_units",
+    },
+    linear=[
+        "char_beds",
+        "char_baths",
+        "char_year_built",
+        "char_floor",
+        "unit_area_share",
+        "mkt_knn_log_ppsf",
+        "mkt_area_level_log_ppsf",
+        "mkt_knn_mean_dist_m",
+    ],
+    ordinals=["char_exterior_condition", "char_interior_condition"],
+    missing=[("mkt_bldg_roll_mean_price", "bldg_roll_missing")],
+    # no style dummies (condo units have no char_style); evidence terms only —
+    # the district random effect still carries geography-conditional width
+    sigma_terms=["bldg_roll_missing", "knn_dist"],
+)
+
+FAMILY_SPECS: dict[str, FamilySpec] = {
+    "residential": RESIDENTIAL_SPEC,
+    "condo": CONDO_SPEC,
 }
-_LINEAR_COVARIATES = [
-    "char_beds",
-    "char_baths",
-    "char_year_built",
-    "mkt_knn_log_ppsf",
-    "mkt_area_level_log_ppsf",
-    "mkt_knn_mean_dist_m",
-    # repeat-sales carry-forward: the parcel's previous sale price in the
-    # index reference frame — a direct prior estimate of y for the 62% of
-    # sales that are repeats. Paired with a missing indicator so non-repeats
-    # aren't imputed to a misleading "average previous price".
-    "mkt_parcel_prev_log_price_ref",
-]
-_ORDINAL_COVARIATES = ["char_exterior_condition", "char_interior_condition"]
 
 
 @dataclass
 class CovariateEncoder:
-    """Impute-with-median + standardize, with parameters fitted on the train slice."""
+    """Impute-with-median + standardize, with parameters fitted on the train
+    slice. Carries its family name so scoring rebuilds the same raw covariate
+    frame; runs persisted before families existed load as residential."""
 
     names: list[str]
     medians: dict[str, float]
     means: dict[str, float]
     stds: dict[str, float]
+    family: str = "residential"
 
     @classmethod
-    def fit(cls, df: pl.DataFrame) -> CovariateEncoder:
-        raw = _raw_covariates(df)
+    def fit(cls, df: pl.DataFrame, spec: FamilySpec = RESIDENTIAL_SPEC) -> CovariateEncoder:
+        raw = _raw_covariates(df, spec)
         names = [c for c in raw.columns if not c.endswith("_missing")]
         medians, means, stds = {}, {}, {}
         for name in names:
@@ -120,50 +185,48 @@ class CovariateEncoder:
             filled = raw[name].fill_null(medians[name]).to_numpy()
             means[name] = float(np.mean(filled))
             stds[name] = float(np.std(filled)) or 1.0
-        return cls(names=names, medians=medians, means=means, stds=stds)
+        return cls(names=names, medians=medians, means=means, stds=stds, family=spec.name)
+
+    @property
+    def spec(self) -> FamilySpec:
+        return FAMILY_SPECS[self.family]
 
     def transform(self, df: pl.DataFrame) -> np.ndarray:
-        raw = _raw_covariates(df)
+        raw = _raw_covariates(df, self.spec)
         columns = [
             (raw[name].fill_null(self.medians[name]).to_numpy() - self.means[name])
             / self.stds[name]
             for name in self.names
         ]
-        columns += [
-            raw[name].to_numpy().astype(np.float64) for name in self._missing_names
-        ]
+        columns += [raw[name].to_numpy().astype(np.float64) for name in self._missing_names]
         return np.column_stack(columns)
 
     @property
     def _missing_names(self) -> list[str]:
         # stable order: derived from the covariate definitions, not the run
-        return ["block_roll_missing", "prev_price_missing"]
+        return [indicator for _, indicator in self.spec.missing]
 
     @property
     def feature_names(self) -> list[str]:
         return [*self.names, *self._missing_names]
 
 
-def _raw_covariates(df: pl.DataFrame) -> pl.DataFrame:
+def _raw_covariates(df: pl.DataFrame, spec: FamilySpec) -> pl.DataFrame:
     # fill_nan: float NaN (e.g. from upstream 0/0) is not null in polars and
     # would otherwise poison the encoder's mean/std for the whole column
     exprs = [
         pl.col(src).cast(pl.Float64).fill_nan(None).log1p().alias(dst)
-        for src, dst in _LOG1P_COVARIATES.items()
+        for src, dst in spec.log1p.items()
     ]
-    exprs += [pl.col(c).cast(pl.Float64).fill_nan(None) for c in _LINEAR_COVARIATES]
+    exprs += [pl.col(c).cast(pl.Float64).fill_nan(None) for c in spec.linear]
     exprs += [
         pl.col(c).cast(pl.String).cast(pl.Int32, strict=False).cast(pl.Float64)
-        for c in _ORDINAL_COVARIATES
+        for c in spec.ordinals
     ]
-    exprs.append(pl.col("mkt_block_roll_mean_price").is_null().alias("block_roll_missing"))
-    exprs.append(
-        pl.col("mkt_parcel_prev_log_price_ref")
-        .cast(pl.Float64)
-        .fill_nan(None)
-        .is_null()
-        .alias("prev_price_missing")
-    )
+    exprs += [
+        pl.col(src).cast(pl.Float64).fill_nan(None).is_null().alias(indicator)
+        for src, indicator in spec.missing
+    ]
     return df.select(exprs)
 
 
@@ -177,7 +240,9 @@ class GeoIndex:
 
     @classmethod
     def fit(
-        cls, df: pl.DataFrame, fine_col: str = "loc_market_area",
+        cls,
+        df: pl.DataFrame,
+        fine_col: str = "loc_market_area",
         coarse_col: str = "loc_district",
     ) -> GeoIndex:
         pairs = (
@@ -195,7 +260,9 @@ class GeoIndex:
         return cls(coarse=coarse, fine=fine, fine_to_coarse_ix=np.array(fine_coarse))
 
     def indices(
-        self, df: pl.DataFrame, fine_col: str = "loc_market_area",
+        self,
+        df: pl.DataFrame,
+        fine_col: str = "loc_market_area",
         coarse_col: str = "loc_district",
     ) -> tuple[np.ndarray, np.ndarray]:
         """(fine index or -1 if unseen, coarse index or -1 if unseen) per row."""
@@ -254,9 +321,7 @@ class RBFBasis:
     def fit(cls, xy: np.ndarray, n_centers: int = N_RBF_CENTERS, seed: int = 42) -> RBFBasis:
         from sklearn.cluster import KMeans
 
-        centers = (
-            KMeans(n_clusters=n_centers, n_init=4, random_state=seed).fit(xy).cluster_centers_
-        )
+        centers = KMeans(n_clusters=n_centers, n_init=4, random_state=seed).fit(xy).cluster_centers_
         # bandwidth ~ 1.5x median nearest-center spacing: overlapping, smooth
         from scipy.spatial import cKDTree
 
@@ -272,27 +337,23 @@ class RBFBasis:
 def _xy(df: pl.DataFrame) -> np.ndarray:
     from philly_assessments.features.market_areas import project_xy
 
-    out = df.select(
-        pl.col("loc_lon").alias("lon"), pl.col("loc_lat").alias("lat")
-    ).with_columns(*project_xy(pl.col("lon"), pl.col("lat")))
+    out = df.select(pl.col("loc_lon").alias("lon"), pl.col("loc_lat").alias("lat")).with_columns(
+        *project_xy(pl.col("lon"), pl.col("lat"))
+    )
     xy = out.select("x_m", "y_m").to_numpy()
     return np.asarray(np.nan_to_num(xy, nan=0.0), dtype=np.float64)
 
 
-SIGMA_TERM_NAMES = [
-    "block_roll_missing",
-    "knn_dist",
-    "style_twin",
-    "style_detached",
-    "style_other",
-]
-
-
-def _sigma_design(df: pl.DataFrame) -> np.ndarray:
-    """Design for log sigma: evidence density plus style, per the conditional
-    calibration finding (coverage 80-99.6% by district/style before v2.1)."""
-    missing = df["mkt_block_roll_mean_price"].is_null().to_numpy().astype(np.float64)
+def _sigma_design(df: pl.DataFrame, family: str = "residential") -> np.ndarray:
+    """Design for log sigma. Residential: evidence density plus style, per the
+    conditional calibration finding (coverage 80-99.6% by district/style before
+    v2.1). Condo: evidence terms only (units have no char_style); the district
+    random effect still carries geography-conditional width."""
     dist = df["mkt_knn_mean_dist_m"].cast(pl.Float64).fill_null(500.0).to_numpy()
+    if family == "condo":
+        missing = df["mkt_bldg_roll_mean_price"].is_null().to_numpy().astype(np.float64)
+        return np.column_stack([missing, np.log1p(dist) / 10.0])
+    missing = df["mkt_block_roll_mean_price"].is_null().to_numpy().astype(np.float64)
     style = df["char_style"].cast(pl.String).fill_null("unknown").to_numpy()
     return np.column_stack(
         [
@@ -409,9 +470,20 @@ def _fit_posterior(
 
 
 _DRAW_VARIABLES = (
-    "alpha_area", "alpha_district", "mu_city", "tau_area",
-    "beta", "tau_gp", "w_spatial", "g0", "g", "u_sigma_district",
-    "tau_sigma_district", "nu", "u_parcel", "tau_parcel",
+    "alpha_area",
+    "alpha_district",
+    "mu_city",
+    "tau_area",
+    "beta",
+    "tau_gp",
+    "w_spatial",
+    "g0",
+    "g",
+    "u_sigma_district",
+    "tau_sigma_district",
+    "nu",
+    "u_parcel",
+    "tau_parcel",
 )
 
 
@@ -507,16 +579,18 @@ def predict_price_draws(
 
 def load_run(
     run_dir: Path,
-) -> tuple[
-    dict[str, np.ndarray], CovariateEncoder, GeoIndex, RBFBasis | None, ParcelIndex | None
-]:
+) -> tuple[dict[str, np.ndarray], CovariateEncoder, GeoIndex, RBFBasis | None, ParcelIndex | None]:
     """Load a trained run's posterior draws, encoder, geography, and (optional)
     spatial basis and parcel index."""
     with np.load(run_dir / "posterior_draws.npz") as data:
         draws = {name: data[name] for name in data.files}
     cov = json.loads((run_dir / "covariates.json").read_text())
     encoder = CovariateEncoder(
-        names=cov["names"], medians=cov["medians"], means=cov["means"], stds=cov["stds"]
+        names=cov["names"],
+        medians=cov["medians"],
+        means=cov["means"],
+        stds=cov["stds"],
+        family=cov.get("family", "residential"),
     )
     g = json.loads((run_dir / "geography.json").read_text())
     geo = GeoIndex(
@@ -544,6 +618,7 @@ class BayesianRunResult:
 def train_bayesian(
     data_dir: Path | None = None,
     *,
+    family: str = "residential",
     test_fraction: float = 0.1,
     time_adjusted: bool = True,
     nu_fixed: float | None = 8.0,
@@ -557,15 +632,23 @@ def train_bayesian(
     seed: int = 42,
 ) -> BayesianRunResult:
     root = data_dir if data_dir is not None else config.data_dir()
-    mart_path = root / "marts" / "sale_features.parquet"
+    spec = FAMILY_SPECS[family]
+    mart_path = root / "marts" / f"{spec.mart}.parquet"
     if not mart_path.exists():
-        raise FileNotFoundError(f"{mart_path} missing; run `philly build-features` first")
+        raise FileNotFoundError(f"{mart_path} missing; run the feature build first")
 
-    df = _load_frame(mart_path)
+    if family == "residential":
+        df = _load_frame(mart_path)
+    else:
+        # condo mart is already one family; no category filter (mirrors condo.py)
+        df = pl.read_parquet(mart_path).sort("sale_date", "sale_id")
+        if "time_adj_log" not in df.columns:
+            df = df.with_columns(pl.lit(0.0).alias("time_adj_log"))
     n_test = max(1, int(df.height * test_fraction))
     train_df, test_df = df.head(df.height - n_test), df.tail(n_test)
     logger.info(
-        "bayesian v2: %s train / %s test rows, %d draws x %d chains, time_adjusted=%s",
+        "bayesian v2 (%s): %s train / %s test rows, %d draws x %d chains, time_adjusted=%s",
+        family,
         f"{train_df.height:,}",
         f"{test_df.height:,}",
         draws,
@@ -573,7 +656,7 @@ def train_bayesian(
         time_adjusted,
     )
 
-    encoder = CovariateEncoder.fit(train_df)
+    encoder = CovariateEncoder.fit(train_df, spec)
     geo = GeoIndex.fit(train_df)
     rbf = RBFBasis.fit(_xy(train_df), seed=seed) if spatial_basis else None
     # opt-in per-parcel latent quality. Measured 2026-07-04: adds ~nothing over
@@ -593,7 +676,7 @@ def train_bayesian(
     idata = _fit_posterior(
         x_train,
         rbf.transform(_xy(train_df)) if rbf is not None else None,
-        _sigma_design(train_df),
+        _sigma_design(train_df, family),
         target(train_df),
         area_train,
         np.maximum(district_train, 0),
@@ -610,14 +693,12 @@ def train_bayesian(
 
     posterior_draws = _thin_draws(idata, max_prediction_draws, seed, nu_fixed=nu_fixed)
     area_test, district_test = geo.indices(test_df)
-    test_adj = (
-        test_df["time_adj_log"].to_numpy() if time_adjusted else np.zeros(test_df.height)
-    )
+    test_adj = test_df["time_adj_log"].to_numpy() if time_adjusted else np.zeros(test_df.height)
     price_draws = predict_price_draws(
         posterior_draws,
         encoder.transform(test_df),
         rbf.transform(_xy(test_df)) if rbf is not None else None,
-        _sigma_design(test_df),
+        _sigma_design(test_df, family),
         area_test,
         district_test,
         seed=seed,
@@ -643,6 +724,8 @@ def train_bayesian(
     rows = []
     for segment_type, segment, mask in segments:
         m = mask.to_numpy()
+        if segment_type != "overall" and not m.any():
+            continue  # e.g. residential categories absent from the condo mart
         rows.append(
             {
                 "model": "bayesian_hierarchical",
@@ -659,8 +742,16 @@ def train_bayesian(
     overall = evaluation.filter(pl.col("segment_type") == "overall").to_dicts()[0]
 
     hyper_summary = []
-    for name in ("mu_city", "tau_district", "tau_area", "tau_gp", "tau_parcel", "g0",
-                 "tau_sigma_district", "nu"):
+    for name in (
+        "mu_city",
+        "tau_district",
+        "tau_area",
+        "tau_gp",
+        "tau_parcel",
+        "g0",
+        "tau_sigma_district",
+        "nu",
+    ):
         if name not in idata.posterior:
             continue
         flat = idata.posterior[name].values.reshape(-1)
@@ -684,8 +775,8 @@ def train_bayesian(
                 "q95": float(np.quantile(beta_flat[:, i], 0.95)),
             }
         )
-    g_flat = idata.posterior["g"].values.reshape(-1, len(SIGMA_TERM_NAMES))
-    for i, name in enumerate(f"sigma_{term}" for term in SIGMA_TERM_NAMES):
+    g_flat = idata.posterior["g"].values.reshape(-1, len(spec.sigma_terms))
+    for i, name in enumerate(f"sigma_{term}" for term in spec.sigma_terms):
         hyper_summary.append(
             {
                 "parameter": name,
@@ -696,13 +787,15 @@ def train_bayesian(
             }
         )
 
-    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-bayesian"
+    suffix = "-bayesian" if family == "residential" else f"-bayesian-{family}"
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + suffix
     run_dir = root / "models" / f"run_id={run_id}"
     run_dir.mkdir(parents=True, exist_ok=False)
     (run_dir / "params.json").write_text(
         json.dumps(
             {
                 "model_version": 2,
+                "family": family,
                 "draws": draws,
                 "tune": tune,
                 "chains": chains,
@@ -712,7 +805,7 @@ def train_bayesian(
                 "spatial_basis": spatial_basis,
                 "parcel_effect": parcel_effect,
                 "n_parcel_effects": parcels.n if parcels is not None else 0,
-                "sigma_terms": SIGMA_TERM_NAMES,
+                "sigma_terms": spec.sigma_terms,
                 "max_prediction_draws": max_prediction_draws,
                 "seed": seed,
                 "covariates": encoder.feature_names,
@@ -740,6 +833,7 @@ def train_bayesian(
     (run_dir / "covariates.json").write_text(
         json.dumps(
             {
+                "family": encoder.family,
                 "names": encoder.names,
                 "medians": encoder.medians,
                 "means": encoder.means,
@@ -762,9 +856,7 @@ def train_bayesian(
     )
     if rbf is not None:
         (run_dir / "rbf.json").write_text(
-            json.dumps(
-                {"centers": rbf.centers.tolist(), "bandwidth_m": rbf.bandwidth_m}, indent=2
-            )
+            json.dumps({"centers": rbf.centers.tolist(), "bandwidth_m": rbf.bandwidth_m}, indent=2)
             + "\n"
         )
     if parcels is not None:
@@ -789,6 +881,4 @@ def train_bayesian(
     )
     write_derived_manifest(manifest, run_dir / "run.parquet")
     logger.info("bayesian run %s -> %s", run_id, run_dir)
-    return BayesianRunResult(
-        run_dir=run_dir, run_id=run_id, overall=overall, evaluation=evaluation
-    )
+    return BayesianRunResult(run_dir=run_dir, run_id=run_id, overall=overall, evaluation=evaluation)

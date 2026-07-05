@@ -141,6 +141,7 @@ def _cmd_train_bayesian(args: argparse.Namespace) -> int:
 
     result = train_bayesian(
         args.data_dir,
+        family=args.family,
         test_fraction=args.test_fraction,
         nu_fixed=None if args.learn_nu else args.nu,
         spatial_basis=args.spatial_basis,
@@ -791,6 +792,12 @@ def main(argv: list[str] | None = None) -> int:
 
     bayes = subparsers.add_parser(
         "train-bayesian", help="train the hierarchical Bayesian model with predictive intervals"
+    )
+    bayes.add_argument(
+        "--family",
+        choices=("residential", "condo"),
+        default="residential",
+        help="property family: rowhome mart (default) or the condo-unit mart",
     )
     bayes.add_argument("--test-fraction", type=float, default=0.1)
     bayes.add_argument("--draws", type=int, default=800)

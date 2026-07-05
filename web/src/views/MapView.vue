@@ -27,9 +27,9 @@ const router = useRouter()
 const container = ref<HTMLDivElement | null>(null)
 /** Which legend groups are visible; chips toggle these on/off. */
 const enabledLabels = ref<Set<string>>(new Set(legend.map((l) => l.label)))
-/** Condo flags come from a different (conformal-only) engine and cluster in
- * Center City towers — a separate toggle (applied at every zoom) keeps them
- * from being read as the rowhome pattern. */
+/** Condo flags come from the condo-unit model and cluster in Center City
+ * towers — a separate toggle (applied at every zoom) keeps them from being
+ * read as the rowhome pattern. */
 const showCondos = ref(true)
 
 const FLAGGED = ['over_assessed_candidate', 'under_assessed_candidate']

@@ -20,7 +20,7 @@ from typing import Literal
 # Persisted model-run directory kinds (data/models/run_id=<stamp>-<kind>).
 # A Literal rather than a StrEnum: the values only ever appear as call-site
 # literals, where Literal gives static typo-checking with no conversion step.
-RunKind = Literal["baseline", "retail", "bayesian", "condo"]
+RunKind = Literal["baseline", "retail", "bayesian", "condo", "bayesian-condo"]
 
 
 class ValidityStatus(StrEnum):

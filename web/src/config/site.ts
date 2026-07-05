@@ -12,6 +12,7 @@ export const SITE = {
     'https://www.phila.gov/departments/office-of-property-assessment/property-assessments/#first-level-review-flr',
   /** The assessment cycle currently shown. Update on each reassessment. */
   assessmentTaxYear: 2027,
+  flrDeadlineText: 'September 1',
   appealDeadlineText: 'the first Monday of October 2026',
 } as const
 
