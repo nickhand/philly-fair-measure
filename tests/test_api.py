@@ -109,6 +109,17 @@ def test_report_degrades_without_model_artifacts(tmp_path):
     assert body["sale_history"] == []
 
 
+def test_flagged_parcels_returns_only_over_under(tmp_path):
+    c = _client(tmp_path)
+    fc = c.get("/api/parcels/flagged").json()
+    flags = {f["properties"]["flag"] for f in fc["features"]}
+    ids = {f["properties"]["id"] for f in fc["features"]}
+    assert flags == {"over_assessed_candidate", "under_assessed_candidate"}
+    assert ids == {"p2", "p3"}  # the within-range majority stays out
+    # cached second call returns the same payload
+    assert c.get("/api/parcels/flagged").json() == fc
+
+
 def test_admin_leaderboard_kinds(tmp_path):
     c = _client(tmp_path)
     over = c.get("/api/admin/leaderboard", params={"kind": "over", "n": 5}).json()

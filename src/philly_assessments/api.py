@@ -471,6 +471,38 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
         ]
         return {"type": "FeatureCollection", "features": features}
 
+    flagged_cache: dict[str, Any] = {}
+
+    @app.get("/api/parcels/flagged")
+    def parcels_flagged() -> dict[str, Any]:
+        """Every flagged (over/under) home citywide — small enough (~9k points)
+        to ship whole, so the map can show the pattern at low zoom. Built once
+        and cached; the within-range half-million stays viewport-only."""
+        if not flagged_cache:
+            sub = frame.filter(
+                pl.col("assessment_flag").is_in(
+                    [str(AssessmentFlag.OVER), str(AssessmentFlag.UNDER)]
+                )
+                & pl.col("loc_lon").is_not_null()
+            )
+            flagged_cache["fc"] = {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [r["loc_lon"], r["loc_lat"]],
+                        },
+                        "properties": {"id": r["parcel_id"], "flag": r["assessment_flag"]},
+                    }
+                    for r in sub.select(
+                        "parcel_id", "loc_lon", "loc_lat", "assessment_flag"
+                    ).to_dicts()
+                ],
+            }
+        return flagged_cache["fc"]  # type: ignore[no-any-return]
+
     @app.get("/api/property/{parcel_id}", response_model=PropertyCore)
     def property_core(parcel_id: str) -> PropertyCore:
         return _core(_row(frame, parcel_id))

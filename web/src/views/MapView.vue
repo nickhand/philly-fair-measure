@@ -15,7 +15,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { api } from '@/api/client'
 import type { PropertyCore, SearchHit } from '@/api/types'
-import { applyFairMeasurePaint, dotLayers, legend } from '@/map/fairMeasureMapStyle'
+import { applyFairMeasurePaint, dotLayers, flagColor, legend } from '@/map/fairMeasureMapStyle'
 import AddressSearch from '@/components/search/AddressSearch.vue'
 import PropertySheet from '@/components/map/PropertySheet.vue'
 
@@ -29,11 +29,13 @@ const enabledLabels = ref<Set<string>>(new Set(legend.map((l) => l.label)))
 
 function applyDotFilter() {
   const m = map.value
-  if (!m?.getLayer('fm-dots')) return
+  if (!m) return
   const flags = legend
     .filter((l) => enabledLabels.value.has(l.label))
     .flatMap((l) => [...l.flags])
-  m.setFilter('fm-dots', ['in', ['get', 'flag'], ['literal', flags]])
+  const expr = ['in', ['get', 'flag'], ['literal', flags]] as maplibregl.FilterSpecification
+  if (m.getLayer('fm-dots')) m.setFilter('fm-dots', expr)
+  if (m.getLayer('fm-dots-far')) m.setFilter('fm-dots-far', expr)
 }
 
 function toggleLegend(label: string) {
@@ -114,6 +116,27 @@ function ensureParcelLayer(m: maplibregl.Map) {
       data: { type: 'FeatureCollection', features: [] },
     })
     for (const layer of dotLayers('parcels')) m.addLayer({ ...layer, minzoom: MIN_PARCEL_ZOOM })
+    // Citywide pattern layer: every flagged home (~9k points, one cached
+    // payload) drawn below street zoom so over/under clustering reads at a
+    // glance; the viewport layer takes over past MIN_PARCEL_ZOOM.
+    m.addSource('flagged', { type: 'geojson', data: '/api/parcels/flagged' })
+    m.addLayer({
+      id: 'fm-dots-far',
+      type: 'circle',
+      source: 'flagged',
+      maxzoom: MIN_PARCEL_ZOOM,
+      paint: {
+        'circle-color': flagColor as unknown as string,
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2, 13, 3.2, 14.5, 4.5],
+        'circle-opacity': 0.8,
+      },
+    })
+    m.on('click', 'fm-dots-far', (e) => {
+      const id = e.features?.[0]?.properties?.id as string | undefined
+      if (id) openParcel(id)
+    })
+    m.on('mouseenter', 'fm-dots-far', () => (m.getCanvas().style.cursor = 'pointer'))
+    m.on('mouseleave', 'fm-dots-far', () => (m.getCanvas().style.cursor = ''))
     applyDotFilter()
     m.on('click', 'fm-dots', (e) => {
       const id = e.features?.[0]?.properties?.id as string | undefined
@@ -206,10 +229,10 @@ onBeforeUnmount(() => {
     <!-- zoom hint -->
     <div
       v-if="zoomedOut"
-      class="pointer-events-none absolute left-1/2 top-[118px] z-10 -translate-x-1/2 rounded-full bg-[rgba(22,36,58,0.85)] px-3.5 py-1.5 text-caption font-semibold text-white"
+      class="pointer-events-none absolute left-1/2 top-[118px] z-10 w-max max-w-[92vw] -translate-x-1/2 rounded-full bg-[rgba(22,36,58,0.85)] px-3.5 py-1.5 text-center text-caption font-semibold text-white"
       role="status"
     >
-      Zoom in to see individual homes
+      Showing flagged homes citywide — zoom in to see every home
     </div>
     <div
       v-if="loadError"

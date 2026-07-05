@@ -25,15 +25,16 @@ function goToProperty(hit: SearchHit) {
   router.push({ name: 'property', params: { parcelId: hit.parcel_id } })
 }
 
-const counters = computed(() =>
-  stats.value
-    ? [
-        { value: num(stats.value.properties), label: 'homes checked citywide' },
-        { value: num(stats.value.over + stats.value.under), label: 'flagged for a closer look' },
-        { value: '$0', label: 'to check or appeal' },
-      ]
-    : null,
-)
+/** Always renders — em-dash placeholders until /api/stats responds, so the
+ * layout never collapses when the API is slow or down. */
+const counters = computed(() => [
+  { value: stats.value ? num(stats.value.properties) : '—', label: 'homes checked citywide' },
+  {
+    value: stats.value ? num(stats.value.over + stats.value.under) : '—',
+    label: 'flagged for a closer look',
+  },
+  { value: '$0', label: 'to check or appeal' },
+])
 
 const promises = [
   {
@@ -69,8 +70,25 @@ const promises = [
       </div>
     </div>
 
+    <!-- citywide counters: the front-page numbers, prominent and always present -->
+    <div class="mx-auto mt-4 max-w-5xl px-4 sm:mt-6">
+      <dl
+        class="grid grid-cols-1 gap-4 rounded-lg border border-line-soft bg-white px-4 py-5 text-center sm:grid-cols-3 sm:px-6"
+      >
+        <div v-for="c in counters" :key="c.label">
+          <dd class="money text-3xl font-extrabold tracking-tight text-brand-600">{{ c.value }}</dd>
+          <dt class="mt-1 text-body-sm text-muted">{{ c.label }}</dt>
+        </div>
+      </dl>
+      <p class="mt-2 text-center text-body-sm">
+        <RouterLink to="/findings" class="font-semibold text-brand-600 underline"
+          >See what ten years of assessments add up to →</RouterLink
+        >
+      </p>
+    </div>
+
     <!-- three promises -->
-    <div class="mx-auto mt-4 grid max-w-5xl gap-3 px-4 sm:mt-6 sm:grid-cols-3 sm:gap-4">
+    <div class="mx-auto mt-4 grid max-w-5xl gap-3 px-4 sm:grid-cols-3 sm:gap-4">
       <div
         v-for="p in promises"
         :key="p.title"
@@ -88,20 +106,8 @@ const promises = [
       </div>
     </div>
 
-    <!-- counters + honesty -->
-    <div class="mx-auto mt-4 grid max-w-5xl gap-3 px-4 sm:grid-cols-[1.1fr_1fr] sm:gap-4">
-      <div
-        v-if="counters"
-        class="flex items-center justify-between gap-3 rounded-lg border border-line-soft bg-white px-4 py-3.5 text-center sm:px-5"
-      >
-        <template v-for="(c, i) in counters" :key="c.label">
-          <div v-if="i > 0" class="w-px self-stretch bg-line-soft" aria-hidden="true"></div>
-          <div>
-            <p class="text-lg font-extrabold tabular-nums text-ink sm:text-xl">{{ c.value }}</p>
-            <p class="mt-0.5 text-caption leading-tight text-muted sm:text-caption">{{ c.label }}</p>
-          </div>
-        </template>
-      </div>
+    <!-- honesty note -->
+    <div class="mx-auto mt-4 max-w-5xl px-4">
       <div class="flex items-center gap-2.5 rounded-lg border border-[#d8e4f2] bg-[#eef4fb] px-4 py-3.5">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f4d90" stroke-width="2" stroke-linecap="round" aria-hidden="true" class="shrink-0"><circle cx="12" cy="12" r="9.5" /><line x1="12" y1="11" x2="12" y2="16.5" /><circle cx="12" cy="7.5" r="0.6" fill="#0f4d90" /></svg>
         <p class="text-caption leading-relaxed text-body">

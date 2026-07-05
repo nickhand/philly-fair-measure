@@ -14,29 +14,42 @@ import { SITE } from '@/config/site'
       class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3"
       aria-label="Main"
     >
-      <RouterLink to="/" class="flex items-center gap-2.5">
+      <RouterLink to="/" class="flex items-center gap-2.5" aria-label="Fair Measure — home">
         <svg width="26" height="17" viewBox="0 0 26 17" aria-hidden="true">
           <rect x="1" y="6" width="24" height="7" rx="3.5" fill="#b9d2ee" />
           <rect x="11" y="2" width="3.5" height="15" rx="1.2" fill="#0f4d90" />
           <circle cx="21" cy="3" r="2.6" fill="#f3c613" />
         </svg>
-        <span class="flex flex-col leading-none">
+        <!-- mark-only on small phones so four nav links fit -->
+        <span class="hidden flex-col leading-none min-[480px]:flex">
           <span class="text-base font-extrabold tracking-tight text-ink">Fair Measure</span>
           <span class="mt-0.5 text-[9.5px] font-semibold uppercase tracking-[0.09em] text-muted">Philadelphia</span>
         </span>
       </RouterLink>
-      <div class="flex items-center gap-1 text-body-sm font-semibold sm:gap-2">
+      <div class="flex items-center gap-0.5 text-body-sm font-semibold sm:gap-1.5">
         <RouterLink
           to="/map"
-          class="rounded-sm px-3 py-2 text-[#334155] hover:bg-brand-50"
+          class="rounded-sm px-2 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
           active-class="bg-brand-50 text-brand-600"
           >Map</RouterLink
         >
         <RouterLink
-          to="/methodology"
-          class="rounded-sm px-3 py-2 text-[#334155] hover:bg-brand-50"
+          to="/findings"
+          class="rounded-sm px-2 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
           active-class="bg-brand-50 text-brand-600"
-          >How it works</RouterLink
+          >Findings</RouterLink
+        >
+        <RouterLink
+          to="/methodology"
+          class="rounded-sm px-2 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
+          active-class="bg-brand-50 text-brand-600"
+          >Methods</RouterLink
+        >
+        <RouterLink
+          to="/trust"
+          class="rounded-sm px-2 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
+          active-class="bg-brand-50 text-brand-600"
+          >The proof</RouterLink
         >
       </div>
     </nav>
@@ -74,8 +87,10 @@ import { SITE } from '@/config/site'
         We do not track you. No ads, no cookies, no analytics.
         <RouterLink to="/methodology" class="font-semibold text-brand-600 underline"
           >Read exactly how this works</RouterLink
-        >
-        or see
+        >,
+        <RouterLink to="/findings" class="font-semibold text-brand-600 underline"
+          >see what we found citywide</RouterLink
+        >, or check
         <RouterLink to="/trust" class="font-semibold text-brand-600 underline"
           >why you can trust these numbers</RouterLink
         >.

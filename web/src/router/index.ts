@@ -23,6 +23,12 @@ const router = createRouter({
       meta: { title: 'Assessment map' },
     },
     {
+      path: '/findings',
+      name: 'findings',
+      component: () => import('@/views/FindingsView.vue'),
+      meta: { title: 'What we found' },
+    },
+    {
       path: '/methodology',
       name: 'methodology',
       component: () => import('@/views/MethodologyView.vue'),
