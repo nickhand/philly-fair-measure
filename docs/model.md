@@ -125,26 +125,26 @@ method's assumptions.
 
 ## 6. Results
 
-Out-of-time test set, n≈19.5k, run `20260704T005329Z-baseline`. Identical test
+Out-of-time test set, n≈19.5k, run `20260705T015912Z-baseline`. Identical test
 set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
 |---|---|---|---|---|---|---|---|
-| **LightGBM** | **0.333** | **25.2%** | 0.981 | **25.6** | **1.082** | **−0.073** | 0.915 |
-| Ridge | 0.425 | 35.5% | 0.989 | 35.9 | 1.041 | −0.078 | 1.022 |
+| **LightGBM** | **0.335** | **25.4%** | 0.975 | **25.9** | **1.071** | **−0.060** | 0.933 |
+| Ridge | 0.436 | 37.7% | 1.022 | 36.9 | 1.038 | −0.054 | 1.022 |
 | **OPA (incumbent)** | 0.449 | 34.0% | 0.983 | 34.5 | 1.190 | −0.234 | 0.787 |
 
-The model is **more accurate** (RMSE 0.333 vs 0.449), **more uniform**
-(COD 25.6 vs 34.5), and **markedly less regressive** (PRD 1.08 vs 1.19; PRB
-−0.07 vs −0.23) than OPA on the same homes. IAAO ratio statistics (COD, PRD,
+The model is **more accurate** (RMSE 0.335 vs 0.449), **more uniform**
+(COD 25.9 vs 34.5), and **markedly less regressive** (PRD 1.07 vs 1.19; PRB
+−0.06 vs −0.23) than OPA on the same homes. IAAO ratio statistics (COD, PRD,
 PRB, MKI) come from assesspy; definitions in [ccao-lessons.md](ccao-lessons.md).
 
 Honest caveats:
 
-- The full-sample **COD 25.6 is above the IAAO ≤15 target** — it includes the
-  cash/distressed tail. On an IAAO-standard trimmed arm's-length sample both
-  figures fall substantially (the `philly iaao-bridge` ratio-study ladder
-  documents this); the model's *edge over OPA* holds throughout.
+- The full-sample **COD 25.9 is above the IAAO ≤15 target** — it includes the
+  cash/distressed tail. On an IAAO-standard trimmed arm's-length sample the model
+  clears the vertical-equity bands (COD 17.0, PRD 1.03, PRB −0.02) while OPA does
+  not — see the [vertical-equity report card](vertical-equity-report-card.md).
 - **Condos are the exception:** the condo LightGBM roughly *ties* OPA
   (RMSE 0.280 vs 0.278, COD 22.4 vs 18.8; 2026-07-04). Condos are homogeneous
   and sell frequently — where OPA's mass appraisal already does well.

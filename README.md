@@ -61,6 +61,7 @@ src/philly_assessments/
   cli.py               # `philly` command-line entry point
 docs/
   model.md             # model architecture, methodology, and results
+  vertical-equity-report-card.md  # our metrics vs OPA vs IAAO bands (full + trimmed)
   features.md          # input feature registry
   source_inventory.md  # verified dataset inventory (Milestone 1)
   ccao-lessons.md      # patterns adopted from ccao-data
