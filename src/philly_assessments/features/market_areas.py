@@ -4,9 +4,15 @@ OPA maintains 600+ hand-drawn GMAs, published only as PDF maps (verified
 2026-07-02). This module learns a comparable partition from arms-length sales:
 k-means over (projected x, projected y, month-detrended log $/sqft), then every
 residential parcel is assigned by majority vote of its k nearest sale points.
-Clustering on coordinates plus a smooth price level yields quasi-contiguous
-areas whose boundaries follow price discontinuities — the property GMAs are
-designed to capture (see docs/feature-plan-v2.md §1.2).
+Clustering on coordinates plus a smooth price level yields areas whose
+boundaries follow price discontinuities — the property GMAs are designed to
+capture (see docs/feature-plan-v2.md §1.2).
+
+Because the price dimension can pull spatially-separated pockets into one
+cluster, a post-hoc pass (`_enforce_contiguity`) then guarantees every final
+market area is a single connected blob: a disconnected pocket large enough to
+stand on its own becomes a new area (inheriting its parent's price level and
+district); smaller strays merge into the nearest area.
 
 Market areas are grouped into ~18 districts (k-means on area centroids), the
 geography used by the monthly price index (price_index.py) — coarse enough for
@@ -26,6 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 import polars as pl
 
 from philly_assessments import config
@@ -38,6 +45,11 @@ logger = logging.getLogger(__name__)
 DEFAULT_N_AREAS = 350
 DEFAULT_N_DISTRICTS = 18
 ASSIGN_NEIGHBORS = 7
+# a parcel farther than this (projected metres) from its area's body is a
+# disconnected pocket; such a pocket of >= MIN_SPLIT_PARCELS becomes its own
+# area, smaller ones merge into the nearest area
+CONTIGUITY_RADIUS_M = 300.0
+MIN_SPLIT_PARCELS = 50
 MIN_PPSF, MAX_PPSF = 10.0, 2000.0
 MIN_AREA_SQFT, MAX_AREA_SQFT = 300.0, 10_000.0
 
@@ -98,6 +110,75 @@ def _detrended(points: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def _enforce_contiguity(
+    assigned: npt.NDArray[np.int64], xy: npt.NDArray[np.float64], n_areas: int
+) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.int64]]:
+    """Make every area one spatially connected blob. Returns (new labels, parent)
+    where parent[final_area] is the original cluster it came from — split-off
+    areas inherit their parent's price level and district. Disconnected pockets
+    of >= MIN_SPLIT_PARCELS become new areas; smaller strays merge into the
+    nearest area (by nearest connected parcel)."""
+    from scipy.sparse.csgraph import connected_components
+    from scipy.spatial import cKDTree
+    from sklearn.neighbors import radius_neighbors_graph
+
+    def components(idx: npt.NDArray[np.int64]) -> tuple[int, npt.NDArray[np.int64]]:
+        graph = radius_neighbors_graph(xy[idx], radius=CONTIGUITY_RADIUS_M, mode="connectivity")
+        n_comp, comp = connected_components(graph, directed=False)
+        return int(n_comp), np.asarray(comp)
+
+    new = assigned.copy()
+    parent = list(range(n_areas))
+    next_label = n_areas
+
+    # pass 1: a big disconnected pocket becomes its own area; small strays are
+    # merged into the nearest kept parcel's area
+    orphan = np.zeros(len(assigned), dtype=bool)
+    for area in range(n_areas):
+        idx = np.flatnonzero(new == area)
+        if len(idx) < 2:
+            continue
+        n_comp, comp = components(idx)
+        if n_comp == 1:
+            continue
+        sizes = np.bincount(comp)
+        keep = int(sizes.argmax())
+        for c in range(n_comp):
+            if c == keep:
+                continue
+            members = idx[comp == c]
+            if sizes[c] >= MIN_SPLIT_PARCELS:
+                new[members] = next_label
+                parent.append(area)
+                next_label += 1
+            else:
+                orphan[members] = True
+    if orphan.any():
+        anchor = ~orphan
+        _, nn = cKDTree(xy[anchor]).query(xy[orphan], k=1)
+        new[orphan] = new[anchor][np.asarray(nn)]
+
+    # pass 2 (the guarantee): a stray can land farther than the radius and
+    # re-split its host area, so split every remaining disconnected component
+    # into its own area — a component is contiguous by definition, so nothing
+    # survives this
+    for area in np.unique(new).tolist():
+        idx = np.flatnonzero(new == area)
+        if len(idx) < 2:
+            continue
+        n_comp, comp = components(idx)
+        if n_comp == 1:
+            continue
+        keep = int(np.bincount(comp).argmax())
+        for c in range(n_comp):
+            if c == keep:
+                continue
+            new[idx[comp == c]] = next_label
+            parent.append(parent[area])  # inherit the ultimate parent cluster
+            next_label += 1
+    return new, np.asarray(parent, dtype=np.int64)
+
+
 @dataclass(frozen=True)
 class BuildResult:
     path: Path
@@ -139,14 +220,18 @@ def build_market_areas(
         .with_columns(*project_xy(pl.col("lon"), pl.col("lat")))
     )
     located = parcels.filter(pl.col("lonlat_status") == "ok")
+    located_xy = located.select("x_m", "y_m").to_numpy()
     tree = cKDTree(points.select("x_m", "y_m").to_numpy())
-    _, neighbor_ix = tree.query(located.select("x_m", "y_m").to_numpy(), k=ASSIGN_NEIGHBORS)
+    _, neighbor_ix = tree.query(located_xy, k=ASSIGN_NEIGHBORS)
     neighbor_labels = labels[neighbor_ix]  # (n_parcels, k)
-    assigned = np.array(
-        [np.bincount(row, minlength=n_areas).argmax() for row in neighbor_labels]
+    assigned = np.asarray(
+        [np.bincount(row, minlength=n_areas).argmax() for row in neighbor_labels], dtype=np.int64
     )
+    assigned, parent_ix = _enforce_contiguity(assigned, located_xy, n_areas)
+    n_areas_final = len(parent_ix)
+    logger.info("market areas after contiguity split: %d (was %d)", n_areas_final, n_areas)
 
-    # districts: cluster area spatial centroids
+    # districts: cluster ORIGINAL area spatial centroids
     points = points.with_columns(pl.Series("area_ix", labels))
     centroids = (
         points.group_by("area_ix")
@@ -166,6 +251,12 @@ def build_market_areas(
         .sort("area_ix")
         .with_columns(pl.Series("district_ix", district_of_area))
     )
+    # expand to the final area set: split-off areas inherit their parent's stats
+    final_stats = (
+        pl.DataFrame({"area_ix": np.arange(n_areas_final, dtype=np.int64), "parent_ix": parent_ix})
+        .join(area_stats.rename({"area_ix": "parent_ix"}), on="parent_ix", how="left")
+        .drop("parent_ix")
+    )
 
     def _ma_name(ix: pl.Expr) -> pl.Expr:
         return pl.format("ma_{}", ix.cast(pl.String).str.zfill(3))
@@ -173,7 +264,7 @@ def build_market_areas(
     assignments = (
         located.select("parcel_id")
         .with_columns(pl.Series("area_ix", assigned))
-        .join(area_stats, on="area_ix", how="left")
+        .join(final_stats, on="area_ix", how="left")
         .with_columns(
             _ma_name(pl.col("area_ix")).alias("market_area"),
             pl.format("d_{}", pl.col("district_ix").cast(pl.String).str.zfill(2)).alias(
@@ -205,7 +296,8 @@ def build_market_areas(
         "marts",
         "market_areas",
         inputs,
-        notes=f"n_areas={n_areas} n_districts={n_districts} seed={seed} "
+        notes=f"n_areas={n_areas}->{n_areas_final} (contiguity split, "
+        f"radius={CONTIGUITY_RADIUS_M}m) n_districts={n_districts} seed={seed} "
         f"assign_neighbors={ASSIGN_NEIGHBORS}",
     )
     return BuildResult(path=path, manifest=manifest)
