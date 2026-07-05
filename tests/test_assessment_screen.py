@@ -172,6 +172,8 @@ def test_finalize_screen_flags_and_ranking():
     by_id = {row["parcel_id"]: row for row in out.to_dicts()}
     assert by_id["over"]["screen_z"] > 0 and by_id["under"]["screen_z"] < 0
     assert by_id["over"]["opa_vs_model_ratio"] == pytest.approx(3.0)
+    # attention never applies to flagged/none rows; "ok" (z≈0.08) is comfortable
+    assert all(by_id[p]["attention"] is None for p in ("over", "under", "ok", "none"))
     # ranked by |screen_z|, most confident disagreement first; nulls last
     assert out["parcel_id"].to_list()[-1] == "none"
     assert abs(out["screen_z"][0]) >= abs(out["screen_z"][1])
@@ -199,6 +201,27 @@ def test_finalize_screen_flags_and_ranking():
     assert row["assessment_flag"] == "over_assessed_candidate"
     assert row["bldg_n_units"] == 42
     assert out2.filter(pl.col("model_family") == "residential")["bldg_n_units"].is_null().all()
+
+
+def test_finalize_screen_attention_tier():
+    # interval 150k-600k around a 300k median: log-width 1.386, sd ≈ 0.421.
+    # watch_high: opa 497k → z ≈ +1.2, inside the interval → attention "high";
+    # watch_low: opa 181k → z ≈ -1.2 → "low"; mid: opa 370k → z ≈ 0.5 → null.
+    df = pl.DataFrame(
+        {
+            "parcel_id": ["watch_high", "watch_low", "mid"],
+            "opa_market_value": [497_000.0, 181_000.0, 370_000.0],
+            "pred_lightgbm_calibrated": [300_000.0] * 3,
+            "model_median": [300_000.0] * 3,
+            "model_pi_low_90": [150_000.0] * 3,
+            "model_pi_high_90": [600_000.0] * 3,
+        }
+    )
+    out = {row["parcel_id"]: row for row in finalize_screen(df).to_dicts()}
+    assert all(r["assessment_flag"] == "within_range" for r in out.values())
+    assert out["watch_high"]["attention"] == "high"
+    assert out["watch_low"]["attention"] == "low"
+    assert out["mid"]["attention"] is None
 
 
 def test_screen_refuses_stale_runs(tmp_path):

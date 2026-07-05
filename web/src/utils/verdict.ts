@@ -15,7 +15,7 @@
  * text-over-text / text-under-text in the component templates instead.
  */
 
-import type { Flag } from '@/api/types'
+import type { Attention, Flag } from '@/api/types'
 
 export interface Verdict {
   flag: Flag
@@ -35,9 +35,9 @@ export interface Verdict {
 export const VERDICTS: Record<Flag, Verdict> = {
   within_range: {
     flag: 'within_range',
-    headline: 'Your assessment looks fair',
+    headline: 'Your assessment is inside our range',
     detail:
-      "The city's value for this home is inside our estimate range. The two numbers tell a similar story.",
+      "The city's value sits comfortably inside the range of prices this home could realistically sell for. Our range is wide on purpose — no model can pin down a home's exact value — so this means we see no sign of a problem, not that the number is perfect.",
     nextStep:
       'No action needed. If the facts the city has about your home are wrong, you can still ask them to fix the records.',
     textClass: 'text-fair',
@@ -76,6 +76,34 @@ export const VERDICTS: Record<Flag, Verdict> = {
   },
 }
 
-export function verdictFor(flag: Flag): Verdict {
+/** Watch tier: within the interval but near its edge (|screen_z| > 1).
+ * Deliberately weaker language than a flag — "worth a look", never "may be
+ * wrong" — with tinted (not full-strength) versions of the over/under hexes. */
+export const WATCH_VERDICTS: Record<'high' | 'low', Verdict> = {
+  high: {
+    flag: 'within_range',
+    headline: 'Your assessment sits near the top of our range',
+    detail:
+      "The city's value is still inside the range of prices this home could sell for, but close to its upper edge. That is not proof of a problem — it is a reason to look closer.",
+    nextStep:
+      'Check the facts the city has on file below, and see how your assessment compares with similar homes. If a recorded fact is wrong, the fix is free.',
+    textClass: 'text-over',
+    badgeClass: 'bg-over-soft text-over',
+    hex: '#d78361',
+  },
+  low: {
+    flag: 'within_range',
+    headline: 'Your assessment sits near the bottom of our range',
+    detail:
+      "The city's value is inside our range but close to its lower edge. A lower assessment usually means a lower tax bill.",
+    nextStep: 'Most owners do not need to do anything with this information.',
+    textClass: 'text-under',
+    badgeClass: 'bg-under-soft text-under',
+    hex: '#5b9dc2',
+  },
+}
+
+export function verdictFor(flag: Flag, attention: Attention = null): Verdict {
+  if (flag === 'within_range' && attention) return WATCH_VERDICTS[attention]
   return VERDICTS[flag] ?? VERDICTS.no_assessment
 }

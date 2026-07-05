@@ -21,6 +21,9 @@ def _screen_rows() -> list[dict]:
             "opa_vs_model_ratio": ratio,
             "screen_z": z,
             "assessment_flag": flag,
+            "attention": ("high" if z > 1 else "low" if z < -1 else None)
+            if flag == "within_range"
+            else None,
             "interval_method": "bayesian_posterior",
             "model_family": "residential",
             "twin_n": twin_n,
@@ -156,6 +159,8 @@ def test_parcels_bbox_filters(tmp_path):
     ids = {f["properties"]["id"] for f in fc["features"]}
     assert "p1" in ids and "p3" not in ids  # p3 is outside the box
     assert fc["features"][0]["geometry"]["type"] == "Point"
+    # the watch tier rides along for the map's tinted dots
+    assert "attention" in fc["features"][0]["properties"]
 
 
 def test_report_degrades_without_model_artifacts(tmp_path):

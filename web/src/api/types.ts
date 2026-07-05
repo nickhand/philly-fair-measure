@@ -6,6 +6,10 @@ export type Flag =
   | 'within_range'
   | 'no_assessment'
 
+/** Within-range but in the outer part of the interval — "worth a closer
+ * look", deliberately weaker language than a flag. */
+export type Attention = 'high' | 'low' | null
+
 export interface SearchHit {
   parcel_id: string
   address: string
@@ -35,6 +39,7 @@ export interface PropertyCore {
   ratio: number | null
   screen_z: number | null
   flag: Flag
+  attention: Attention
   twin_n: number | null
   twin_ratio: number | null
   lon: number | null

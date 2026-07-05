@@ -32,25 +32,26 @@ const enabledLabels = ref<Set<string>>(new Set(legend.map((l) => l.label)))
  * read as the rowhome pattern. */
 const showCondos = ref(true)
 
-const FLAGGED = ['over_assessed_candidate', 'under_assessed_candidate']
+/** OR the enabled legend chips of the given tiers into one layer filter;
+ * an all-off selection matches nothing. */
+function tierFilter(tiers: readonly string[]): maplibregl.FilterSpecification {
+  const exprs = legend
+    .filter((l) => tiers.includes(l.tier) && enabledLabels.value.has(l.label))
+    .map((l) => l.expr as unknown)
+  const combined = exprs.length ? ['any', ...exprs] : ['==', ['get', 'flag'], '__none__']
+  return (
+    showCondos.value ? combined : ['all', combined, ['!=', ['get', 'family'], 'condo']]
+  ) as maplibregl.FilterSpecification
+}
 
 function applyDotFilter() {
   const m = map.value
   if (!m) return
-  const enabled = legend
-    .filter((l) => enabledLabels.value.has(l.label))
-    .flatMap((l) => [...l.flags])
-  const withCondoRule = (flags: string[]) => {
-    const expr = ['in', ['get', 'flag'], ['literal', flags]]
-    return (
-      showCondos.value ? expr : ['all', expr, ['!=', ['get', 'family'], 'condo']]
-    ) as maplibregl.FilterSpecification
-  }
-  const flaggedEnabled = enabled.filter((f) => FLAGGED.includes(f))
-  const baseEnabled = enabled.filter((f) => !FLAGGED.includes(f))
-  if (m.getLayer('fm-dots-base')) m.setFilter('fm-dots-base', withCondoRule(baseEnabled))
-  if (m.getLayer('fm-dots-flagged')) m.setFilter('fm-dots-flagged', withCondoRule(flaggedEnabled))
-  if (m.getLayer('fm-dots-far')) m.setFilter('fm-dots-far', withCondoRule(flaggedEnabled))
+  if (m.getLayer('fm-dots-base')) m.setFilter('fm-dots-base', tierFilter(['base']))
+  // watch tints share the top layer so they paint above the gray majority
+  if (m.getLayer('fm-dots-flagged')) m.setFilter('fm-dots-flagged', tierFilter(['strong', 'watch']))
+  // the citywide payload only contains strong flags
+  if (m.getLayer('fm-dots-far')) m.setFilter('fm-dots-far', tierFilter(['strong']))
 }
 
 function toggleCondos() {

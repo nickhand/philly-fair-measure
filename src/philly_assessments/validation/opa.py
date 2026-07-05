@@ -27,7 +27,10 @@ Two model families share the mart, distinguished by `model_family` +
 `screen_z` expresses the disagreement in predictive-uncertainty units
 (log(OPA/median) scaled by the interval's log-width / 3.29, i.e. ~standard
 normal if the predictive distribution is right), so properties are ranked by
-how confidently the model disagrees — not just by raw dollar gap. Interpret
+how confidently the model disagrees — not just by raw dollar gap. Within-range
+rows additionally carry `attention` ("high"/"low"/null) when |screen_z| >
+_ATTENTION_Z: the OPA value is still inside the sale-plausibility interval but
+in its outer part — surfaced as "worth a closer look", never as a flag. Interpret
 candidates as *screening leads for comp-level review*, not verdicts: the
 models inherit every current_only characteristics caveat documented in
 docs/features.md.
@@ -54,11 +57,16 @@ from philly_assessments.models.scoring import (
     score_bayesian_intervals,
     score_lightgbm,
 )
-from philly_assessments.vocab import AssessmentFlag, IntervalMethod, ModelFamily
+from philly_assessments.vocab import AssessmentFlag, AttentionTier, IntervalMethod, ModelFamily
 
 logger = logging.getLogger(__name__)
 
 _Z_SCALE = 3.29  # log-width of a 90% interval in standard-normal units (2 * 1.645)
+# Attention tier: within-range rows whose OPA value sits beyond ~1 predictive
+# sd of the model median. Deliberately weaker than a flag (|z| > ~1.645): with
+# the median rowhome interval, z=1 still means OPA ~1.7x or ~0.6x our estimate,
+# but per-home sale noise keeps it short of a defensible over/under call.
+_ATTENTION_Z = 1.0
 
 
 class StaleRunError(RuntimeError):
@@ -68,7 +76,7 @@ class StaleRunError(RuntimeError):
 _RETRAIN_HINTS = {
     "baseline": "philly train-baseline",
     "bayesian": "philly train-bayesian",
-    "retail": "philly retail-market",
+    "retail": "philly train-baseline --market retail",
     "condo": "philly train-condo",
     "bayesian-condo": "philly train-bayesian --family condo",
 }
@@ -134,6 +142,21 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
             ),
         )
         .with_columns(pl.col("screen_z").abs().alias("screen_abs_z"))
+        .with_columns(
+            # attention: inside the interval but in its outer part — "worth a
+            # closer look", explicitly weaker language than a flag
+            pl.when(
+                (pl.col("assessment_flag") == AssessmentFlag.WITHIN)
+                & (pl.col("screen_abs_z") > _ATTENTION_Z)
+            )
+            .then(
+                pl.when(pl.col("screen_z") > 0)
+                .then(pl.lit(AttentionTier.HIGH))
+                .otherwise(pl.lit(AttentionTier.LOW))
+            )
+            .otherwise(pl.lit(None, dtype=pl.String))
+            .alias("attention")
+        )
         .sort("screen_abs_z", descending=True, nulls_last=True)
     )
 

@@ -12,7 +12,7 @@ import { verdictFor } from '@/utils/verdict'
 const props = defineProps<{ property: PropertyCore }>()
 defineEmits<{ close: [] }>()
 
-const verdict = computed(() => verdictFor(props.property.flag))
+const verdict = computed(() => verdictFor(props.property.flag, props.property.attention))
 const hasInterval = computed(
   () =>
     props.property.model_pi_low_90 != null &&

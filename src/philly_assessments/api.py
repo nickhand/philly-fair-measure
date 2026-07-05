@@ -86,6 +86,9 @@ class PropertyCore(BaseModel):
     ratio: float | None
     screen_z: float | None
     flag: str
+    # within-range but in the outer part of the interval ("high"/"low") —
+    # weaker evidence than a flag, shown as "worth a closer look"
+    attention: str | None = None
     twin_n: int | None
     twin_ratio: float | None
     lon: float | None
@@ -244,6 +247,7 @@ def _core(s: dict[str, Any]) -> PropertyCore:
         ratio=_f(s.get("opa_vs_model_ratio")),
         screen_z=_f(s.get("screen_z")),
         flag=str(s.get("assessment_flag") or AssessmentFlag.NONE),
+        attention=s.get("attention"),
         twin_n=_i(s.get("twin_n")),
         twin_ratio=_f(s.get("opa_vs_twin_median")),
         lon=_f(s.get("loc_lon")),
@@ -465,6 +469,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                 "properties": {
                     "id": r["parcel_id"],
                     "flag": r["assessment_flag"],
+                    "attention": r["attention"],
                     "opa": r["opa_market_value"],
                     "model": r["model_median"],
                     "family": r["model_family"],
@@ -475,6 +480,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                 "loc_lon",
                 "loc_lat",
                 "assessment_flag",
+                "attention",
                 "opa_market_value",
                 "model_median",
                 "model_family",

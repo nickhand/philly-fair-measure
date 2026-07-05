@@ -49,6 +49,15 @@ class AssessmentFlag(StrEnum):
     NONE = "no_assessment"
 
 
+class AttentionTier(StrEnum):
+    """Within-range rows whose OPA value sits in the outer part of the
+    interval (|screen_z| above the attention threshold) — weaker evidence
+    than a flag, presented as "worth a closer look" (validation/opa.py)."""
+
+    HIGH = "high"
+    LOW = "low"
+
+
 class IntervalMethod(StrEnum):
     """How a screen row's predictive interval was produced."""
 

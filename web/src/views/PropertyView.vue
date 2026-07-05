@@ -64,7 +64,9 @@ async function load(id: string) {
 
 watch(() => props.parcelId, load, { immediate: true })
 
-const verdict = computed(() => (core.value ? verdictFor(core.value.flag) : null))
+const verdict = computed(() =>
+  core.value ? verdictFor(core.value.flag, core.value.attention) : null,
+)
 const hasInterval = computed(
   () =>
     core.value != null &&
@@ -77,9 +79,12 @@ const hasInterval = computed(
 /** Delta pill: computed dollar gap (data, not verdict copy). */
 const deltaPill = computed(() => {
   if (!core.value || !hasInterval.value) return null
-  const { flag, opa_market_value: opa, model_pi_low_90: low, model_pi_high_90: high } = core.value
+  const { flag, attention, opa_market_value: opa, model_pi_low_90: low, model_pi_high_90: high } =
+    core.value
   if (flag === 'over_assessed_candidate') return `${money(opa! - high!)} above our highest estimate`
   if (flag === 'under_assessed_candidate') return `${money(low! - opa!)} below our lowest estimate`
+  if (flag === 'within_range' && attention === 'high') return 'Near the top of our 90% range'
+  if (flag === 'within_range' && attention === 'low') return 'Near the bottom of our 90% range'
   if (flag === 'within_range') return 'Inside our 90% range'
   return null
 })
