@@ -570,7 +570,8 @@ def _cmd_leaderboard(args: argparse.Namespace) -> int:
                       f"{gap:+.0f}% vs {int(r['twin_n'])} identical twins")
             else:
                 print(f"  {r['parcel_id']}  {addr:<34} OPA ${r['opa_market_value']:>10,.0f}  "
-                      f"model ${r['model_median']:>10,.0f}  {r['opa_vs_model_ratio']:.2f}x")
+                      f"model ${r['model_median']:>10,.0f}  {r['opa_vs_model_ratio']:.1f}x  "
+                      f"z {r['screen_z']:+.1f}")
 
     if args.reports:
         made = 0
