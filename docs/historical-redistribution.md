@@ -53,11 +53,17 @@ Bottom-40% (by value) net **over**-payment; the top-60% under-paid the same.
 two quintiles, the financed figure is on the order of **$300–350 per
 lower-value home in the regressive years**.
 
-**The shape tells a policy story.** Regressivity was worst in the **pre-reform
-years (2016–18)**, collapsed during the **2020–22 assessment freeze** (stale
-values are paradoxically uniform — 2022 was even slightly *progressive*), and has
-climbed back since the 2023 reassessment. So the harm tracks *assessment
-practice*, not something inherent.
+**The shape tells a policy story — but the 2020–22 dip is a trap, not a fix.**
+Regressivity was worst in the **pre-reform years (2016–18)** and has climbed back
+since the 2023 reassessment. The near-zero **2020–22** stretch is *not* the freeze
+making assessments fairer: the freeze locked the TY2020 roll while the market
+boomed, so rising sale prices pulled every assessed/sale ratio down (the median
+hit **0.63** by 2022 — everyone under-assessed relative to current prices), and
+the previously *over*-assessed cheap end was **absorbed by appreciation**, which
+masked the regressivity and briefly inverted it. It snapped right back at the
+2023 reassessment, and a freeze during a *falling* market would have made it
+worse. So the harm tracks *assessment practice*, but a rising market can
+temporarily hide it.
 
 ## Card 2 — by race, the intuitive story reverses
 
