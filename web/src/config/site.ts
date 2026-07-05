@@ -10,6 +10,9 @@ export const SITE = {
    * assessment notice, or owners can request one. */
   flrUrl:
     'https://www.phila.gov/departments/office-of-property-assessment/property-assessments/#first-level-review-flr',
+  /** The assessment cycle currently shown. Update on each reassessment. */
+  assessmentTaxYear: 2027,
+  appealDeadlineText: 'the first Monday of October 2026',
 } as const
 
 /** The city's own record of what it has on file for a property — the page an

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
 import { SITE } from '@/config/site'
+import TaxYearBanner from '@/components/ui/TaxYearBanner.vue'
 </script>
 
 <template>
@@ -8,6 +9,8 @@ import { SITE } from '@/config/site'
 
   <!-- flag-gold rule: the one place gold touches the chrome -->
   <div class="h-1 bg-gold" aria-hidden="true"></div>
+
+  <TaxYearBanner />
 
   <header class="border-b border-line bg-white">
     <nav
@@ -84,7 +87,7 @@ import { SITE } from '@/config/site'
         >.
       </p>
       <p>
-        We do not track you. No ads, no cookies, no analytics.
+        No ads and no cookies. We collect anonymous usage statistics to improve the site.
         <RouterLink to="/methodology" class="font-semibold text-brand-600 underline"
           >Read exactly how this works</RouterLink
         >,

@@ -36,11 +36,20 @@ const PAD = 24
 const BASE = 88
 const MAXBAR = 60
 
+/** Domain comes from the BINS ONLY: an extreme outlier "you" (e.g. 1142%)
+ * must not stretch the axis — it would crush the bins and pile the ticks on
+ * top of each other. Off-scale subjects clamp to the edge with an arrow. */
 const domain = computed(() => {
-  const lo = Math.min(...props.histogram.map((b) => b.x0), props.you)
-  const hi = Math.max(...props.histogram.map((b) => b.x1), props.you)
+  const lo = Math.min(...props.histogram.map((b) => b.x0))
+  const hi = Math.max(...props.histogram.map((b) => b.x1))
   return [lo, hi] as const
 })
+const clampedYou = computed(() =>
+  Math.min(Math.max(props.you, domain.value[0]), domain.value[1]),
+)
+const offScale = computed<'' | 'high' | 'low'>(() =>
+  props.you > domain.value[1] ? 'high' : props.you < domain.value[0] ? 'low' : '',
+)
 const x = computed(() =>
   scaleLinear().domain(domain.value).range([PAD, width.value - PAD]),
 )
@@ -84,10 +93,17 @@ const ariaLabel = computed(
       >
         Similar homes' middle {{ pct(peerMedian) }}
       </text>
-      <line :x1="x(you)" y1="34" :x2="x(you)" :y2="BASE" :stroke="youHex" stroke-width="2" stroke-dasharray="3 4" />
-      <circle :cx="x(you)" cy="34" r="3.5" :fill="youHex" />
-      <text :x="x(you) + 9 > width - 70 ? x(you) - 9 : x(you) + 9" y="30" :text-anchor="x(you) + 9 > width - 70 ? 'end' : 'start'" font-size="12.5" font-weight="700" :fill="youHex">
-        You {{ pct(you) }}
+      <line :x1="x(clampedYou)" y1="34" :x2="x(clampedYou)" :y2="BASE" :stroke="youHex" stroke-width="2" stroke-dasharray="3 4" />
+      <circle :cx="x(clampedYou)" cy="34" r="3.5" :fill="youHex" />
+      <text
+        :x="offScale === 'high' || x(clampedYou) + 9 > width - 70 ? x(clampedYou) - 9 : x(clampedYou) + 9"
+        y="30"
+        :text-anchor="offScale === 'high' || x(clampedYou) + 9 > width - 70 ? 'end' : 'start'"
+        font-size="12.5"
+        font-weight="700"
+        :fill="youHex"
+      >
+        You {{ pct(you) }}{{ offScale === 'high' ? ' →' : offScale === 'low' ? ' ←' : '' }}
       </text>
       <line :x1="PAD" :y1="BASE" :x2="width - PAD" :y2="BASE" stroke="#dfe5ec" stroke-width="1" />
       <text v-for="t in ticks" :key="t" :x="x(t)" :y="BASE + 15" text-anchor="middle" font-size="11.5" fill="#8593a4" style="font-variant-numeric: tabular-nums">

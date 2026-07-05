@@ -13,6 +13,7 @@ import { api, ApiError } from '@/api/client'
 import type { PropertyCore, Report } from '@/api/types'
 import { money, num, pct } from '@/utils/format'
 import { opaInquiryUrl, SITE } from '@/config/site'
+import { track } from '@/lib/analytics'
 import type { CompRow } from '@/api/types'
 import { verdictFor } from '@/utils/verdict'
 import IntervalStrip from '@/components/viz/IntervalStrip.vue'
@@ -50,6 +51,7 @@ async function load(id: string) {
         : 'Something went wrong loading this property. Please try again.'
     return
   }
+  track('report_viewed', { flag: core.value.flag, family: core.value.model_family })
   reportLoading.value = true
   try {
     report.value = await api.report(id)
@@ -106,6 +108,7 @@ const inquiryLink = computed(() =>
 
 
 async function loadComps() {
+  track('comps_shown')
   compsLoading.value = true
   compsError.value = false
   try {
@@ -125,6 +128,7 @@ function distMiles(m: number | null): string {
 const liveUrl = computed(() => (typeof window === 'undefined' ? '' : window.location.href))
 
 function printPage() {
+  track('report_printed')
   window.print()
 }
 </script>
@@ -205,7 +209,7 @@ function printPage() {
                survive printing and screen readers without the chart -->
           <dl class="mt-4 flex flex-wrap items-end gap-x-8 gap-y-2">
             <div>
-              <dt class="text-caption text-muted">City’s value</dt>
+              <dt class="text-caption text-muted">City’s value · Tax Year {{ SITE.assessmentTaxYear }}</dt>
               <dd class="money text-2xl font-extrabold tracking-tight" :class="verdict.textClass">
                 {{ money(core.opa_market_value) }}
               </dd>
@@ -474,29 +478,37 @@ function printPage() {
           </p>
         </template>
         <p v-else class="text-body-sm text-muted">
-          Compare the city’s recorded facts (size, condition, year built) with reality —
+          Compare the city’s recorded facts (size, condition, year built) with reality at
+          <a :href="cityLink" rel="noopener" class="font-semibold text-brand-600 underline"
+            >property.phila.gov</a
+          >; report anything wrong through the
           <a :href="inquiryLink" rel="noopener" class="font-semibold text-brand-600 underline"
-            >the city’s record for this home</a
-          >
-          shows everything OPA has on file.
+            >property inquiry page</a
+          >.
         </p>
 
         <div class="mt-5 rounded-lg bg-brand-50 p-4 text-body-sm text-[#2c3a4d]">
           <h3 class="text-body-sm font-extrabold text-brand-900">How to act on this (all free)</h3>
           <ol class="mt-2 list-decimal space-y-1.5 pl-5">
             <li>
-              Check the facts first:
-              <a :href="inquiryLink" rel="noopener" class="font-bold text-brand-600 underline"
-                >see exactly what the city has recorded for your home</a
+              Check the facts on your record at
+              <a :href="cityLink" rel="noopener" class="font-bold text-brand-600 underline"
+                >property.phila.gov</a
               >.
             </li>
             <li>
-              Facts wrong, or the value looks off? Ask OPA for a
+              A fact is wrong? Tell OPA through the
+              <a :href="inquiryLink" rel="noopener" class="font-bold text-brand-600 underline"
+                >property inquiry page</a
+              >.
+            </li>
+            <li>
+              Disagree with the value itself? Ask OPA for a
               <a :href="SITE.flrUrl" rel="noopener" class="font-bold text-brand-600 underline"
                 >First Level Review (FLR)</a
               >
-              — the FLR form comes in the mail with your new assessment notice, or you can request
-              one from OPA.
+              — the form comes in the mail with your new assessment notice, or you can request one
+              from OPA.
             </li>
             <li>
               Still disagree after the review? File a formal appeal with the

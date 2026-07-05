@@ -65,7 +65,11 @@ Python side `uv run pytest tests/test_api.py`.
   ≥14.5 via bbox queries; below that, a hint. Bottom sheet on tap; map
   controls sit top-right so the sheet never covers them; the address search
   overlay is the accessible non-map path.
-- **No tracking.** No analytics, no cookies; the footer says so.
+- **Analytics, minimally.** PostHog with autocapture and session recording
+  OFF, cookieless (localStorage persistence), manual pageviews + a small set
+  of named events (address_selected, report_viewed, comps_shown,
+  report_printed, map_parcel_opened, map_filter_toggled); prod builds only.
+  The footer says "no ads, no cookies, anonymous usage statistics".
 
 ## Scaling / deploy path (not yet done)
 

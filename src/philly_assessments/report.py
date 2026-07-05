@@ -650,6 +650,9 @@ def leaderboards(
         .with_columns((pl.col("opa_vs_twin_median") - 1.0).abs().alias("twin_gap"))
         .sort("twin_gap", descending=True)
         .head(n)
-        .select("parcel_id", "address", "opa_market_value", "twin_n", "opa_vs_twin_median")
+        .select(
+            "parcel_id", "address", "opa_market_value", "model_median",
+            "twin_n", "opa_vs_twin_median",
+        )
     )
     return {"over_assessed": over, "under_assessed": under, "non_uniform_block": non_uniform}

@@ -6,6 +6,7 @@
  * behavior, ids, and ARIA structure are unchanged. */
 import { computed, ref, useId } from 'vue'
 import { useSearch } from '@/composables/useSearch'
+import { track } from '@/lib/analytics'
 import { money } from '@/utils/format'
 import type { SearchHit } from '@/api/types'
 
@@ -35,6 +36,7 @@ function choose(hit: SearchHit) {
   text.value = hit.address
   open.value = false
   reset()
+  track('address_selected')
   emit('select', hit)
 }
 

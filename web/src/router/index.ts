@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { trackPageview } from '@/lib/analytics'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -64,6 +65,7 @@ const router = createRouter({
 router.afterEach((to) => {
   const title = (to.meta.title as string) ?? 'Fair Measure'
   document.title = to.name === 'home' ? title : `${title} — Fair Measure`
+  trackPageview(to.fullPath)
   // Accessibility: move focus to the main heading on route change so screen
   // readers announce the new page.
   requestAnimationFrame(() => {

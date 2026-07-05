@@ -14,6 +14,7 @@ import { useRouter } from 'vue-router'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { api } from '@/api/client'
+import { track } from '@/lib/analytics'
 import type { PropertyCore, SearchHit } from '@/api/types'
 import { applyFairMeasurePaint, dotLayers, flagColor, legend } from '@/map/fairMeasureMapStyle'
 import AddressSearch from '@/components/search/AddressSearch.vue'
@@ -54,6 +55,7 @@ function applyDotFilter() {
 
 function toggleCondos() {
   showCondos.value = !showCondos.value
+  track('map_filter_toggled', { group: 'condos', on: showCondos.value })
   applyDotFilter()
 }
 
@@ -62,6 +64,7 @@ function toggleLegend(label: string) {
   if (next.has(label)) next.delete(label)
   else next.add(label)
   enabledLabels.value = next
+  track('map_filter_toggled', { group: label, on: next.has(label) })
   applyDotFilter()
 }
 const map = shallowRef<maplibregl.Map | null>(null)
@@ -97,6 +100,7 @@ async function refreshParcels() {
 }
 
 async function openParcel(parcelId: string) {
+  track('map_parcel_opened')
   try {
     selected.value = await api.property(parcelId)
     map.value?.setFilter('fm-dot-selected', ['==', ['get', 'id'], parcelId])
@@ -226,10 +230,15 @@ onBeforeUnmount(() => {
 
     <!-- legend chips double as show/hide toggles for each dot type -->
     <div
-      class="absolute left-3 top-[66px] z-10 flex max-w-[320px] flex-wrap gap-1.5"
+      class="absolute left-3 top-[66px] z-10 flex max-w-[320px] flex-wrap items-center gap-1.5"
       role="group"
       aria-label="Show or hide homes by result"
     >
+      <span
+        aria-hidden="true"
+        class="rounded-full bg-[rgba(22,36,58,0.72)] px-2 py-0.5 text-caption font-bold text-white"
+        >Show:</span
+      >
       <button
         v-for="l in legend"
         :key="l.label"
@@ -254,9 +263,14 @@ onBeforeUnmount(() => {
         type="button"
         :aria-pressed="showCondos"
         class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-caption font-semibold shadow-float transition-colors duration-[var(--duration-fast)]"
-        :class="showCondos ? 'border-line-soft bg-white text-body' : 'border-line bg-paper text-faint line-through'"
+        :class="showCondos ? 'border-line-soft bg-white text-body' : 'border-line bg-paper text-muted'"
         @click="toggleCondos"
       >
+        <!-- explicit checkbox glyph: this chip is a filter, not a legend entry -->
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" :stroke="showCondos ? '#0f4d90' : '#8593a4'" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3.5" y="3.5" width="17" height="17" rx="3.5" />
+          <path v-if="showCondos" d="M8 12.5 11 15.5 16.5 9" />
+        </svg>
         Condos
       </button>
     </div>
