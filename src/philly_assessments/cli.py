@@ -543,7 +543,9 @@ def _cmd_report(args: argparse.Namespace) -> int:
 def _cmd_leaderboard(args: argparse.Namespace) -> int:
     from philly_assessments.report import build_property_report, leaderboards
 
-    boards = leaderboards(args.data_dir, n=args.n)
+    boards = leaderboards(args.data_dir, n=args.n, plausible=not args.extremes)
+    mode = "raw extremes (incl. model blind spots)" if args.extremes else "plausible appeal band"
+    print(f"assessment leaderboard — over/under lists: {mode}")
     titles = {
         "over_assessed": "MOST OVER-ASSESSED  (OPA above the model)",
         "under_assessed": "MOST UNDER-ASSESSED  (OPA below the model)",
@@ -949,6 +951,12 @@ def main(argv: list[str] | None = None) -> int:
         "--kind", choices=("all", "over", "under", "nonuniform"), default="all"
     )
     leaderboard.add_argument("--n", type=int, default=20, help="rows per list (default 20)")
+    leaderboard.add_argument(
+        "--extremes",
+        action="store_true",
+        help="show raw biggest-disagreement outliers (incl. model blind spots) "
+        "instead of the plausible appeal band",
+    )
     leaderboard.add_argument(
         "--reports", action="store_true", help="also render the HTML report for each listed parcel"
     )

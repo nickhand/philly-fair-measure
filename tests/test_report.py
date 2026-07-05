@@ -185,6 +185,9 @@ def test_leaderboards_rank_over_under_and_nonuniform(tmp_path):
         {"parcel_id": "over_small", "address": "2 HIGH ST", "opa_market_value": 180_000.0,
          "model_median": 150_000.0, "opa_vs_model_ratio": 1.2,
          "assessment_flag": "over_assessed_candidate", "twin_n": 6, "opa_vs_twin_median": 1.0},
+        {"parcel_id": "over_extreme", "address": "9 HUGE ST", "opa_market_value": 700_000.0,
+         "model_median": 35_000.0, "opa_vs_model_ratio": 20.0,  # model blind spot
+         "assessment_flag": "over_assessed_candidate", "twin_n": 6, "opa_vs_twin_median": 1.0},
         {"parcel_id": "under_big", "address": "1 LOW ST", "opa_market_value": 100_000.0,
          "model_median": 300_000.0, "opa_vs_model_ratio": 0.33,
          "assessment_flag": "under_assessed_candidate", "twin_n": 6, "opa_vs_twin_median": 1.0},
@@ -196,11 +199,15 @@ def test_leaderboards_rank_over_under_and_nonuniform(tmp_path):
         pl.DataFrame(rows), tmp_path, "marts", "assessment_screen",
         [InputRef(dataset="t", fetched_at="t")],
     )
-    boards = leaderboards(tmp_path, n=5)
+    boards = leaderboards(tmp_path, n=5)  # plausible band (default)
 
-    assert boards["over_assessed"]["parcel_id"][0] == "over_big"  # highest ratio first
+    assert boards["over_assessed"]["parcel_id"][0] == "over_big"  # highest in-band ratio
+    assert "over_extreme" not in boards["over_assessed"]["parcel_id"].to_list()  # blind spot hidden
     assert boards["under_assessed"]["parcel_id"][0] == "under_big"  # lowest ratio first
     assert boards["non_uniform_block"]["parcel_id"][0] == "odd_twin"  # biggest twin gap
+
+    extremes = leaderboards(tmp_path, n=5, plausible=False)
+    assert extremes["over_assessed"]["parcel_id"][0] == "over_extreme"  # raw biggest disagreement
 
 
 def test_render_html_minimal_condo():

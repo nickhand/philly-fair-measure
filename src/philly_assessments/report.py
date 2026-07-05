@@ -604,31 +604,35 @@ def build_property_report(
 
 
 _MIN_TWINS = 5  # only blocks with this many identical homes count for uniformity
+# Plausible-appeal bands: over/under-assessed but not a model blind spot. Ratios
+# outside these (e.g. a $37M parcel the residential model can't value) are the
+# model's limits, not over-taxed homeowners — surfaced only with plausible=False.
+_OVER_BAND = (1.3, 3.0)
+_UNDER_BAND = (0.33, 0.77)
 
 
-def leaderboards(data_dir: Path | None = None, *, n: int = 25) -> dict[str, pl.DataFrame]:
+def leaderboards(
+    data_dir: Path | None = None, *, n: int = 25, plausible: bool = True
+) -> dict[str, pl.DataFrame]:
     """Review/appeal worklists from the assessment screen: the most over- and
     under-assessed flagged properties (OPA vs model, dual-model-gated) and the
-    least-uniform blocks (a home vs its identical twins' median). A $30k value
-    floor drops the glitch tail; verify any single row against its report, which
-    surfaces data errors."""
+    least-uniform blocks (a home vs its identical twins' median). By default the
+    over/under lists are held to a plausible ratio band so the model's blind
+    spots (huge/atypical parcels) don't crowd out ordinary appeal targets; pass
+    plausible=False for the raw biggest-disagreement extremes. Verify any single
+    row against its report, which surfaces data errors."""
     root = data_dir if data_dir is not None else config.data_dir()
     s = pl.read_parquet(root / "marts" / "assessment_screen.parquet").filter(
         (pl.col("opa_market_value") > 30_000) & (pl.col("model_median") > 30_000)
     )
     cols = ["parcel_id", "address", "opa_market_value", "model_median", "opa_vs_model_ratio"]
-    over = (
-        s.filter(pl.col("assessment_flag") == AssessmentFlag.OVER)
-        .sort("opa_vs_model_ratio", descending=True)
-        .head(n)
-        .select(cols)
-    )
-    under = (
-        s.filter(pl.col("assessment_flag") == AssessmentFlag.UNDER)
-        .sort("opa_vs_model_ratio")
-        .head(n)
-        .select(cols)
-    )
+    over_flagged = s.filter(pl.col("assessment_flag") == AssessmentFlag.OVER)
+    under_flagged = s.filter(pl.col("assessment_flag") == AssessmentFlag.UNDER)
+    if plausible:
+        over_flagged = over_flagged.filter(pl.col("opa_vs_model_ratio").is_between(*_OVER_BAND))
+        under_flagged = under_flagged.filter(pl.col("opa_vs_model_ratio").is_between(*_UNDER_BAND))
+    over = over_flagged.sort("opa_vs_model_ratio", descending=True).head(n).select(cols)
+    under = under_flagged.sort("opa_vs_model_ratio").head(n).select(cols)
     non_uniform = (
         s.filter((pl.col("twin_n") >= _MIN_TWINS) & pl.col("opa_vs_twin_median").is_not_null())
         .with_columns((pl.col("opa_vs_twin_median") - 1.0).abs().alias("twin_gap"))
