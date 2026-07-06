@@ -60,7 +60,7 @@ def readme_screen_counts(stats: dict[str, Any]) -> str:
         f"As of the latest run (Tax Year 2027 assessments), the screen covers\n"
         f"**{s['properties']:,}** residential properties and condos: **{s['over']:,}** flagged\n"
         f"as likely over-assessed, **{s['under']:,}** as likely under-assessed, and\n"
-        f"**{s['watch']:,}** inside the interval but near its edge (\"worth a look\").\n"
+        f'**{s["watch"]:,}** inside the interval but near its edge ("worth a look").\n'
         f"A residential flag requires two independent uncertainty methods — the\n"
         f"Bayesian posterior interval and a spatially weighted\n"
         f"conformalized-quantile-regression band — to both place the city's value\n"
@@ -155,7 +155,7 @@ def sync_docs(repo_root: Path | None = None, *, check: bool = False) -> SyncResu
         path = root / rel
         text = path.read_text()
 
-        def replace(match: re.Match[str]) -> str:
+        def replace(match: re.Match[str], rel: Path = rel) -> str:
             name = match.group("name")
             builder = BLOCKS.get(name)
             if builder is None:
