@@ -73,6 +73,18 @@ def lightgbm_median_ratio(run_dir: Path, model: str = "lightgbm") -> float:
     return float(row["median_ratio"][0])
 
 
+def bayesian_median_ratio(run_dir: Path) -> float:
+    """Out-of-time median estimate/price ratio of a Bayesian run — the same
+    transparent global calibration convention the LightGBM point uses
+    (`lightgbm_median_ratio`). The area-time slope model trades level against
+    time-correlated covariates, leaving a flat few-percent bias at every
+    horizon (measured 2026-07-06: 0.95 at all t_c); dividing it out once,
+    from a published number, keeps screen z-scores centered."""
+    evaluation = pl.read_parquet(run_dir / "evaluation.parquet")
+    row = evaluation.filter(pl.col("segment_type") == "overall")
+    return float(row["median_ratio"][0])
+
+
 def score_bayesian_intervals(
     run_dir: Path,
     df: pl.DataFrame,
@@ -84,18 +96,24 @@ def score_bayesian_intervals(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """(median, pi_low, pi_high) price arrays at the frame's dates; chunked to
     bound draw-matrix memory. Handles the run's time adjustment internally."""
-    from philly_fair_measure.models.bayesian import _sigma_design, _xy
+    from datetime import date
+
+    from philly_fair_measure.models.bayesian import _sigma_design, _time_centered, _xy
 
     draws, encoder, geo, basis, parcels = load_run(run_dir)
+    params = run_params(run_dir)
     x = encoder.transform(df)
     area, district = geo.indices(df)
     b = basis.transform(_xy(df)) if basis is not None else None
     z = _sigma_design(df, encoder.family)
     parcel = parcels.seen(df) if parcels is not None else None
-    if run_params(run_dir).get("time_adjusted") and "time_adj_log" in df.columns:
+    if params.get("time_adjusted") and "time_adj_log" in df.columns:
         adj = df["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy()
     else:
         adj = np.zeros(len(x))
+    # per-area time slopes (runs that trained with them persist time_ref)
+    time_ref = params.get("time_ref")
+    t_c = _time_centered(df, date.fromisoformat(time_ref[:10])) if time_ref else None
 
     medians, lows, highs = [], [], []
     for start in range(0, len(x), chunk_size):
@@ -110,6 +128,7 @@ def score_bayesian_intervals(
             seed=seed + start,
             time_adj_log=adj[start:stop],
             parcel=parcel[start:stop] if parcel is not None else None,
+            t_c=t_c[start:stop] if t_c is not None else None,
         )
         medians.append(np.median(price_draws, axis=0))
         lows.append(np.quantile(price_draws, pi_low, axis=0))

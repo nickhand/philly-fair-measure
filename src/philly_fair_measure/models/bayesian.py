@@ -52,7 +52,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -373,6 +373,20 @@ def _xy(df: pl.DataFrame) -> np.ndarray:
     return np.asarray(np.nan_to_num(xy, nan=0.0), dtype=np.float64)
 
 
+def _time_centered(df: pl.DataFrame, ref: date) -> np.ndarray:
+    """Years relative to the run's reference date (negative in the past) —
+    the time axis for the per-area appreciation slopes. Sale frames use the
+    sale date; the assessment roll uses the valuation date (≈ 0); frames with
+    neither pin to the reference."""
+    col = next((c for c in ("sale_date", "valuation_date") if c in df.columns), None)
+    if col is None:
+        return np.zeros(df.height)
+    days = df.select((pl.col(col).cast(pl.Date) - pl.lit(ref)).dt.total_days().alias("d"))[
+        "d"
+    ].fill_null(0)
+    return np.asarray(days.to_numpy(), dtype=np.float64) / 365.25
+
+
 def _sigma_design(df: pl.DataFrame, family: str = "residential") -> np.ndarray:
     """Design for log sigma. Residential: evidence density plus style, per the
     conditional calibration finding (coverage 80-99.6% by district/style before
@@ -427,6 +441,7 @@ def _fit_posterior(
     nu_fixed: float | None,
     parcel_mapped: np.ndarray | None = None,
     n_parcels: int = 0,
+    t_c: np.ndarray | None = None,
 ) -> InferenceData:
     import pymc as pm
 
@@ -455,6 +470,25 @@ def _fit_posterior(
 
         beta = pm.Normal("beta", 0.0, 1.0, dims="covariate")
         mu = alpha_area[area_idx] + x @ beta
+        if t_c is not None:
+            # per-area appreciation slope on centered time (years before the
+            # reference date). The training target is already district-index
+            # adjusted, so this models each market area's residual trend vs
+            # its district — a gentrifying area outpacing its index gets a
+            # positive slope and its intercept lands at the REFERENCE-DATE
+            # level instead of the training-window average. Slopes deviate
+            # from an UNSHRUNK grand mean, not from zero: with a zero-centered
+            # prior, shrinkage fights any citywide residual trend and biases
+            # every end-of-window intercept (measured 2026-07-06: a flat
+            # −5% median ratio at all t_c). HalfNormal(0.05): 2sd ≈ 10%/yr
+            # area differential around the common trend.
+            mu_slope = pm.Normal("mu_slope", 0.0, 0.05)
+            tau_slope = pm.HalfNormal("tau_slope", 0.05)
+            z_slope = pm.Normal("z_slope", 0.0, 1.0, dims="area")
+            slope_area = pm.Deterministic(
+                "slope_area", mu_slope + tau_slope * z_slope, dims="area"
+            )
+            mu = mu + slope_area[area_idx] * t_c
         if parcel_mapped is not None:
             # per-parcel latent quality, identified by repeats (non-centered);
             # a zero slot at index n absorbs singleton/unseen parcels so the
@@ -491,9 +525,7 @@ def _fit_posterior(
         raw_log_sigma = g0 + z_sigma @ g + u_sigma_district[district_idx]
         sigma = pm.Deterministic(
             "sigma_obs",
-            pm.math.exp(
-                _LOG_SIGMA_CAP - pm.math.softplus(_LOG_SIGMA_CAP - raw_log_sigma)
-            ),
+            pm.math.exp(_LOG_SIGMA_CAP - pm.math.softplus(_LOG_SIGMA_CAP - raw_log_sigma)),
         )
 
         # learned nu couples every observation through one global parameter and
@@ -530,6 +562,9 @@ _DRAW_VARIABLES = (
     "alpha_district",
     "mu_city",
     "tau_area",
+    "slope_area",
+    "tau_slope",
+    "mu_slope",
     "beta",
     "tau_gp",
     "w_spatial",
@@ -580,6 +615,7 @@ def predict_price_draws(
     seed: int,
     time_adj_log: np.ndarray | None = None,
     parcel: np.ndarray | None = None,
+    t_c: np.ndarray | None = None,
 ) -> np.ndarray:
     """(n_draws, n_rows) posterior-predictive price draws at the sale/valuation
     date (levels): reference-month draws shifted back by `time_adj_log`."""
@@ -600,6 +636,17 @@ def predict_price_draws(
         alpha[:, unseen_all] = draws["mu_city"][:, None]
 
     mu = alpha + draws["beta"] @ x.T
+    if t_c is not None and "slope_area" in draws:
+        # per-area appreciation slopes (see _fit_posterior); unseen areas
+        # marginalize the unknown deviation around the common trend
+        slope = np.empty((n_draws, n_rows))
+        slope[:, seen] = draws["slope_area"][:, area[seen]]
+        if (~seen).any():
+            grand = draws.get("mu_slope", np.zeros(n_draws))
+            slope[:, ~seen] = grand[:, None] + draws["tau_slope"][:, None] * rng.standard_normal(
+                (n_draws, int((~seen).sum()))
+            )
+        mu = mu + slope * t_c[None, :]
     if parcel is not None and "u_parcel" in draws:
         # known repeat parcel: use its learned effect (the repeat-sales win);
         # unseen/singleton parcel: marginalize the unknown house quality as
@@ -729,6 +776,12 @@ def train_bayesian(
             y = y + frame["time_adj_log"].to_numpy()
         return np.asarray(y, dtype=np.float64)
 
+    # reference date for the per-area time slopes: the training window's end,
+    # so slopes are identified in-sample and the roll scores at t_c ≈ 0
+    time_ref: date = train_df["sale_date"].max()  # type: ignore[assignment]
+    if isinstance(time_ref, datetime):
+        time_ref = time_ref.date()
+
     x_train = encoder.transform(train_df)
     area_train, district_train = geo.indices(train_df)
     idata = _fit_posterior(
@@ -747,6 +800,7 @@ def train_bayesian(
         nu_fixed=nu_fixed,
         parcel_mapped=parcels.mapped(train_df) if parcels is not None else None,
         n_parcels=parcels.n if parcels is not None else 0,
+        t_c=_time_centered(train_df, time_ref),
     )
 
     posterior_draws = _thin_draws(idata, max_prediction_draws, seed, nu_fixed=nu_fixed)
@@ -762,6 +816,7 @@ def train_bayesian(
         seed=seed,
         time_adj_log=test_adj,
         parcel=parcels.seen(test_df) if parcels is not None else None,
+        t_c=_time_centered(test_df, time_ref),
     )
     point = np.median(price_draws, axis=0)
     pi_low = np.quantile(price_draws, PI_LOW, axis=0)
@@ -872,6 +927,7 @@ def train_bayesian(
                 "n_rbf_centers": len(rbf.centers) if rbf is not None else 0,
                 "rbf_bandwidth_m": rbf.bandwidth_m if rbf is not None else None,
                 "test_start_date": str(test_df["sale_date"].min()),
+                "time_ref": time_ref.isoformat(),
             },
             indent=2,
         )

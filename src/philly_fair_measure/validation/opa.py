@@ -68,6 +68,7 @@ from philly_fair_measure.features.assessment_features import assemble_assessment
 from philly_fair_measure.ingest.derived import write_derived_table
 from philly_fair_measure.ingest.manifests import DerivedManifest, InputRef, read_derived_manifest
 from philly_fair_measure.models.scoring import (
+    bayesian_median_ratio,
     latest_run_dir,
     lightgbm_median_ratio,
     run_params,
@@ -423,6 +424,11 @@ def build_assessment_screen(
         pred_lgb = pred_lgb * np.exp(-features["time_adj_log"].to_numpy())
     calibration = lightgbm_median_ratio(baseline_run)
     median, lo, hi = score_bayesian_intervals(bayesian_run, features, chunk_size=chunk_size)
+    # same published-global-calibration convention as the LightGBM point: the
+    # run's out-of-time median ratio divides the whole predictive band (a log
+    # shift — width and coverage are untouched, z-scores become centered)
+    bayes_calibration = bayesian_median_ratio(bayesian_run)
+    median, lo, hi = median / bayes_calibration, lo / bayes_calibration, hi / bayes_calibration
 
     # second uncertainty machine: spatially weighted conformal offsets around
     # the LightGBM point (models/conformal.py). Residuals are frame-invariant,
@@ -547,7 +553,11 @@ def build_assessment_screen(
         "marts",
         "assessment_screen",
         inputs,
-        notes=f"valuation_date={valuation_date:%Y-%m-%d}; lightgbm calibration={calibration:.4f}",
+        notes=(
+            f"valuation_date={valuation_date:%Y-%m-%d}; "
+            f"lightgbm calibration={calibration:.4f}; "
+            f"bayesian calibration={bayes_calibration:.4f}"
+        ),
     )
     flag_counts = {
         f"{row['model_family']}/{row['assessment_flag']}": row["len"]
