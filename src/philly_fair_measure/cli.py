@@ -256,6 +256,31 @@ def _cmd_conformal_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_ensemble_check(args: argparse.Namespace) -> int:
+    from philly_fair_measure.models.ensemble import ensemble_check
+
+    result = ensemble_check(args.data_dir, alpha=args.alpha, k=args.k)
+    print(
+        f"conformalized stacking: {result.baseline_run.name} + {result.bayesian_run.name}"
+        f" (nominal {1 - args.alpha:.0%})"
+    )
+    print(f"stack weight on lightgbm: {result.weight_lightgbm:.3f}\n")
+
+    point_cols = ("n", "rmse_log", "mape", "median_ratio", "cod", "prd")
+    print(f"{'point estimator':<20}" + "".join(f"{c:>14}" for c in point_cols))
+    for row in result.points.to_dicts():
+        cells = "".join(f"{row[c]:>14,.4f}" for c in point_cols)
+        print(f"{row['estimator']:<20}{cells}")
+
+    print(f"\n{'interval system':<26}{'coverage':>10}{'med hi/lo':>12}{'mean rel width':>16}")
+    for row in result.intervals.to_dicts():
+        print(
+            f"{row['interval']:<26}{row['coverage']:>10.3f}"
+            f"{row['median_width_ratio']:>12.2f}{row['mean_width_rel']:>16.2f}"
+        )
+    return 0
+
+
 def _cmd_acs_sensitivity(args: argparse.Namespace) -> int:
     import polars as pl
 
@@ -890,6 +915,17 @@ def main(argv: list[str] | None = None) -> int:
     conformal.add_argument("--k", type=int, default=500, help="calibration neighbors (knn method)")
     conformal.add_argument("--data-dir", type=Path)
     conformal.set_defaults(func=_cmd_conformal_check)
+
+    ensemble = subparsers.add_parser(
+        "ensemble-check",
+        help="conformalized stack of the LightGBM point and Bayesian median: "
+        "point accuracy and interval sharpness vs each arm, on the held-out "
+        "half of the out-of-time slice",
+    )
+    ensemble.add_argument("--alpha", type=float, default=0.10)
+    ensemble.add_argument("--k", type=int, default=500, help="calibration neighbors (knn method)")
+    ensemble.add_argument("--data-dir", type=Path)
+    ensemble.set_defaults(func=_cmd_ensemble_check)
 
     acs = subparsers.add_parser(
         "acs-sensitivity",

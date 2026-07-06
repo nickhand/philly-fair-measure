@@ -37,6 +37,12 @@ export interface PropertyCore {
   model_median: number | null
   model_pi_low_90: number | null
   model_pi_high_90: number | null
+  /** The range both uncertainty methods support (Bayesian ∩ conformal for
+   * residential; the native band elsewhere) — what the UI should display.
+   * Flags are still judged against model_pi_*. Optional so older API
+   * payloads keep working; fall back to model_pi_*. */
+  display_pi_low_90?: number | null
+  display_pi_high_90?: number | null
   ratio: number | null
   screen_z: number | null
   flag: Flag
@@ -124,6 +130,8 @@ export interface CompRow {
   price_adj_today: number | null
   livable_area: number | null
   distance_m: number | null
+  /** Shared-model-leaf similarity in [0, 1]; null for condo building comps. */
+  similarity?: number | null
 }
 
 export interface Stats {

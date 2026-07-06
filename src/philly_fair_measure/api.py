@@ -84,6 +84,11 @@ class PropertyCore(BaseModel):
     model_median: float | None
     model_pi_low_90: float | None
     model_pi_high_90: float | None
+    # the range both uncertainty machines support (Bayesian ∩ conformal for
+    # residential; the native band elsewhere) — what surfaces should display.
+    # Flags are still judged against model_pi_*.
+    display_pi_low_90: float | None = None
+    display_pi_high_90: float | None = None
     ratio: float | None
     screen_z: float | None
     flag: str
@@ -174,6 +179,9 @@ class CompRow(BaseModel):
     price_adj_today: float | None
     livable_area: float | None
     distance_m: float | None
+    # shared-LightGBM-leaf similarity in [0, 1] (models/comps.py); null for
+    # condo building comps, which are selected by building membership instead
+    similarity: float | None = None
 
 
 class Stats(BaseModel):
@@ -251,6 +259,16 @@ def _core(s: dict[str, Any]) -> PropertyCore:
         model_median=_f(s.get("model_median")),
         model_pi_low_90=_f(s.get("model_pi_low_90")),
         model_pi_high_90=_f(s.get("model_pi_high_90")),
+        display_pi_low_90=_f(
+            s.get("display_pi_low_90")
+            if s.get("display_pi_low_90") is not None
+            else s.get("model_pi_low_90")
+        ),
+        display_pi_high_90=_f(
+            s.get("display_pi_high_90")
+            if s.get("display_pi_high_90") is not None
+            else s.get("model_pi_high_90")
+        ),
         ratio=_f(s.get("opa_vs_model_ratio")),
         screen_z=_f(s.get("screen_z")),
         flag=str(s.get("assessment_flag") or AssessmentFlag.NONE),
@@ -692,6 +710,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                 price_adj_today=_f(r.get("price_adj_today")),
                 livable_area=_f(r.get("char_livable_area")),
                 distance_m=_f(r.get("distance_m")),
+                similarity=_f(r.get("similarity")),
             )
             for r in comps.to_dicts()
         ]

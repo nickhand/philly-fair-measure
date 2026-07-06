@@ -387,6 +387,30 @@ def render_html(data: ReportData) -> str:
         if s.get("interval_method") == "bayesian_posterior"
         else "spatially weighted conformal interval"
     )
+    # headline range: where both uncertainty machines agree (display_pi_*,
+    # Bayesian ∩ conformal); the full flag-anchoring band moves to the
+    # methods footnote. A $2.7M posterior ceiling on an $800k rowhome is
+    # honest math but dishonest communication.
+    display_lo = s.get("display_pi_low_90") or s.get("model_pi_low_90")
+    display_hi = s.get("display_pi_high_90") or s.get("model_pi_high_90")
+    has_agreed_band = (
+        s.get("display_pi_low_90") is not None
+        and s.get("model_pi_low_90") is not None
+        and (
+            s["display_pi_low_90"] != s["model_pi_low_90"]
+            or s.get("display_pi_high_90") != s.get("model_pi_high_90")
+        )
+    )
+    band_note = (
+        f"Estimated range: where two independent uncertainty methods agree — a "
+        f"Bayesian posterior predictive interval and a spatially weighted "
+        f"conformal band around the point model. The full Bayesian 90% interval "
+        f"is {_fmt_money(s.get('model_pi_low_90'))} – "
+        f"{_fmt_money(s.get('model_pi_high_90'))}; the verdict above is judged "
+        f"against it."
+        if has_agreed_band
+        else f"Interval: {interval_note}."
+    )
 
     parts: list[str] = [
         "<!doctype html><html><head><meta charset='utf-8'>",
@@ -399,12 +423,11 @@ def render_html(data: ReportData) -> str:
         "<h2>Assessment vs model</h2><div class='kv'>",
         f"<div><b>OPA market value</b>{_fmt_money(s.get('opa_market_value'))}</div>",
         f"<div><b>Model estimate</b>{_fmt_money(s.get('model_median'))}</div>",
-        f"<div><b>90% interval</b>{_fmt_money(s.get('model_pi_low_90'))} – "
-        f"{_fmt_money(s.get('model_pi_high_90'))}</div>",
+        f"<div><b>Estimated range</b>{_fmt_money(display_lo)} – {_fmt_money(display_hi)}</div>",
         f"<div><b>OPA / model</b>{_fmt(s.get('opa_vs_model_ratio'))}</div>",
         f"<div><b>Disagreement z</b>{_fmt(s.get('screen_z'))}</div>",
         "</div>",
-        f"<p class='note'>Interval: {interval_note}. The estimate comes from a "
+        f"<p class='note'>{band_note} The estimate comes from a "
         "public-data model trained on validated arms-length sales; it inherits "
         "the city roll's characteristic errors and cannot see interior condition.</p>",
     ]
@@ -418,7 +441,14 @@ def render_html(data: ReportData) -> str:
         points = appeal_points(data.explanation, c)
         if points:
             parts += _render_appeal(points)
-    if s.get("retail_value") is not None:
+    # the retail/cash panel leans on the LightGBM point alone; when that point
+    # has drifted well away from the interval-anchoring median, the panel's
+    # precision is fake (measured 2026-07-06: a $1.03M retail line on a home
+    # whose comp support tops out ~$810k) — suppress rather than caveat
+    point_agrees = True
+    if s.get("pred_lightgbm") and s.get("model_median"):
+        point_agrees = 0.85 <= s["pred_lightgbm"] / s["model_median"] <= 1.20
+    if s.get("retail_value") is not None and point_agrees:
         parts += [
             "<h2>Two value conventions</h2><div class='kv'>",
             f"<div><b>Retail value</b>{_fmt_money(s.get('retail_value'))}</div>",
@@ -508,9 +538,12 @@ def render_html(data: ReportData) -> str:
             "assignments); prices also shown adjusted to today via the district "
             "price index.</p><table><tr><th>Address</th><th>Sold</th>"
             "<th class='num'>Price</th><th class='num'>Adj. today</th>"
-            "<th class='num'>Sqft</th><th>Style</th><th class='num'>Distance</th></tr>"
+            "<th class='num'>Sqft</th><th>Style</th><th class='num'>Distance</th>"
+            "<th class='num'>Similarity</th></tr>"
         )
         for r in data.comps.to_dicts():
+            similarity = r.get("similarity")
+            sim = f"{similarity * 100:.0f}%" if similarity is not None else "—"
             parts.append(
                 f"<tr><td>{html.escape(str(r.get('address') or '?'))}</td>"
                 f"<td>{r['sale_date']:%Y-%m-%d}</td>"
@@ -518,7 +551,8 @@ def render_html(data: ReportData) -> str:
                 f"<td class='num'>{_fmt_money(r.get('price_adj_today'))}</td>"
                 f"<td class='num'>{_fmt(r.get('char_livable_area'))}</td>"
                 f"<td>{_fmt(r.get('char_style'))}</td>"
-                f"<td class='num'>{r.get('distance_m') or 0:,.0f}m</td></tr>"
+                f"<td class='num'>{r.get('distance_m') or 0:,.0f}m</td>"
+                f"<td class='num'>{sim}</td></tr>"
             )
         parts.append("</table>")
 

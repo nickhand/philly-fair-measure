@@ -4,7 +4,10 @@ A property's comps are the validated arms-length sales that repeatedly land in
 the same leaves of the trained valuation model's trees. Two properties share a
 leaf only when every split on the path — location, size, style, condition,
 market context — sorts them together, so shared-leaf frequency is similarity
-*as the model prices it*, not an ad-hoc filter cascade. This is the
+*as the model prices it*. A thin hygiene pre-filter (same style, livable area
+within ±30%, widened when too few sales survive) runs before the ranking so
+the table reads as fair to an appeal board; the ordering within the pool stays
+the model's. This is the
 interpretable appeal-evidence output the project brief calls for: each comp is
 a real, recent, arms-length sale, shown with its price both as transacted and
 adjusted to today via the district price index.
@@ -31,6 +34,13 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_K = 10
 DEFAULT_WINDOW_YEARS = 5.0
+# appeal-evidence hygiene: a comp should look like the subject before the
+# model ranks it — same style, livable area within this band. Leaf similarity
+# alone lets a 2,619 sf twin or a premium-block outlier into a 1,576 sf
+# rowhome's table (measured 2026-07-06, 2314 Wallace St), which reads as
+# cherry-picking to an appeal board even when the model meant it.
+SIZE_BAND = 0.30
+_MIN_POOL = 50
 
 
 @dataclass(frozen=True)
@@ -88,7 +98,28 @@ def find_comps(
         (pl.col("sale_date") >= anchor - pl.duration(days=int(window_years * 365.25)))
         & (pl.col("parcel_id") != parcel_id)
     )
-    logger.info("comps pool: %s sales in the last %.1fy", f"{pool.height:,}", window_years)
+    # pre-filter to same-style, size-banded sales; widen progressively when
+    # the strict pool is too thin for leaf ranking to mean anything
+    style = target_df["char_style"][0]
+    area = target_df["char_livable_area"][0]
+    same_style = pl.col("char_style") == style if style is not None else pl.lit(True)
+    size_banded = (
+        pl.col("char_livable_area").is_between(area * (1 - SIZE_BAND), area * (1 + SIZE_BAND))
+        if area
+        else pl.lit(True)
+    )
+    for label, mask in (
+        ("style+size", same_style & size_banded),
+        ("style", same_style),
+        ("unfiltered", pl.lit(True)),
+    ):
+        candidate = pool.filter(mask)
+        if candidate.height >= max(_MIN_POOL, 5 * k):
+            pool = candidate
+            logger.info("comps pool (%s): %s sales", label, f"{pool.height:,}")
+            break
+    else:
+        logger.info("comps pool: %s sales (all filters too thin)", f"{pool.height:,}")
 
     run_dir = latest_run_dir("baseline", data_dir)
     target_leaves = _leaf_matrix(run_dir, target_df)  # (1, n_trees)

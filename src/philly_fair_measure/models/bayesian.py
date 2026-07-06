@@ -367,7 +367,14 @@ def _sigma_design(df: pl.DataFrame, family: str = "residential") -> np.ndarray:
     if family == "condo":
         missing = df["mkt_bldg_roll_mean_price"].is_null().to_numpy().astype(np.float64)
         return np.column_stack([missing, np.log1p(dist) / 10.0])
+    # graded, not binary: a block with no rolling sale but 15 kNN comps at
+    # 70m is not data-starved, and the binary term priced it as if it were
+    # (measured 2026-07-06: block_roll_n=0 parcels carried median 7.6x
+    # high/low interval ratios vs 5.3x citywide, 10.7x on a dense Fairmount
+    # block). Scale the missing indicator by how far the kNN evidence
+    # actually sits — full weight only when the nearest comps are 300m+ out.
     missing = df["mkt_block_roll_mean_price"].is_null().to_numpy().astype(np.float64)
+    missing = missing * np.minimum(1.0, dist / 300.0)
     style = df["char_style"].cast(pl.String).fill_null("unknown").to_numpy()
     new_build = df["char_new_build"].cast(pl.Float64).fill_null(0.0).to_numpy()
     newbuild_n = df["mkt_newbuild_knn_n"].cast(pl.Float64).fill_null(0.0).to_numpy()

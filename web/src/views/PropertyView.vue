@@ -35,6 +35,8 @@ const reportLoading = ref(false)
 const comps = ref<CompRow[] | null>(null)
 const compsLoading = ref(false)
 const compsError = ref(false)
+/** Condo building comps carry no leaf similarity — hide the column. */
+const hasSimilarity = computed(() => (comps.value ?? []).some((c) => c.similarity != null))
 
 async function load(id: string) {
   core.value = null
@@ -78,16 +80,26 @@ const hasInterval = computed(
     core.value.opa_market_value != null,
 )
 
+/** The band the UI shows: where both uncertainty methods agree
+ * (display_pi_*), falling back to the flag-anchoring model band on older
+ * payloads. Flags/attention still come from model_pi_* server-side. */
+const bandLo = computed(() => core.value?.display_pi_low_90 ?? core.value?.model_pi_low_90 ?? null)
+const bandHi = computed(
+  () => core.value?.display_pi_high_90 ?? core.value?.model_pi_high_90 ?? null,
+)
+
 /** Delta pill: computed dollar gap (data, not verdict copy). */
 const deltaPill = computed(() => {
   if (!core.value || !hasInterval.value) return null
-  const { flag, attention, opa_market_value: opa, model_pi_low_90: low, model_pi_high_90: high } =
-    core.value
+  const { flag, attention, opa_market_value: opa } = core.value
+  const low = bandLo.value
+  const high = bandHi.value
   if (flag === 'over_assessed_candidate') return `${money(opa! - high!)} above our highest estimate`
   if (flag === 'under_assessed_candidate') return `${money(low! - opa!)} below our lowest estimate`
-  if (flag === 'within_range' && attention === 'high') return 'Near the top of our 90% range'
-  if (flag === 'within_range' && attention === 'low') return 'Near the bottom of our 90% range'
-  if (flag === 'within_range') return 'Inside our 90% range'
+  if (flag === 'within_range' && attention === 'high') return 'Near the top of our estimated range'
+  if (flag === 'within_range' && attention === 'low')
+    return 'Near the bottom of our estimated range'
+  if (flag === 'within_range') return 'Inside our estimated range'
   return null
 })
 
@@ -246,8 +258,8 @@ function printPage() {
 
           <div v-if="hasInterval && core.flag !== 'insufficient_record'" class="mt-4">
             <IntervalStrip
-              :low="core.model_pi_low_90!"
-              :high="core.model_pi_high_90!"
+              :low="bandLo!"
+              :high="bandHi!"
               :median="core.model_median!"
               :opa="core.opa_market_value!"
               :flag="core.flag"
@@ -255,8 +267,8 @@ function printPage() {
             <div class="no-print">
               <InfoTip label="Why a range and not one number?">
                 No one knows a home’s exact value until it sells. Our model studies thousands of nearby
-                sales and gives its best estimate, plus a range it is 90% sure about — like a weather
-                forecast for your home’s value.
+                sales and gives its best estimate, plus the range where its two independent ways of
+                measuring uncertainty agree — like a weather forecast for your home’s value.
                 <RouterLink to="/methodology" class="font-semibold text-brand-600 underline"
                   >Learn how this works</RouterLink
                 >.
@@ -442,7 +454,10 @@ function printPage() {
                   <th scope="col" class="py-2 pr-3 text-right font-semibold">Price</th>
                   <th scope="col" class="py-2 pr-3 text-right font-semibold">In today’s market</th>
                   <th scope="col" class="py-2 pr-3 text-right font-semibold">Size</th>
-                  <th scope="col" class="py-2 text-right font-semibold">Away</th>
+                  <th scope="col" class="py-2 pr-3 text-right font-semibold">Away</th>
+                  <th v-if="hasSimilarity" scope="col" class="py-2 text-right font-semibold">
+                    Similarity
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -456,8 +471,11 @@ function printPage() {
                   <td class="money py-2 pr-3 text-right whitespace-nowrap">
                     {{ c.livable_area ? `${num(c.livable_area)} sq ft` : '—' }}
                   </td>
-                  <td class="money py-2 text-right whitespace-nowrap">
+                  <td class="money py-2 pr-3 text-right whitespace-nowrap">
                     {{ c.distance_m === 0 ? 'Same building' : distMiles(c.distance_m) }}
+                  </td>
+                  <td v-if="hasSimilarity" class="money py-2 text-right whitespace-nowrap">
+                    {{ c.similarity != null ? `${Math.round(c.similarity * 100)}%` : '—' }}
                   </td>
                 </tr>
               </tbody>
@@ -465,6 +483,8 @@ function printPage() {
           </div>
           <p class="mt-2 text-caption text-faint">
             “In today’s market” adjusts each sale to current prices using our district price index.
+            “Similarity” is how often our model sorts the comp with this home when it prices
+            properties — higher means the model treats them as closer matches.
             These are the model’s comparables, not an appraiser’s. You can bring your own comparables
             to an appeal.
           </p>

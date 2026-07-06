@@ -32,6 +32,13 @@ Two model families share the mart, distinguished by `model_family` +
                  pairing; the condo Bayesian arm is a research artifact
                  (hot median, stiff to unit-level evidence)
 
+Residential rows also carry `conformal_pi_low_90`/`conformal_pi_high_90`
+(spatially weighted conformal band around the LightGBM point — the frequentist
+cross-check) and every row a `display_pi_low_90`/`display_pi_high_90`: the
+range both machines support (Bayesian ∩ conformal for residential, the native
+band elsewhere). Surfaces should show the display band; flags stay anchored to
+`model_pi_*`.
+
 `screen_z` expresses the disagreement in predictive-uncertainty units
 (log(OPA/median) scaled by the interval's log-width / 3.29, i.e. ~standard
 normal if the predictive distribution is right), so properties are ranked by
@@ -172,8 +179,25 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
         .alias("screen_z")
     )
     unpriceable_null = pl.when(insufficient).then(pl.lit(None, dtype=pl.Float64))
+    # Display band: the range BOTH uncertainty machines support. For
+    # residential that's the Bayesian posterior ∩ conformal-knn intersection;
+    # condo rows (and fixtures without conformal columns) keep their native
+    # band. An empty intersection means the methods disagree outright — fall
+    # back to the flag-anchoring Bayesian band rather than invent a range.
+    # Flags and screen_z stay on model_pi_*; this is presentation-layer truth.
+    if {"conformal_pi_low_90", "conformal_pi_high_90"}.issubset(df.columns):
+        cross_lo = pl.max_horizontal("model_pi_low_90", "conformal_pi_low_90")
+        cross_hi = pl.min_horizontal("model_pi_high_90", "conformal_pi_high_90")
+        agree = cross_lo < cross_hi
+        display_lo = pl.when(agree).then(cross_lo).otherwise(pl.col("model_pi_low_90"))
+        display_hi = pl.when(agree).then(cross_hi).otherwise(pl.col("model_pi_high_90"))
+    else:
+        display_lo = pl.col("model_pi_low_90")
+        display_hi = pl.col("model_pi_high_90")
     return (
         df.with_columns(
+            display_lo.alias("display_pi_low_90"),
+            display_hi.alias("display_pi_high_90"),
             flag.alias("assessment_flag"),
             screen_z,
             new_build.alias("new_build"),
@@ -357,6 +381,27 @@ def build_assessment_screen(
     calibration = lightgbm_median_ratio(baseline_run)
     median, lo, hi = score_bayesian_intervals(bayesian_run, features, chunk_size=chunk_size)
 
+    # second uncertainty machine: spatially weighted conformal offsets around
+    # the LightGBM point (models/conformal.py). Residuals are frame-invariant,
+    # so offsets learned in the reference frame apply to the valuation-date
+    # prediction. The Bayesian band keeps anchoring the flags; this band's job
+    # is honesty where the two disagree — the display range is their
+    # intersection (finalize_screen), so one arm's blown-up tail can't put a
+    # $2.7M ceiling on an $800k rowhome (measured 2026-07-06, 2314 Wallace St:
+    # bayesian 254k-2.71M vs conformal-knn 630k-1.65M on the same features)
+    from philly_fair_measure.models.conformal import (
+        calibration_from_run,
+        conformal_offsets,
+        xy_district,
+    )
+
+    cal = calibration_from_run(baseline_run, data_dir)
+    xy, district = xy_district(features)
+    conf_lo_off, conf_hi_off = conformal_offsets(cal, xy, district, method="knn")
+    log_pred = np.log(pred_lgb)
+    conformal_lo = np.exp(log_pred + conf_lo_off)
+    conformal_hi = np.exp(log_pred + conf_hi_off)
+
     residential = features.select(
         "parcel_id",
         "address",
@@ -383,6 +428,8 @@ def build_assessment_screen(
         pl.Series("model_median", median),
         pl.Series("model_pi_low_90", lo),
         pl.Series("model_pi_high_90", hi),
+        pl.Series("conformal_pi_low_90", conformal_lo),
+        pl.Series("conformal_pi_high_90", conformal_hi),
         pl.lit(ModelFamily.RESIDENTIAL).alias("model_family"),
         pl.lit(IntervalMethod.BAYESIAN).alias("interval_method"),
         pl.lit(valuation_date).alias("valuation_date"),

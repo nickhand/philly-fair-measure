@@ -21,19 +21,25 @@ const hasInterval = computed(
     props.property.opa_market_value != null,
 )
 
+/** The band the sheet shows: where both uncertainty methods agree
+ * (display_pi_*), falling back to the flag-anchoring model band on older
+ * payloads. */
+const bandLo = computed(() => props.property.display_pi_low_90 ?? props.property.model_pi_low_90)
+const bandHi = computed(() => props.property.display_pi_high_90 ?? props.property.model_pi_high_90)
+
 /** Compact 64px strip. */
 const W = 343
 const PAD = 18
 const x = computed(() => {
   const c = props.property
-  const lo = Math.min(c.model_pi_low_90!, c.opa_market_value!) * 0.94
-  const hi = Math.max(c.model_pi_high_90!, c.opa_market_value!) * 1.06
+  const lo = Math.min(bandLo.value!, c.opa_market_value!) * 0.94
+  const hi = Math.max(bandHi.value!, c.opa_market_value!) * 1.06
   return scaleLinear().domain([lo, hi]).range([PAD, W - PAD])
 })
 const ariaLabel = computed(() => {
   const c = props.property
   return (
-    `Estimate range ${money(c.model_pi_low_90)} to ${money(c.model_pi_high_90)}, ` +
+    `Estimate range ${money(bandLo.value)} to ${money(bandHi.value)}, ` +
     `best estimate ${money(c.model_median)}. City value ${money(c.opa_market_value)} is ` +
     `${c.flag === 'within_range' ? 'inside' : 'outside'} the range.`
   )
@@ -92,9 +98,9 @@ function edgeAnchor(v: number): 'start' | 'middle' | 'end' {
       >
         <line :x1="PAD" y1="46" :x2="W - PAD" y2="46" stroke="#dfe5ec" stroke-width="1" />
         <rect
-          :x="x(property.model_pi_low_90!)"
+          :x="x(bandLo!)"
           y="38"
-          :width="Math.max(0, x(property.model_pi_high_90!) - x(property.model_pi_low_90!))"
+          :width="Math.max(0, x(bandHi!) - x(bandLo!))"
           height="16"
           rx="4"
           fill="#dbe7f5"
@@ -102,9 +108,9 @@ function edgeAnchor(v: number): 'start' | 'middle' | 'end' {
         />
         <line :x1="medSx" :x2="medSx" y1="32" y2="60" stroke="#0f4d90" stroke-width="2.5" />
         <circle :cx="opaSx" cy="46" r="5" :fill="verdict.hex" />
-        <text :x="clampX(x(property.model_pi_low_90!))" y="72" text-anchor="middle" font-size="11.5" fill="#8593a4" style="font-variant-numeric: tabular-nums">{{ moneyCompact(property.model_pi_low_90!) }}</text>
+        <text :x="clampX(x(bandLo!))" y="72" text-anchor="middle" font-size="11.5" fill="#8593a4" style="font-variant-numeric: tabular-nums">{{ moneyCompact(bandLo!) }}</text>
         <text :x="clampX(medSx)" y="14" :text-anchor="edgeAnchor(medSx)" font-size="11.5" font-weight="700" fill="#0f4d90" style="font-variant-numeric: tabular-nums">Ours {{ moneyCompact(property.model_median!) }}</text>
-        <text :x="clampX(x(property.model_pi_high_90!))" y="72" text-anchor="middle" font-size="11.5" fill="#8593a4" style="font-variant-numeric: tabular-nums">{{ moneyCompact(property.model_pi_high_90!) }}</text>
+        <text :x="clampX(x(bandHi!))" y="72" text-anchor="middle" font-size="11.5" fill="#8593a4" style="font-variant-numeric: tabular-nums">{{ moneyCompact(bandHi!) }}</text>
         <text
           :x="clampX(opaSx)"
           :y="cityLabelY"
