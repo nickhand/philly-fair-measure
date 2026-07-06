@@ -38,6 +38,11 @@ const enabledLabels = ref<Set<string>>(
  * read as the rowhome pattern. */
 const showCondos = ref(true)
 
+/** The legend doubles as the filter panel; on a phone it otherwise eats the
+ * top-left quarter of the map and sits over the search dropdown. Collapse it
+ * to a single chip by default on narrow screens, expanded on wider ones. */
+const legendOpen = ref(typeof window === 'undefined' || window.innerWidth >= 1024)
+
 /** OR the enabled legend chips of the given tiers into one layer filter;
  * an all-off selection matches nothing. */
 function tierFilter(tiers: readonly string[]): maplibregl.FilterSpecification {
@@ -329,57 +334,73 @@ onBeforeUnmount(() => {
       aria-label="Map of Philadelphia homes colored by assessment check result. Use the address search above the map if you prefer not to use the map."
     ></div>
 
-    <!-- floating search -->
-    <div class="absolute inset-x-3 top-3 z-10 mx-auto max-w-[560px]">
+    <!-- floating search — z-20 keeps its dropdown above the legend column
+         (both were z-10, and the later-in-DOM legend won the tie) -->
+    <div class="absolute inset-x-3 top-3 z-20 mx-auto max-w-[560px]">
       <AddressSearch ref="searchRef" compact @select="onSearchSelect" />
     </div>
 
     <!-- legend chips double as show/hide toggles; a vertical column ordered
-         high → low so it reads like the scale it encodes -->
-    <div
-      class="absolute left-3 top-[66px] z-10 flex w-fit flex-col items-stretch gap-1.5"
-      role="group"
-      aria-label="Show or hide homes by result"
-    >
-      <span
-        aria-hidden="true"
-        class="w-fit rounded-full bg-[rgba(22,36,58,0.72)] px-2 py-0.5 text-caption font-bold text-white"
-        >Show:</span
-      >
-      <button
-        v-for="l in legend"
-        :key="l.label"
-        type="button"
-        :aria-pressed="enabledLabels.has(l.label)"
-        class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-caption font-semibold shadow-float transition-colors duration-[var(--duration-fast)]"
-        :class="
-          enabledLabels.has(l.label)
-            ? 'border-line-soft bg-white text-body'
-            : 'border-line bg-paper text-faint line-through'
-        "
-        @click="toggleLegend(l.label)"
-      >
-        <span
-          class="h-2.5 w-2.5 rounded-full"
-          :style="{ background: enabledLabels.has(l.label) ? l.hex : '#c3ccd6' }"
-          aria-hidden="true"
-        ></span>
-        {{ l.label }}
-      </button>
+         high → low so it reads like the scale it encodes. Collapsible: on a
+         phone the panel otherwise blankets the map's top-left corner. -->
+    <div class="absolute left-3 top-[66px] z-10 flex w-fit flex-col items-stretch gap-1.5">
       <button
         type="button"
-        :aria-pressed="showCondos"
-        class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-caption font-semibold shadow-float transition-colors duration-[var(--duration-fast)]"
-        :class="showCondos ? 'border-line-soft bg-white text-body' : 'border-line bg-paper text-muted'"
-        @click="toggleCondos"
+        :aria-expanded="legendOpen"
+        aria-controls="legend-panel"
+        class="inline-flex min-h-9 w-fit items-center gap-1.5 rounded-full bg-[rgba(22,36,58,0.82)] px-3 py-1.5 text-caption font-bold text-white shadow-float"
+        @click="legendOpen = !legendOpen"
       >
-        <!-- explicit checkbox glyph: this chip is a filter, not a legend entry -->
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" :stroke="showCondos ? '#0f4d90' : '#8593a4'" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="3.5" y="3.5" width="17" height="17" rx="3.5" />
-          <path v-if="showCondos" d="M8 12.5 11 15.5 16.5 9" />
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" />
         </svg>
-        Condos
+        {{ legendOpen ? 'Hide' : 'Show' }}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="transition-transform duration-[var(--duration-fast)]" :class="legendOpen ? '' : '-rotate-90'">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </button>
+      <div
+        v-show="legendOpen"
+        id="legend-panel"
+        role="group"
+        aria-label="Show or hide homes by result"
+        class="flex flex-col items-stretch gap-1.5"
+      >
+        <button
+          v-for="l in legend"
+          :key="l.label"
+          type="button"
+          :aria-pressed="enabledLabels.has(l.label)"
+          class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-caption font-semibold shadow-float transition-colors duration-[var(--duration-fast)]"
+          :class="
+            enabledLabels.has(l.label)
+              ? 'border-line-soft bg-white text-body'
+              : 'border-line bg-paper text-faint line-through'
+          "
+          @click="toggleLegend(l.label)"
+        >
+          <span
+            class="h-2.5 w-2.5 rounded-full"
+            :style="{ background: enabledLabels.has(l.label) ? l.hex : '#c3ccd6' }"
+            aria-hidden="true"
+          ></span>
+          {{ l.label }}
+        </button>
+        <button
+          type="button"
+          :aria-pressed="showCondos"
+          class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-caption font-semibold shadow-float transition-colors duration-[var(--duration-fast)]"
+          :class="showCondos ? 'border-line-soft bg-white text-body' : 'border-line bg-paper text-muted'"
+          @click="toggleCondos"
+        >
+          <!-- explicit checkbox glyph: this chip is a filter, not a legend entry -->
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" :stroke="showCondos ? '#0f4d90' : '#8593a4'" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3.5" y="3.5" width="17" height="17" rx="3.5" />
+            <path v-if="showCondos" d="M8 12.5 11 15.5 16.5 9" />
+          </svg>
+          Condos
+        </button>
+      </div>
     </div>
 
     <!-- zoom hint / fetch pill: bottom-center so they never cover the legend

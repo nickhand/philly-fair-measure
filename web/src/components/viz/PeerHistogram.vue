@@ -23,6 +23,9 @@ const wrapper = ref<HTMLDivElement | null>(null)
 const width = ref(343)
 let observer: ResizeObserver | undefined
 onMounted(() => {
+  // seed from the live layout so the first paint is right even where
+  // ResizeObserver is unavailable or never fires (some embedded WebViews)
+  if (wrapper.value?.clientWidth) width.value = Math.max(280, wrapper.value.clientWidth)
   observer = new ResizeObserver((entries) => {
     const w = entries[0]?.contentRect.width
     if (w) width.value = Math.max(280, w)
@@ -82,8 +85,21 @@ const ariaLabel = computed(
         rx="1.5"
         :fill="i === youBin ? '#ffd9bd' : '#c9d9ec'"
       />
+      <!-- axis + marker lines first; the two data labels are drawn LAST (below)
+           so they sit on top of every line, each with a white halo so a line
+           passing behind stays legible -->
+      <line :x1="PAD" :y1="BASE" :x2="width - PAD" :y2="BASE" stroke="#dfe5ec" stroke-width="1" />
       <line :x1="x(peerMedian)" y1="24" :x2="x(peerMedian)" :y2="BASE" stroke="#0f4d90" stroke-width="2" />
+      <line :x1="x(clampedYou)" y1="34" :x2="x(clampedYou)" :y2="BASE" :stroke="youHex" stroke-width="2" stroke-dasharray="3 4" />
+      <circle :cx="x(clampedYou)" cy="34" r="3.5" :fill="youHex" />
+      <text v-for="t in ticks" :key="t" :x="x(t)" :y="BASE + 15" text-anchor="middle" font-size="11.5" fill="#8593a4" style="font-variant-numeric: tabular-nums">
+        {{ Math.round(t * 100) }}%
+      </text>
+      <text :x="width / 2" :y="HEIGHT - 4" text-anchor="middle" font-size="11.5" fill="#8593a4">
+        assessment as % of our estimate
+      </text>
       <text
+        class="hist-label"
         :x="Math.max(PAD - 14, Math.min(x(peerMedian) - 5, width - 175))"
         y="14"
         text-anchor="start"
@@ -93,9 +109,8 @@ const ariaLabel = computed(
       >
         Similar homes' middle {{ pct(peerMedian) }}
       </text>
-      <line :x1="x(clampedYou)" y1="34" :x2="x(clampedYou)" :y2="BASE" :stroke="youHex" stroke-width="2" stroke-dasharray="3 4" />
-      <circle :cx="x(clampedYou)" cy="34" r="3.5" :fill="youHex" />
       <text
+        class="hist-label"
         :x="offScale === 'high' || x(clampedYou) + 9 > width - 70 ? x(clampedYou) - 9 : x(clampedYou) + 9"
         y="30"
         :text-anchor="offScale === 'high' || x(clampedYou) + 9 > width - 70 ? 'end' : 'start'"
@@ -104,13 +119,6 @@ const ariaLabel = computed(
         :fill="youHex"
       >
         You {{ pct(you) }}{{ offScale === 'high' ? ' →' : offScale === 'low' ? ' ←' : '' }}
-      </text>
-      <line :x1="PAD" :y1="BASE" :x2="width - PAD" :y2="BASE" stroke="#dfe5ec" stroke-width="1" />
-      <text v-for="t in ticks" :key="t" :x="x(t)" :y="BASE + 15" text-anchor="middle" font-size="11.5" fill="#8593a4" style="font-variant-numeric: tabular-nums">
-        {{ Math.round(t * 100) }}%
-      </text>
-      <text :x="width / 2" :y="HEIGHT - 4" text-anchor="middle" font-size="11.5" fill="#8593a4">
-        assessment as % of our estimate
       </text>
     </svg>
 
@@ -132,3 +140,14 @@ const ariaLabel = computed(
     </details>
   </div>
 </template>
+
+<style scoped>
+/* White halo behind the two data labels so they stay legible when a marker
+   line passes behind them (paint the stroke first, then the fill on top). */
+.hist-label {
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+}
+</style>
