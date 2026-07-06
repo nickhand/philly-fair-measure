@@ -74,10 +74,12 @@ def incoherent_display_count(df: pl.DataFrame) -> int:
 def assert_screen_invariants(df: pl.DataFrame) -> None:
     disputed = disputed_flag_count(df)
     incoherent = incoherent_display_count(df)
-    if disputed or incoherent:
+    pinned = audit_screen(df)["invariants"]["median_pinned_to_display_edge"]
+    if disputed or incoherent or pinned:
         raise ScreenInvariantError(
             f"screen invariants violated: {disputed} flags disputed by the conformal band, "
-            f"{incoherent} rows with the median outside the display band. "
+            f"{incoherent} rows with the median outside the display band, "
+            f"{pinned} rows with the estimate pinned to a display edge. "
             "Refusing to write the mart — see validation/screen_audit.py."
         )
 
@@ -111,6 +113,16 @@ def audit_screen(df: pl.DataFrame) -> dict[str, Any]:
         (pl.col("assessment_flag") != AssessmentFlag.INSUFFICIENT)
         & (pl.col("model_median") < 30_000)
     )
+    # estimate pinned to a display edge (within 0.5%): "estimate $X, range
+    # $X–$Y" — the presentation bug the fallback headroom pad exists to prevent
+    pinned = df.filter(
+        pl.col("model_median").is_not_null()
+        & (pl.col("display_pi_low_90") > 0)
+        & (
+            ((pl.col("model_median") / pl.col("display_pi_low_90")) < 1.005)
+            | ((pl.col("display_pi_high_90") / pl.col("model_median")) < 1.005)
+        )
+    ).height
     return {
         "rows": df.height,
         "flags": dict(sorted(flags.items())),
@@ -120,6 +132,7 @@ def audit_screen(df: pl.DataFrame) -> dict[str, Any]:
         "invariants": {
             "disputed_flags": disputed_flag_count(df),
             "median_outside_display": incoherent_display_count(df),
+            "median_pinned_to_display_edge": pinned,
         },
         "bands": bands,
         "extremes": {

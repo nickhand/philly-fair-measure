@@ -225,8 +225,14 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
             & (pl.col("model_median") >= cross_lo)
             & (pl.col("model_median") <= cross_hi)
         )
-        conf_lo = pl.min_horizontal("conformal_pi_low_90", "model_median")
-        conf_hi = pl.max_horizontal("conformal_pi_high_90", "model_median")
+        # Expansion gives the median HEADROOM (>=10% on the deficient side),
+        # not bare containment: pinning the band edge to the median rendered
+        # "estimate $535k, range $535k-$1.12M" on 13k reports (measured
+        # 2026-07-06, 2314 Wallace St) — technically coherent, visually
+        # nonsense. Real bands are ±57%+ wide, so the pad only engages at
+        # the synthetic edge.
+        conf_lo = pl.min_horizontal("conformal_pi_low_90", pl.col("model_median") * 0.9)
+        conf_hi = pl.max_horizontal("conformal_pi_high_90", pl.col("model_median") * 1.1)
         use_conf = (
             pl.col("conformal_pi_low_90").is_not_null()
             & (conf_lo > 0)
@@ -239,6 +245,15 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     else:
         display_lo = pl.col("model_pi_low_90")
         display_hi = pl.col("model_pi_high_90")
+    # Universal headroom clamp, last: WHATEVER branch produced the band
+    # (intersection, fallback, native), the shown range extends at least 10%
+    # past the shown estimate on each side. The first pad only covered the
+    # fallback candidates; the invariant then caught 908 rows pinned at the
+    # INTERSECTION edge (median exactly at max(model_lo, conformal_lo)). No
+    # estimate in this domain honestly carries <10% one-sided uncertainty —
+    # every real band is ±57%+ — so the clamp only engages at synthetic edges.
+    display_lo = pl.min_horizontal(display_lo, pl.col("model_median") * 0.9)
+    display_hi = pl.max_horizontal(display_hi, pl.col("model_median") * 1.1)
     return (
         df.with_columns(
             display_lo.alias("display_pi_low_90"),

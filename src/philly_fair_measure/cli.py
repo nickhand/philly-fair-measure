@@ -210,12 +210,9 @@ def _cmd_screen_audit(args: argparse.Namespace) -> int:
     report = run_screen_audit(args.data_dir, save=not args.no_save)
     print(f"screen audit — {report['rows']:,} rows")
     inv = report["invariants"]
-    ok = not (inv["disputed_flags"] or inv["median_outside_display"])
-    print(
-        f"  invariants: {'OK' if ok else 'VIOLATED'} "
-        f"(disputed flags {inv['disputed_flags']}, "
-        f"median outside display {inv['median_outside_display']})"
-    )
+    ok = not any(inv.values())
+    detail = ", ".join(f"{name} {count}" for name, count in inv.items())
+    print(f"  invariants: {'OK' if ok else 'VIOLATED'} ({detail})")
     print("  flags:")
     for key, count in report["flags"].items():
         print(f"    {key:<40} {count:>9,}")

@@ -292,9 +292,10 @@ def test_finalize_screen_agreement_gate_and_display_band():
     assert out["agreed_over"]["display_pi_low_90"] == pytest.approx(200_000.0)
     assert out["agreed_over"]["display_pi_high_90"] == pytest.approx(600_000.0)
     # ...but never a band that excludes the shown estimate: the narrower of
-    # the two coherent candidates (native band vs conformal expanded to
-    # include the median) wins per row
-    assert out["med_outside"]["display_pi_low_90"] == pytest.approx(300_000.0)
+    # the two coherent candidates (native band vs conformal expanded PAST the
+    # median with >=10% headroom — an edge pinned to the estimate reads as
+    # "estimate $X, range $X-$Y") wins per row
+    assert out["med_outside"]["display_pi_low_90"] == pytest.approx(270_000.0)
     assert out["med_outside"]["display_pi_high_90"] == pytest.approx(900_000.0)
     assert out["gap"]["display_pi_low_90"] == pytest.approx(150_000.0)
     assert out["gap"]["display_pi_high_90"] == pytest.approx(600_000.0)
@@ -324,7 +325,11 @@ def test_screen_audit_invariants_and_report():
     )
     assert_screen_invariants(clean)  # a finalize_screen output always passes
     report = audit_screen(clean)
-    assert report["invariants"] == {"disputed_flags": 0, "median_outside_display": 0}
+    assert report["invariants"] == {
+        "disputed_flags": 0,
+        "median_outside_display": 0,
+        "median_pinned_to_display_edge": 0,
+    }
     assert report["flags"]["residential/over_assessed_candidate"] == 1
     assert report["bands"]["residential"]["display"]["max"] > 1
 
