@@ -15,7 +15,7 @@ DEFAULT_DATA_DIR: Final = Path("data")
 # dedicated model (see the CCAO condo playbook in docs/ccao-lessons.md).
 CONDO_ACCOUNT_PREFIX: Final = "88"
 
-# The recurring snapshot set: every table here is captured by `philly snapshot-all`.
+# The recurring snapshot set: every table here is captured by `fair-measure snapshot-all`.
 # Page sizes reflect row width (verified in docs/source_inventory.md).
 CORE_CARTO_TABLES: Final[dict[str, int]] = {
     "opa_properties_public": 20_000,

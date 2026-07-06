@@ -10,7 +10,7 @@ a real, recent, arms-length sale, shown with its price both as transacted and
 adjusted to today via the district price index.
 
 Requires marts/assessment_features.parquet (persisted by
-`philly screen-assessments`) for the target property's current features, and a
+`fair-measure screen-assessments`) for the target property's current features, and a
 persisted baseline run for the model.
 """
 
@@ -73,7 +73,9 @@ def find_comps(
     features_path = root / "marts" / "assessment_features.parquet"
     sales_path = root / "marts" / "sale_features.parquet"
     if not features_path.exists():
-        raise FileNotFoundError(f"{features_path} missing; run `philly screen-assessments` first")
+        raise FileNotFoundError(
+            f"{features_path} missing; run `fair-measure screen-assessments` first"
+        )
 
     target_df = pl.read_parquet(features_path).filter(pl.col("parcel_id") == parcel_id)
     if target_df.height == 0:

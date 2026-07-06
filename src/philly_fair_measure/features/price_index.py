@@ -54,7 +54,7 @@ def build_price_index(data_dir: Path | None = None) -> BuildResult:
     }
     for path in paths.values():
         if not path.exists():
-            raise FileNotFoundError(f"{path} missing; run `philly build-market-areas` first")
+            raise FileNotFoundError(f"{path} missing; run `fair-measure build-market-areas` first")
 
     points = sale_points(pl.scan_parquet(paths["sales"]), pl.scan_parquet(paths["opa"]))
     districts = pl.read_parquet(paths["market_areas"]).select("parcel_id", "district")

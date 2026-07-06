@@ -116,7 +116,9 @@ def train_condo(
     root = data_dir if data_dir is not None else config.data_dir()
     mart_path = root / "marts" / "condo_sale_features.parquet"
     if not mart_path.exists():
-        raise FileNotFoundError(f"{mart_path} missing; run `philly build-condo-features` first")
+        raise FileNotFoundError(
+            f"{mart_path} missing; run `fair-measure build-condo-features` first"
+        )
 
     df = pl.read_parquet(mart_path).sort("sale_date", "sale_id")
     if "time_adj_log" not in df.columns:

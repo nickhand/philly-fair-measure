@@ -977,8 +977,9 @@ def build_sale_features(
     for path in paths.values():
         if not path.exists():
             raise FileNotFoundError(
-                f"{path} missing; run snapshots, `philly stage`, `philly validate-sales`, "
-                "`philly build-market-areas`, and `philly build-price-index` first"
+                f"{path} missing; run snapshots, `fair-measure stage`, "
+                "`fair-measure validate-sales`, `fair-measure build-market-areas`, "
+                "and `fair-measure build-price-index` first"
             )
     optional: dict[str, pl.LazyFrame | None] = {}
     for name in (

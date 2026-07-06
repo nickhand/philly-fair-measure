@@ -4,7 +4,7 @@
     {
       "name": "api",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "philly", "api", "--port", "8000"],
+      "runtimeArgs": ["run", "fair-measure", "api", "--port", "8000"],
       "port": 8000
     },
     {

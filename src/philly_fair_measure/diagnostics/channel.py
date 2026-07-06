@@ -45,7 +45,7 @@ from philly_fair_measure import config
 logger = logging.getLogger(__name__)
 
 # Pure within-tier cash-channel discounts by price quintile, measured via
-# `philly channel-decomp` (the "+distress" stage, 2026-07-04). Published, not
+# `fair-measure channel-decomp` (the "+distress" stage, 2026-07-04). Published, not
 # a hidden propensity: cash-market value = retail value * (1 + discount). This
 # is the transparent way to express the cash convention — a documented number
 # an owner or a board can inspect, NOT a demographic proxy baked into a model.

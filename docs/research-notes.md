@@ -59,7 +59,7 @@ socioeconomic features belong in *diagnostics*, not the valuation path
 - STEB Common Level Ratio 94.3% (2025).
 
 **Reconciling their COD 10.1 with our measured COD 34.6 for OPA — now fully
-QUANTIFIED (2026-07-03, `philly ratio-study`).** Both numbers are real, on
+QUANTIFIED (2026-07-03, `fair-measure ratio-study`).** Both numbers are real, on
 different questions, and the bridge decomposes the gap on identical
 out-of-time test sales (n=19,515):
 
@@ -170,7 +170,7 @@ field, the 2026 toolchain: `pm.gp.HSGP` (PyMC, mature), GPBoost
 to Python.
 
 **Conformal cross-check verdict (measured 2026-07-03,
-`philly conformal-check`, artifacts in the baseline run dir).** The
+`fair-measure conformal-check`, artifacts in the baseline run dir).** The
 spatially weighted conformal wrapper proposed above is now built
 (models/conformal.py: split-conformal on the rebuilt validation slice,
 asymmetric residual quantiles, global / district-Mondrian / kNN-weighted
@@ -193,7 +193,7 @@ measured interior-condition information limit; kNN-conformal degrades most
 gracefully (0.852 at width 1.42).
 
 **Aerial change-detection pilot verdict (measured 2026-07-03,
-`philly aerial-pilot`, diagnostics/aerial_change.py).** Free PASDA
+`fair-measure aerial-pilot`, diagnostics/aerial_change.py).** Free PASDA
 orthophotos CAN see structural change. Setup: per-parcel tile pairs from the
 2020 and 2023 flights (render matrix probed first — only the 2020/2023/2024/
 2025 MapServers serve pixels from /export; 2015-2019 and 2022 are tile-cache
@@ -216,7 +216,7 @@ data/diagnostics/aerial_pilot_examples/ — the first demolition example shows
 a structure present in 2020 and a parking lot in 2023.
 
 **Mapillary facade-condition layer verdict: NO-GO (measured 2026-07-03,
-`philly facade-coverage`, diagnostics/facade.py).** The stage-1 coverage gate
+`fair-measure facade-coverage`, diagnostics/facade.py).** The stage-1 coverage gate
 failed decisively: of 1,998 residential parcels stratified across all 18
 districts, only **11.1% have a usable facade image** (4-45m away, camera
 facing the parcel or a pano), **3.7% captured 2020+, 0.5% captured 2023+**.
@@ -277,7 +277,7 @@ under-assessed), the aerial-change pattern — and that flag needs no LLM. The
 scorer lives in scratchpad, unshipped.
 
 **Stability audit — CV distribution + look-ahead bound (measured 2026-07-04,
-`philly stability-audit`).** Replaces "COD 26 is one split" with a
+`fair-measure stability-audit`).** Replaces "COD 26 is one split" with a
 distribution, and confronts the learned-geography look-ahead honestly.
 
 - **Temporal rolling-origin CV** (5 expanding-window out-of-time folds,

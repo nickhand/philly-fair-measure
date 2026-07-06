@@ -18,7 +18,7 @@ dev:
 # Run the Python API in development mode
 [group: "dev"]
 api:
-	uv run philly api
+	uv run fair-measure api
 
 # Run the web dev server
 [group: "dev"]
@@ -49,25 +49,25 @@ test:
 # refuses stale runs) — this is the one command that keeps it all coherent.
 [group: "pipeline"]
 retrain-all:
-	uv run philly build-features
-	uv run philly build-condo-features
-	uv run philly train-baseline
-	uv run philly train-baseline --market retail
-	uv run philly train-bayesian
-	uv run philly train-condo
-	uv run philly screen-assessments
-	uv run philly export-web-stats
+	uv run fair-measure build-features
+	uv run fair-measure build-condo-features
+	uv run fair-measure train-baseline
+	uv run fair-measure train-baseline --market retail
+	uv run fair-measure train-bayesian
+	uv run fair-measure train-condo
+	uv run fair-measure screen-assessments
+	uv run fair-measure export-web-stats
 
 # Rebuild the screen + regenerate the site's stats (models unchanged)
 [group: "pipeline"]
 rescreen:
-	uv run philly screen-assessments
-	uv run philly export-web-stats
+	uv run fair-measure screen-assessments
+	uv run fair-measure export-web-stats
 
 # Regenerate web/src/data/siteStats.json from the latest runs
 [group: "pipeline"]
 export-stats:
-	uv run philly export-web-stats
+	uv run fair-measure export-web-stats
 
 # ---------------------------------------------------------------- deploy: api (Fly.io)
 

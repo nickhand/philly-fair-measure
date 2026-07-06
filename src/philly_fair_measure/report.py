@@ -1,4 +1,4 @@
-"""Static property report: the appeal-packet renderer (`philly report`).
+"""Static property report: the appeal-packet renderer (`fair-measure report`).
 
 The founding deliverable's last mile: everything the pipeline knows about one
 property, rendered into a single self-contained HTML file an owner could

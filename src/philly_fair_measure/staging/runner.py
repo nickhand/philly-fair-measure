@@ -59,7 +59,7 @@ def build_all(data_dir: Path | None = None, only: Sequence[str] | None = None) -
         if missing:
             raise FileNotFoundError(
                 f"staged table {table_name!r} needs raw snapshots {missing}; "
-                "run `philly snapshot` first"
+                "run `fair-measure snapshot` first"
             )
         refs = [latest[d] for d in input_datasets]
         frame = builder(*(pl.scan_parquet(ref.data_path) for ref in refs)).collect()

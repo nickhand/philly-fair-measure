@@ -15,7 +15,7 @@ import { SITE } from '@/config/site'
 import InfoTip from '@/components/ui/InfoTip.vue'
 
 /** All figures come from web/src/data/siteStats.json — regenerate with
- * `philly export-web-stats` after every retrain (never hand-edit). */
+ * `fair-measure export-web-stats` after every retrain (never hand-edit). */
 import stats from '@/data/siteStats.json'
 
 const iaao = stats.iaao_card
@@ -345,12 +345,12 @@ const fullCard = [
       <p class="mt-4 text-caption text-faint">
         Source: out-of-time test slice of model run {{ meta.model_run_id }}, n =
         {{ meta.n_test.toLocaleString() }} arms-length Philadelphia sales (regenerated
-        {{ meta.generated_at }} via <code>philly export-web-stats</code>); the sale-chasing check
+        {{ meta.generated_at }} via <code>fair-measure export-web-stats</code>); the sale-chasing check
         uses the assesspy implementation across TY2025–2026. Every figure is reproducible from the
         <a :href="SITE.githubUrl" rel="noopener" class="font-semibold text-brand-600 underline"
           >open-source pipeline</a
         >
-        (<code>philly train-baseline</code>, <code>philly ratio-study</code>) and documented — with
+        (<code>fair-measure train-baseline</code>, <code>fair-measure ratio-study</code>) and documented — with
         the measurements that did NOT work — in the
         <a :href="SITE.modelDocsUrl" rel="noopener" class="font-semibold text-brand-600 underline"
           >technical model documentation</a

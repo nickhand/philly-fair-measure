@@ -2,7 +2,7 @@
 
 One row per validated arms-length sale (2016+ by default; the full arms-length
 pool back to the start of RTT records feeds the rolling windows). Built by
-`philly build-features` from staged tables + the sale-validity mart.
+`fair-measure build-features` from staged tables + the sale-validity mart.
 
 Temporal quality follows the AGENTS.md contract. Prefixes encode it:
 
@@ -146,8 +146,8 @@ geometry-change detection regardless.
 
 ## Condo model (`marts/condo_sale_features.parquet`, v1 2026-07-03)
 
-Separate model per CCAO practice (`philly build-condo-features` +
-`philly train-condo`).
+Separate model per CCAO practice (`fair-measure build-condo-features` +
+`fair-measure train-condo`).
 
 **The v0→v1 story is a data-linkage detective story.** v0 (COD 55.7, "wild
 thin market") was trained on the wrong population: RTT leaves
@@ -183,7 +183,7 @@ equity asymmetry is therefore *between* segments: the condo-owning
 (affluent-skewing) stock gets accurate, slightly-under assessments while
 cheap rowhomes get severely dispersed, regressive ones.
 
-**Screen integration:** `philly screen-assessments` now scores every RES
+**Screen integration:** `fair-measure screen-assessments` now scores every RES
 CONDO unit (250–12,000 sqft) alongside residential — point estimate from the
 condo run, 90% interval from spatially weighted conformal offsets
 (`interval_method="conformal_knn"`; the condo model has no Bayesian arm).
@@ -266,7 +266,7 @@ Bayesian model.
   scores exist; we skip flood entirely for now.
 - **School ratings** — CCAO dropped them in 2025.
 - **ACS tract aggregates** — measured, excluded (2026-07-03): the
-  `philly acs-sensitivity` diagnostic retrain shows tract demographics carry
+  `fair-measure acs-sensitivity` diagnostic retrain shows tract demographics carry
   1.15% of gain and move NO metric (overall, q1, or any majority-race group)
   beyond noise — the learned spatial machinery subsumes them. The legal ban
   costs nothing; demographics remain diagnostics-only by design AND by
@@ -275,7 +275,7 @@ Bayesian model.
 
 ## Proximity (`prox_`/`loc_street_class`, 2026-07-03 — the last OPA-parity family)
 
-`philly build-proximity` → `marts/proximity.parquet` (quasi-static,
+`fair-measure build-proximity` → `marts/proximity.parquet` (quasi-static,
 per-parcel; joined into all three feature builds). Sources live-verified:
 SEPTA's ArcGIS org (BSL 24 + MFL 28 rapid-transit stations, 155 regional-rail
 stations), city PPR_Properties (506 park polygons), city Street_Centerline

@@ -7,7 +7,7 @@
  * reverses, so it stays in the technical docs with its full caveats. */
 import { SITE } from '@/config/site'
 /** All figures come from web/src/data/siteStats.json — regenerate with
- * `philly export-web-stats` after every retrain (never hand-edit). */
+ * `fair-measure export-web-stats` after every retrain (never hand-edit). */
 import stats from '@/data/siteStats.json'
 
 const t = stats.tiers_financed
@@ -200,7 +200,7 @@ function colH(m: number): number {
     <p class="mt-4 text-caption leading-normal text-faint">
       Measured on Philadelphia deed records {{ redis.year_span }}; model run
       {{ stats.meta.model_run_id }}, regenerated {{ stats.meta.generated_at }} via
-      <code>philly export-web-stats</code>. Full methods,
+      <code>fair-measure export-web-stats</code>. Full methods,
       caveats, and the analyses we deliberately do not headline (including why per-group dollar
       claims need care) are in the
       <a :href="SITE.modelDocsUrl" rel="noopener" class="font-semibold text-brand-600 underline"

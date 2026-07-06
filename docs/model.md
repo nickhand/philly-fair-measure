@@ -172,7 +172,7 @@ The model is **more accurate** (RMSE 0.337 vs 0.449), **more uniform**
 −0.06 vs −0.23) than OPA on the same homes. The raw-sample median ratio runs
 1.04 (the financed-calibrated booster sits above the cash-heavy raw test
 slice); on the IAAO financed/TASP basis the median is 1.002 with COD 19.9
-(see `philly export-web-stats` / the site's ratio card). IAAO ratio
+(see `fair-measure export-web-stats` / the site's ratio card). IAAO ratio
 statistics (COD, PRD, PRB, MKI) come from assesspy; definitions in
 [ccao-lessons.md](ccao-lessons.md).
 

@@ -328,7 +328,7 @@ def build_sale_validity(data_dir: Path | None = None) -> BuildResult:
     opa_path = root / "staged" / "opa_properties.parquet"
     for path in (deeds_path, opa_path):
         if not path.exists():
-            raise FileNotFoundError(f"{path} missing; run `philly stage` first")
+            raise FileNotFoundError(f"{path} missing; run `fair-measure stage` first")
 
     frame = classify_sales(pl.scan_parquet(deeds_path), pl.scan_parquet(opa_path)).collect()
 

@@ -413,7 +413,9 @@ def run_aerial_score(
     root = data_dir if data_dir is not None else config.data_dir()
     screen_path = root / "marts" / "assessment_screen.parquet"
     if not screen_path.exists():
-        raise FileNotFoundError(f"{screen_path} missing; run `philly screen-assessments` first")
+        raise FileNotFoundError(
+            f"{screen_path} missing; run `fair-measure screen-assessments` first"
+        )
     screen = pl.scan_parquet(screen_path)
     if "model_family" in screen.collect_schema().names():
         screen = screen.filter(pl.col("model_family") == "residential")

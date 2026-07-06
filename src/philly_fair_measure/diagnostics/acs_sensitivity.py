@@ -42,7 +42,7 @@ def _acs_frame(data_dir: Path | None) -> pl.DataFrame:
     ref = catalog.latest_snapshots(data_dir).get(ACS_DATASET)
     if ref is None:
         raise FileNotFoundError(
-            f"no {ACS_DATASET} snapshot; run `philly snapshot arcgis "
+            f"no {ACS_DATASET} snapshot; run `fair-measure snapshot arcgis "
             "Philadelphia_Census_Tracts_ACS_2022_Select_Demographics "
             f"--dataset {ACS_DATASET}` first"
         )

@@ -17,7 +17,7 @@ export default defineConfig({
     },
   },
   server: {
-    // the Python API: `uv run philly api` from the repo root
+    // the Python API: `uv run fair-measure api` from the repo root
     proxy: {
       '/api': 'http://127.0.0.1:8000',
     },

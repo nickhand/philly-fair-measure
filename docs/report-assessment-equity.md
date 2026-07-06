@@ -169,7 +169,7 @@ OPA's **8.7-point** White/Black median-ratio gap collapses to **0.4 points**
 under the public-data model, which contains no demographic features — while
 uniformity improves in every group. But this single-window number needs three
 robustness checks before it can carry weight, and they qualify it in
-important ways (`philly fairness-robustness`):
+important ways (`fair-measure fairness-robustness`):
 
 - **It is stable across time — the strong result.** Re-run per fold in a
   5-fold temporal cross-validation, the *model's* Black–White level gap stays
@@ -418,15 +418,15 @@ tool:
 | Finding | Command |
 |---|---|
 | Ratio study by tract race/income (F1, F2, F3, F7) | equity diagnostics (`docs/equity-diagnostics.md`) |
-| Banned-data sensitivity (F4) | `philly acs-sensitivity` |
-| Cash/financed channel decomposition (F5) | `philly channel-decomp` |
-| Retail vs cash convention (F5) | `philly retail-market` |
-| Char-leakage bound + racial gap under retail (Robustness) | `philly robustness-audit` |
-| Fairness robustness: mechanism, CV folds, full roll (F3) | `philly fairness-robustness` |
-| Vertical regressivity across periods + conventions (Robustness) | `philly regressivity-cv` |
-| Temporal + spatial CV, look-ahead bound | `philly stability-audit` |
-| Sales-chasing and convention bridge (F6) | `philly ratio-study` |
-| Per-property both-value report | `philly report <address>` |
+| Banned-data sensitivity (F4) | `fair-measure acs-sensitivity` |
+| Cash/financed channel decomposition (F5) | `fair-measure channel-decomp` |
+| Retail vs cash convention (F5) | `fair-measure retail-market` |
+| Char-leakage bound + racial gap under retail (Robustness) | `fair-measure robustness-audit` |
+| Fairness robustness: mechanism, CV folds, full roll (F3) | `fair-measure fairness-robustness` |
+| Vertical regressivity across periods + conventions (Robustness) | `fair-measure regressivity-cv` |
+| Temporal + spatial CV, look-ahead bound | `fair-measure stability-audit` |
+| Sales-chasing and convention bridge (F6) | `fair-measure ratio-study` |
+| Per-property both-value report | `fair-measure report <address>` |
 
 Data sources: OPA property assessments and characteristics, Real Estate
 Transfer records, L&I permits/violations/complaints, PWD parcels, and the city

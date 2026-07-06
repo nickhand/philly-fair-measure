@@ -41,7 +41,7 @@ def _cmd_catalog(args: argparse.Namespace) -> int:
     raw_refs = catalog.latest_snapshots(args.data_dir)
     derived_refs = catalog.list_derived(args.data_dir)
     if not raw_refs and not derived_refs:
-        print("no snapshots found; run `philly snapshot` first")
+        print("no snapshots found; run `fair-measure snapshot` first")
         return 1
     header = f"{'view':<34} {'rows':>12}  {'as_of':<21} source"
     print(header)
@@ -533,7 +533,7 @@ def _cmd_aerial_score(args: argparse.Namespace) -> int:
         f"\n{scores.height:,} flagged screen parcels scored ({args.early} vs {args.late}); "
         f"{flagged.height:,} show aerial change above the control-calibrated threshold"
     )
-    print("rerun `philly screen-assessments` to embed the evidence columns")
+    print("rerun `fair-measure screen-assessments` to embed the evidence columns")
     return 0
 
 

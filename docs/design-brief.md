@@ -50,7 +50,7 @@ Professional but civic-minded, operationally:
 
 The app works and follows the right patterns, but visually it's default-Tailwind generic: stock slate grays, one navy, emoji as icons (🏠 ⚖️ 📝 ⓘ ⚠), uniform rounded-2xl cards with no hierarchy between the verdict (the emotional payoff) and supporting panels, no wordmark, no visual identity.
 
-Run it locally to see it: `uv run philly api` + `cd web && npm run dev` → http://localhost:5173 (try address "108 ELFRETHS ALY"; map at /map; /methodology; /admin passphrase `philly-staff`).
+Run it locally to see it: `uv run fair-measure api` + `cd web && npm run dev` → http://localhost:5173 (try address "108 ELFRETHS ALY"; map at /map; /methodology; /admin passphrase `philly-staff`).
 
 Known specific weaknesses to solve:
 

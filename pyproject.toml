@@ -24,7 +24,8 @@ dependencies = [
 ]
 
 [project.scripts]
-philly = "philly_fair_measure.cli:main"
+fair-measure = "philly_fair_measure.cli:main"
+fm = "philly_fair_measure.cli:main"
 
 [dependency-groups]
 dev = [

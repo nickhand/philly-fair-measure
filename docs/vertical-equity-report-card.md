@@ -7,7 +7,7 @@ happens to every home, including the cash/distressed tail the standard excludes)
 
 Numbers are the out-of-time test slice of baseline run
 `20260705T015912Z` (n ≈ 19.5k residential arms-length sales). Reproduce with
-`philly train-baseline` then `philly ratio-study`. This report card is
+`fair-measure train-baseline` then `fair-measure ratio-study`. This report card is
 deliberately not a "we made it fair" claim — see the honest reading below.
 
 ## The standards (IAAO Standard on Ratio Studies)

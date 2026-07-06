@@ -3,7 +3,7 @@
 The web app's Findings / Trust / Methodology pages carry measured results
 (ratio-study cards, financed tier ratios, the cash/financed split, the
 historical redistribution series). Those numbers must never be hand-edited:
-`philly export-web-stats` recomputes every one from the latest baseline run's
+`fair-measure export-web-stats` recomputes every one from the latest baseline run's
 artifacts and the marts, and writes `web/src/data/siteStats.json`, which the
 frontend imports at build time. Regenerate after every retrain/screen rebuild.
 """

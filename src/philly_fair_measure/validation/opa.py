@@ -82,11 +82,11 @@ class StaleRunError(RuntimeError):
 
 
 _RETRAIN_HINTS = {
-    "baseline": "philly train-baseline",
-    "bayesian": "philly train-bayesian",
-    "retail": "philly train-baseline --market retail",
-    "condo": "philly train-condo",
-    "bayesian-condo": "philly train-bayesian --family condo",
+    "baseline": "fair-measure train-baseline",
+    "bayesian": "fair-measure train-bayesian",
+    "retail": "fair-measure train-baseline --market retail",
+    "condo": "fair-measure train-condo",
+    "bayesian-condo": "fair-measure train-bayesian --family condo",
 }
 
 

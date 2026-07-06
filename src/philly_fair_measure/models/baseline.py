@@ -383,7 +383,7 @@ def train_baseline(
     root = data_dir if data_dir is not None else config.data_dir()
     mart_path = root / "marts" / "sale_features.parquet"
     if not mart_path.exists():
-        raise FileNotFoundError(f"{mart_path} missing; run `philly build-features` first")
+        raise FileNotFoundError(f"{mart_path} missing; run `fair-measure build-features` first")
 
     df = _load_frame(mart_path)
     numeric, categorical = feature_lists(time_adjusted)

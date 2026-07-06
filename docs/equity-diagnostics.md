@@ -96,7 +96,7 @@ that track wealth and race.
 
 ## What would the banned features buy? Nothing (measured 2026-07-03)
 
-`philly acs-sensitivity` retrains the residential LightGBM with tract ACS
+`fair-measure acs-sensitivity` retrains the residential LightGBM with tract ACS
 aggregates (racial shares, median income, poverty rate) as features, on the
 identical split/params/seed — a diagnostic only; the augmented model is never
 persisted or used. Result: ACS features carry **1.15% of total gain**;
@@ -114,7 +114,7 @@ error. (Artifact: `data/diagnostics/acs_sensitivity.parquet`.)
 
 The sharpest attack on any "OPA over-assesses cheap homes" finding is: *cheap
 homes really do sell for less, so of course the ratio looks high.* We
-measured whether that rebuttal holds (`philly channel-decomp`, an OLS of
+measured whether that rebuttal holds (`fair-measure channel-decomp`, an OLS of
 reference-frame log price with sequential controls; diagnostic only).
 
 **~40% of Philadelphia arms-length sales are cash, and the discount survives
@@ -156,7 +156,7 @@ the ratio against **both** cash-sale and retail-value conventions (as we
 report both out-of-time and TASP time conventions) is what makes the analysis
 un-dismissable. Artifact: `data/diagnostics/channel_decomposition.parquet`.
 
-### The retail model and the both-conventions ratio study (`philly retail-market`)
+### The retail model and the both-conventions ratio study (`fair-measure retail-market`)
 
 We built the retail predictor (train the LightGBM on mortgage-financed sales
 only — the transactions that ARE the typical-financing standard) and verified
@@ -189,7 +189,7 @@ they are over-assessed relative to expensive homes. This is the robust,
 pre-empted form of the regressivity finding. Artifacts:
 `data/diagnostics/retail_vs_blend.parquet`.
 
-## Fairness-robustness (`philly fairness-robustness`, 2026-07-04)
+## Fairness-robustness (`fair-measure fairness-robustness`, 2026-07-04)
 
 Three checks on the "demographic-free model eliminates the race gap" claim.
 **(1) Mechanism** — a deliberately coarse model (hedonics + ward/ZIP dummies,
@@ -209,7 +209,7 @@ eliminate the race gap" is overclaimed — the robust, convention-proof pieces
 are vertical regressivity and the persistent ~2× dispersion gap. Report
 Finding 3 rewritten to match.
 
-## Robustness audit (`philly robustness-audit`, 2026-07-04)
+## Robustness audit (`fair-measure robustness-audit`, 2026-07-04)
 
 Two adversarial stress tests. **(1) Char-leakage bound.** The model uses
 today's characteristics for old sales; on the recent (2025–26) out-of-time

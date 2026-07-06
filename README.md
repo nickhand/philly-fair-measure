@@ -15,26 +15,26 @@ Requires [uv](https://docs.astral.sh/uv/).
 uv sync
 
 # Smoke-test the snapshot pipeline with a small fetch
-uv run philly snapshot carto opa_properties_public --limit 1000
+uv run fair-measure snapshot carto opa_properties_public --limit 1000
 
 # The full pipeline: raw snapshots -> staged tables -> sale-validity mart
-uv run philly snapshot-all      # capture all core tables (or: philly snapshot carto <table>)
-uv run philly stage             # typed/deduped/classified staged tables (polars)
-uv run philly validate-sales    # marts/sale_validity.parquet with reason codes
-uv run philly build-features    # marts/sale_features.parquet (registry: docs/features.md)
-uv run philly train-baseline    # LightGBM + Ridge baselines, benchmarked against OPA
-uv run philly train-bayesian    # hierarchical Bayesian model with predictive intervals
-uv run philly screen-assessments  # flag OPA values outside each property's predictive interval
-uv run philly comps "108 ELFRETHS ALY"  # comparable sales for a property (parcel id or address)
-uv run philly freshness         # heartbeat: exit 1 if snapshots are missing/stale
+uv run fair-measure snapshot-all      # capture all core tables (or: fair-measure snapshot carto <table>)
+uv run fair-measure stage             # typed/deduped/classified staged tables (polars)
+uv run fair-measure validate-sales    # marts/sale_validity.parquet with reason codes
+uv run fair-measure build-features    # marts/sale_features.parquet (registry: docs/features.md)
+uv run fair-measure train-baseline    # LightGBM + Ridge baselines, benchmarked against OPA
+uv run fair-measure train-bayesian    # hierarchical Bayesian model with predictive intervals
+uv run fair-measure screen-assessments  # flag OPA values outside each property's predictive interval
+uv run fair-measure comps "108 ELFRETHS ALY"  # comparable sales for a property (parcel id or address)
+uv run fair-measure freshness         # heartbeat: exit 1 if snapshots are missing/stale
 
 # The public dashboard (see docs/frontend.md): API + Vue app
-uv run philly api                      # JSON API on :8000
+uv run fair-measure api                      # JSON API on :8000
 (cd web && npm install && npm run dev) # front door on :5173
 
 # See what's on disk, then query it (views: raw_<dataset>, stg_<table>, mart_<table>)
-uv run philly catalog
-uv run philly sql "
+uv run fair-measure catalog
+uv run fair-measure sql "
   SELECT a.year, a.market_value, o.total_livable_area
   FROM raw_assessments a
   JOIN raw_opa_properties_public o USING (parcel_number)
