@@ -21,7 +21,7 @@ WORKDIR /app
 COPY requirements.serve.txt ./
 RUN uv pip install --system --no-cache -r requirements.serve.txt
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 RUN uv pip install --system --no-cache --no-deps .
 
