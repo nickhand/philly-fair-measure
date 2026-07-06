@@ -206,9 +206,15 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     # condo rows (and fixtures without conformal columns) keep their native
     # band. The intersection must also CONTAIN the displayed median — an
     # intersection that excludes it reads as "estimate $996k, range
-    # $711k–$797k" (measured 2026-07-06: 28,837 rows) — otherwise fall back
-    # to the flag-anchoring band rather than show an incoherent pair.
-    # Flags and screen_z stay on model_pi_*; this is presentation-layer truth.
+    # $711k–$797k" (measured 2026-07-06: 28,837 rows). When the intersection
+    # fails, two coherent candidates exist: the native posterior band, and the
+    # conformal band minimally expanded to include the median. Neither
+    # dominates — the posterior's parametric sigma blows up on rare covariate
+    # combos (115x on 3416 Sansom St), while expanding the conformal band
+    # re-imports the full level gap where the two arms disagree about price
+    # level (measured: 384x max if always-conformal). Show whichever is
+    # narrower per row. Flags and screen_z stay on model_pi_*; this is
+    # presentation-layer truth.
     if {"conformal_pi_low_90", "conformal_pi_high_90"}.issubset(df.columns):
         cross_lo = pl.max_horizontal("model_pi_low_90", "conformal_pi_low_90")
         cross_hi = pl.min_horizontal("model_pi_high_90", "conformal_pi_high_90")
@@ -217,8 +223,17 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
             & (pl.col("model_median") >= cross_lo)
             & (pl.col("model_median") <= cross_hi)
         )
-        display_lo = pl.when(agree).then(cross_lo).otherwise(pl.col("model_pi_low_90"))
-        display_hi = pl.when(agree).then(cross_hi).otherwise(pl.col("model_pi_high_90"))
+        conf_lo = pl.min_horizontal("conformal_pi_low_90", "model_median")
+        conf_hi = pl.max_horizontal("conformal_pi_high_90", "model_median")
+        use_conf = (
+            pl.col("conformal_pi_low_90").is_not_null()
+            & (conf_lo > 0)
+            & ((conf_hi / conf_lo) < (pl.col("model_pi_high_90") / pl.col("model_pi_low_90")))
+        )
+        fallback_lo = pl.when(use_conf).then(conf_lo).otherwise(pl.col("model_pi_low_90"))
+        fallback_hi = pl.when(use_conf).then(conf_hi).otherwise(pl.col("model_pi_high_90"))
+        display_lo = pl.when(agree).then(cross_lo).otherwise(fallback_lo)
+        display_hi = pl.when(agree).then(cross_hi).otherwise(fallback_hi)
     else:
         display_lo = pl.col("model_pi_low_90")
         display_hi = pl.col("model_pi_high_90")
@@ -506,6 +521,11 @@ def build_assessment_screen(
         frames.append(frame)
         condo_runs.extend(runs)
     screen = finalize_screen(pl.concat(frames, how="diagonal"))
+    # structural truths every build must satisfy (the 2026-07-06 review's two
+    # bug classes, made unrepeatable): refuse to write a mart that breaks them
+    from philly_fair_measure.validation.screen_audit import assert_screen_invariants
+
+    assert_screen_invariants(screen)
 
     inputs = []
     for run_dir in (baseline_run, bayesian_run, *condo_runs):

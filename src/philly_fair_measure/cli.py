@@ -204,6 +204,45 @@ def _cmd_screen_assessments(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_screen_audit(args: argparse.Namespace) -> int:
+    from philly_fair_measure.validation.screen_audit import run_screen_audit
+
+    report = run_screen_audit(args.data_dir, save=not args.no_save)
+    print(f"screen audit — {report['rows']:,} rows")
+    inv = report["invariants"]
+    ok = not (inv["disputed_flags"] or inv["median_outside_display"])
+    print(
+        f"  invariants: {'OK' if ok else 'VIOLATED'} "
+        f"(disputed flags {inv['disputed_flags']}, "
+        f"median outside display {inv['median_outside_display']})"
+    )
+    print("  flags:")
+    for key, count in report["flags"].items():
+        print(f"    {key:<40} {count:>9,}")
+    print(f"    {'watch (attention tier)':<40} {report['watch']:>9,}")
+    print("  band hi/lo by family:")
+    for family, kinds in report["bands"].items():
+        for kind, q in kinds.items():
+            if q:
+                print(
+                    f"    {family}/{kind:<10} median {q['median']:>6.2f}  "
+                    f"p99 {q['p99']:>6.2f}  max {q['max']:>8.2f}"
+                )
+    ex = report["extremes"]
+    print(
+        f"  extremes: median<$30k {ex['median_lt_30k']} "
+        f"({ex['median_lt_30k_flagged']} flagged) · median>$5M {ex['median_gt_5m']} · "
+        f"opa missing {ex['opa_missing']}"
+    )
+    if report["deltas_vs_previous"]:
+        print("  deltas vs previous audit:")
+        for key, (before, after) in sorted(report["deltas_vs_previous"].items()):
+            print(f"    {key:<44} {before} -> {after}")
+    else:
+        print("  deltas vs previous audit: none (or first audit)")
+    return 0 if ok else 1
+
+
 def _cmd_conformal_check(args: argparse.Namespace) -> int:
     import polars as pl
 
@@ -905,6 +944,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     screen.add_argument("--data-dir", type=Path)
     screen.set_defaults(func=_cmd_screen_assessments)
+
+    audit = subparsers.add_parser(
+        "screen-audit",
+        help="health report on the assessment screen: invariants (must pass), "
+        "flag/watch counts, band-width quantiles, extreme values, and deltas "
+        "against the previous audit snapshot",
+    )
+    audit.add_argument(
+        "--no-save",
+        action="store_true",
+        help="do not overwrite the saved audit snapshot with this run",
+    )
+    audit.add_argument("--data-dir", type=Path)
+    audit.set_defaults(func=_cmd_screen_audit)
 
     conformal = subparsers.add_parser(
         "conformal-check",

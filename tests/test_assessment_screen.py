@@ -260,19 +260,23 @@ def test_finalize_screen_agreement_gate_and_display_band():
     # conformal band around the LightGBM point is the second machine.
     df = pl.DataFrame(
         {
-            "parcel_id": ["agreed_over", "disputed_over", "disputed_under", "med_outside"],
-            "opa_market_value": [900_000.0, 900_000.0, 100_000.0, 310_000.0],
-            "pred_lightgbm_calibrated": [300_000.0] * 4,
-            "model_median": [300_000.0] * 4,
-            "model_pi_low_90": [150_000.0] * 4,
-            "model_pi_high_90": [600_000.0] * 4,
+            "parcel_id": ["agreed_over", "disputed_over", "disputed_under", "med_outside", "gap"],
+            "opa_market_value": [900_000.0, 900_000.0, 100_000.0, 310_000.0, 310_000.0],
+            "pred_lightgbm_calibrated": [300_000.0] * 5,
+            "model_median": [300_000.0] * 5,
+            "model_pi_low_90": [150_000.0] * 5,
+            "model_pi_high_90": [600_000.0] * 5,
             # agreed_over: conformal also has OPA above (hi 700k < 900k).
             # disputed_over: conformal reaches 1.2M — OPA plausible there.
             # disputed_under: conformal reaches down to 80k — OPA plausible.
             # med_outside: bands overlap on 400k-600k, which EXCLUDES the
-            #   300k median — display must fall back to the native band.
-            "conformal_pi_low_90": [200_000.0, 250_000.0, 80_000.0, 400_000.0],
-            "conformal_pi_high_90": [700_000.0, 1_200_000.0, 500_000.0, 900_000.0],
+            #   300k median — expanded conformal [300k, 900k] (3x) beats the
+            #   native band (4x), so the display uses it.
+            # gap: conformal way below the median (level disagreement) —
+            #   expanding it would give [30k, 300k] (10x); the native band
+            #   (4x) is narrower and wins.
+            "conformal_pi_low_90": [200_000.0, 250_000.0, 80_000.0, 400_000.0, 30_000.0],
+            "conformal_pi_high_90": [700_000.0, 1_200_000.0, 500_000.0, 900_000.0, 90_000.0],
         }
     )
     out = {row["parcel_id"]: row for row in finalize_screen(df).to_dicts()}
@@ -287,9 +291,48 @@ def test_finalize_screen_agreement_gate_and_display_band():
     # display band = intersection when it contains the median...
     assert out["agreed_over"]["display_pi_low_90"] == pytest.approx(200_000.0)
     assert out["agreed_over"]["display_pi_high_90"] == pytest.approx(600_000.0)
-    # ...but never a band that excludes the shown estimate
-    assert out["med_outside"]["display_pi_low_90"] == pytest.approx(150_000.0)
-    assert out["med_outside"]["display_pi_high_90"] == pytest.approx(600_000.0)
+    # ...but never a band that excludes the shown estimate: the narrower of
+    # the two coherent candidates (native band vs conformal expanded to
+    # include the median) wins per row
+    assert out["med_outside"]["display_pi_low_90"] == pytest.approx(300_000.0)
+    assert out["med_outside"]["display_pi_high_90"] == pytest.approx(900_000.0)
+    assert out["gap"]["display_pi_low_90"] == pytest.approx(150_000.0)
+    assert out["gap"]["display_pi_high_90"] == pytest.approx(600_000.0)
+
+
+def test_screen_audit_invariants_and_report():
+    from philly_fair_measure.validation.screen_audit import (
+        ScreenInvariantError,
+        assert_screen_invariants,
+        audit_screen,
+    )
+
+    clean = finalize_screen(
+        pl.DataFrame(
+            {
+                "parcel_id": ["a", "b"],
+                "opa_market_value": [900_000.0, 250_000.0],
+                "pred_lightgbm_calibrated": [300_000.0, 300_000.0],
+                "model_median": [300_000.0, 300_000.0],
+                "model_pi_low_90": [150_000.0] * 2,
+                "model_pi_high_90": [600_000.0] * 2,
+                "conformal_pi_low_90": [200_000.0] * 2,
+                "conformal_pi_high_90": [700_000.0] * 2,
+                "model_family": ["residential"] * 2,
+            }
+        )
+    )
+    assert_screen_invariants(clean)  # a finalize_screen output always passes
+    report = audit_screen(clean)
+    assert report["invariants"] == {"disputed_flags": 0, "median_outside_display": 0}
+    assert report["flags"]["residential/over_assessed_candidate"] == 1
+    assert report["bands"]["residential"]["display"]["max"] > 1
+
+    # hand-corrupt a row (flag the conformal band disagrees with) — the
+    # tripwire must fire; this is the regression the gate exists to prevent
+    corrupt = clean.with_columns(pl.lit(2_000_000.0).alias("conformal_pi_high_90"))
+    with pytest.raises(ScreenInvariantError):
+        assert_screen_invariants(corrupt)
 
 
 def test_screen_refuses_stale_runs(tmp_path):
