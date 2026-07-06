@@ -144,6 +144,8 @@ def test_train_baseline_end_to_end(tmp_path):
 
     for artifact in (
         "model_lightgbm.txt",
+        "model_lightgbm_q05.txt",
+        "model_lightgbm_q95.txt",
         "params.json",
         "categorical_mappings.json",
         "evaluation.parquet",
@@ -152,6 +154,15 @@ def test_train_baseline_end_to_end(tmp_path):
         "run.manifest.json",
     ):
         assert (result.run_dir / artifact).exists()
+
+    # the CQR quantile heads score in order and bracket sensibly
+    from philly_fair_measure.models.scoring import score_quantile_heads
+
+    bands = score_quantile_heads(result.run_dir, _synthetic_mart().tail(120))
+    assert bands is not None
+    q_lo, q_hi = bands
+    assert (q_lo <= q_hi).all()
+    assert float(np.median(q_hi - q_lo)) > 0.01  # a real band, not a collapsed one
 
     predictions = pl.read_parquet(result.run_dir / "predictions.parquet")
     assert predictions.height == 120

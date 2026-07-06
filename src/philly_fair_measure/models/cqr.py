@@ -110,6 +110,42 @@ def _knn_correction(
     return out
 
 
+def cqr_band_for_frame(
+    run_dir: Path,
+    df: pl.DataFrame,
+    data_dir: Path | None = None,
+    *,
+    alpha: float = ALPHA,
+    k: int = KNN_K,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """Spatially weighted CQR band (price levels, in `df`'s own date frame)
+    from a run's persisted quantile heads — the screen's second uncertainty
+    machine (Stage 3b). Calibrates on the run's validation slice, which the
+    heads never trained on. Returns None for runs that predate the heads
+    (callers fall back to the fixed-offset conformal band)."""
+    from philly_fair_measure.models.scoring import score_quantile_heads
+
+    target_bands = score_quantile_heads(run_dir, df)
+    if target_bands is None:
+        return None
+    _, val_df, _ = split_frames(run_dir, data_dir)
+    val_bands = score_quantile_heads(run_dir, val_df)
+    assert val_bands is not None  # same run as target_bands
+    scores = cqr_score(_adjusted_log_price(run_dir, val_df), *val_bands)
+    xy_val, _ = xy_district(val_df)
+    ok = np.isfinite(scores)
+    corr = _knn_correction(scores[ok], xy_val[ok], xy_district(df)[0], alpha=alpha, k=k)
+    # heads predict reference-frame log prices; shift to the frame's dates
+    # (same convention as the point model in the screen)
+    adj = (
+        df["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy()
+        if run_params(run_dir).get("time_adjusted") and "time_adj_log" in df.columns
+        else np.zeros(df.height)
+    )
+    t_lo, t_hi = target_bands
+    return np.exp(t_lo - corr - adj), np.exp(t_hi + corr - adj)
+
+
 @dataclass(frozen=True)
 class CqrCheckResult:
     run_dir: Path

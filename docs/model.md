@@ -156,7 +156,7 @@ weighted variants. Where **both** the Bayesian posterior and the conformal band
 put OPA's value outside their 90% interval, the flag is robust to either
 method's assumptions.
 
-### 5.7 Conformalized quantile regression — the bake-off (built, not adopted)
+### 5.7 Conformalized quantile regression — bake-off and adoption
 `fair-measure cqr-check` trains LightGBM quantile heads (q05/q95) on the fit
 slice, conformalizes their miss on the validation slice (globally and with
 the same spatially weighted kNN correction as 5.6), and compares every
@@ -168,13 +168,20 @@ sharper (q4/q5 width 0.65 vs 0.74/0.75 conformal) at 89–92% coverage, and its
 by-district coverage floor is the best of the four (0.864 vs 0.856 conformal,
 0.770 raw Bayesian). **No method fixes the cheap-tail undercoverage** (q1:
 cqr 0.850, conformal 0.858, Bayesian 0.790 — vs 90 nominal); q1 misses are
-genuine outliers, not a width-model failure. Adopting cqr-knn as the band
-around the LightGBM point (display + second gate machine) is a live option;
-the screen currently keeps the 5.6 fixed-offset variant.
+genuine outliers, not a width-model failure. **Adopted for the residential
+screen (Stage 3b):** every baseline/retail run persists q05/q95 quantile
+heads (trained on the fit slice only — the validation slice stays clean as
+the CQR calibration set), and the screen's second machine is the spatially
+weighted CQR band around them. Measured effect on flags: over-candidates
+429 → 222 — the feature-adaptive band widens exactly on the high-variance
+homes that produce marginal over-calls, so the agreement gate vetoes them
+into the watch tier — while under-candidates are ~unchanged (6,353 → 6,289).
+Condos keep the 5.6 fixed-offset variant (their band is the flag anchor, not
+a cross-check, and the bake-off was residential-only).
 
 ## 6. Results
 
-Out-of-time test set, n≈19.5k, run `20260706T194138Z-baseline`. Identical test
+Out-of-time test set, n≈19.5k, run `20260706T202658Z-baseline`. Identical test
 set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
@@ -251,9 +258,9 @@ Guards keep the flags honest where the record, not the value, is the problem:
   flagged, so the strong flags stay reserved for cases outside the model's
   stated uncertainty.
 
-As of run `20260706T194138Z` (Tax Year 2027 roll): 496,975 properties
-screened — 1,923 over-assessed candidates, 11,484 under-assessed candidates,
-53,293 in the attention tier, 93 insufficient records. A coherence gate
+As of run `20260706T202658Z` (Tax Year 2027 roll): 496,975 properties
+screened — 1,716 over-assessed candidates, 11,420 under-assessed candidates,
+53,564 in the attention tier, 93 insufficient records. A coherence gate
 refuses to screen against feature marts and model runs from different
 generations (`StaleRunError`) rather than silently mixing them, and every
 build must pass the structural invariants in `validation/screen_audit.py`

@@ -1,7 +1,7 @@
 {
   "meta": {
     "generated_at": "2026-07-06",
-    "model_run_id": "20260706T194138Z-baseline",
+    "model_run_id": "20260706T202658Z-baseline",
     "interval_run_id": "20260706T200133Z-bayesian",
     "n_test": 19484,
     "interval_nominal_pct": 90,

@@ -32,10 +32,11 @@ Two model families share the mart, distinguished by `model_family` +
                  pairing; the condo Bayesian arm is a research artifact
                  (hot median, stiff to unit-level evidence)
 
-Residential rows also carry `conformal_pi_low_90`/`conformal_pi_high_90`
-(spatially weighted conformal band around the LightGBM point — the frequentist
-cross-check) and every row a `display_pi_low_90`/`display_pi_high_90`: the
-range both machines support (Bayesian ∩ conformal for residential when that
+Residential rows also carry `conformal_pi_low_90`/`conformal_pi_high_90` —
+the second uncertainty machine: spatially weighted CQR around the LightGBM
+quantile heads (models/cqr.py; fixed-offset conformal for runs predating the
+heads) — and every row a `display_pi_low_90`/`display_pi_high_90`: the range
+both machines support (Bayesian ∩ second machine for residential when that
 intersection also contains the median, the native band elsewhere). Surfaces
 should show the display band. Residential over/under flags require BOTH
 machines to put OPA outside on the same side (the agreement gate in
@@ -430,26 +431,36 @@ def build_assessment_screen(
     bayes_calibration = bayesian_median_ratio(bayesian_run)
     median, lo, hi = median / bayes_calibration, lo / bayes_calibration, hi / bayes_calibration
 
-    # second uncertainty machine: spatially weighted conformal offsets around
-    # the LightGBM point (models/conformal.py). Residuals are frame-invariant,
-    # so offsets learned in the reference frame apply to the valuation-date
-    # prediction. The Bayesian band keeps anchoring the flags; this band's job
-    # is honesty where the two disagree — the display range is their
-    # intersection (finalize_screen), so one arm's blown-up tail can't put a
-    # $2.7M ceiling on an $800k rowhome (measured 2026-07-06, 2314 Wallace St:
-    # bayesian 254k-2.71M vs conformal-knn 630k-1.65M on the same features)
-    from philly_fair_measure.models.conformal import (
-        calibration_from_run,
-        conformal_offsets,
-        xy_district,
-    )
+    # second uncertainty machine: spatially weighted CQR around the LightGBM
+    # quantile heads (models/cqr.py, Stage 3b) — feature-adaptive widths with
+    # the same kNN-local conformal guarantee. Adopted on the measured bake-off
+    # (model.md §5.7): ~6% narrower than fixed-offset conformal at equal
+    # coverage, 12% narrower in q4/q5, best by-district floor. The Bayesian
+    # band keeps anchoring flags and z; this band's job is the agreement gate
+    # and display honesty — the shown range is their intersection
+    # (finalize_screen). Runs that predate the quantile heads fall back to the
+    # fixed-offset conformal band (models/conformal.py).
+    from philly_fair_measure.models.cqr import cqr_band_for_frame
 
-    cal = calibration_from_run(baseline_run, data_dir)
-    xy, district = xy_district(features)
-    conf_lo_off, conf_hi_off = conformal_offsets(cal, xy, district, method="knn")
-    log_pred = np.log(pred_lgb)
-    conformal_lo = np.exp(log_pred + conf_lo_off)
-    conformal_hi = np.exp(log_pred + conf_hi_off)
+    second_machine = "cqr_knn"
+    cqr_band = cqr_band_for_frame(baseline_run, features, data_dir)
+    if cqr_band is not None:
+        conformal_lo, conformal_hi = cqr_band
+    else:
+        from philly_fair_measure.models.conformal import (
+            calibration_from_run,
+            conformal_offsets,
+            xy_district,
+        )
+
+        second_machine = "conformal_knn"
+        logger.info("run predates CQR heads; second machine falls back to fixed-offset conformal")
+        cal = calibration_from_run(baseline_run, data_dir)
+        xy, district = xy_district(features)
+        conf_lo_off, conf_hi_off = conformal_offsets(cal, xy, district, method="knn")
+        log_pred = np.log(pred_lgb)
+        conformal_lo = np.exp(log_pred + conf_lo_off)
+        conformal_hi = np.exp(log_pred + conf_hi_off)
 
     residential = features.select(
         "parcel_id",
@@ -556,7 +567,8 @@ def build_assessment_screen(
         notes=(
             f"valuation_date={valuation_date:%Y-%m-%d}; "
             f"lightgbm calibration={calibration:.4f}; "
-            f"bayesian calibration={bayes_calibration:.4f}"
+            f"bayesian calibration={bayes_calibration:.4f}; "
+            f"second machine={second_machine}"
         ),
     )
     flag_counts = {

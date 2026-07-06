@@ -12,13 +12,13 @@ comparisons — is published in a per-property report.
 · **Model documentation:** [docs/model.md](docs/model.md)
 
 As of the July 2026 run (Tax Year 2027 assessments), the screen covers
-**496,975** residential properties and condos: **1,923** flagged as likely
-over-assessed, **11,484** as likely under-assessed, and **53,293** inside the
+**496,975** residential properties and condos: **1,716** flagged as likely
+over-assessed, **11,420** as likely under-assessed, and **53,564** inside the
 interval but near its edge ("worth a look"). A residential flag requires two
 independent uncertainty methods — the Bayesian posterior interval and a
-spatially weighted conformal band — to both place the city's value outside on
-the same side. 93 records with no recorded livable area are reported as
-insufficient rather than valued.
+spatially weighted conformalized-quantile-regression band — to both place the
+city's value outside on the same side. 93 records with no recorded livable
+area are reported as insufficient rather than valued.
 
 ## What it does
 
@@ -40,7 +40,7 @@ insufficient rather than valued.
 
 ## Results
 
-Out-of-time test set (n = 19,484), run `20260706T194138Z-baseline`. The same
+Out-of-time test set (n = 19,484), run `20260706T202658Z-baseline`. The same
 homes, the same treatment; OPA's assessed values are the incumbent benchmark.
 
 On the IAAO ratio-study basis (financed, arm's-length sales — the standard

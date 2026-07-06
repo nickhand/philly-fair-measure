@@ -73,6 +73,25 @@ def lightgbm_median_ratio(run_dir: Path, model: str = "lightgbm") -> float:
     return float(row["median_ratio"][0])
 
 
+def score_quantile_heads(run_dir: Path, df: pl.DataFrame) -> tuple[np.ndarray, np.ndarray] | None:
+    """(q05, q95) REFERENCE-FRAME log-price predictions from a run's persisted
+    CQR quantile heads, crossing-ordered; None when the run predates them."""
+    import lightgbm as lgb
+
+    from philly_fair_measure.models.baseline import QUANTILE_HEAD_FILES, QUANTILE_HEAD_LEVELS
+
+    paths = {q: run_dir / QUANTILE_HEAD_FILES[q] for q in QUANTILE_HEAD_LEVELS}
+    if not all(p.exists() for p in paths.values()):
+        return None
+    mappings = json.loads((run_dir / "categorical_mappings.json").read_text())
+    params = run_params(run_dir)
+    x = _encode(df, mappings, params["numeric_features"], params["categorical_features"])
+    lo_q, hi_q = QUANTILE_HEAD_LEVELS
+    lo = np.asarray(lgb.Booster(model_file=str(paths[lo_q])).predict(x), dtype=np.float64)
+    hi = np.asarray(lgb.Booster(model_file=str(paths[hi_q])).predict(x), dtype=np.float64)
+    return np.minimum(lo, hi), np.maximum(lo, hi)
+
+
 def bayesian_median_ratio(run_dir: Path) -> float:
     """Out-of-time median estimate/price ratio of a Bayesian run — the same
     transparent global calibration convention the LightGBM point uses

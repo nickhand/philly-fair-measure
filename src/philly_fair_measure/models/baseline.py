@@ -194,6 +194,18 @@ DEFAULT_LGB_PARAMS: Final = {
     "seed": 42,
 }
 
+# CQR quantile heads (Stage 3b): trained by every baseline/retail run on the
+# fit slice, persisted next to the point model, consumed by models/cqr.py as
+# the screen's second uncertainty machine. Fixed rounds (no early stopping):
+# stopping on the validation slice would leak the CQR calibration set into
+# the heads.
+QUANTILE_HEAD_LEVELS: Final = (0.05, 0.95)
+QUANTILE_HEAD_ROUNDS: Final = 600
+QUANTILE_HEAD_FILES: Final = {
+    0.05: "model_lightgbm_q05.txt",
+    0.95: "model_lightgbm_q95.txt",
+}
+
 RIDGE_NUMERIC_BASE: Final = (
     "char_livable_area",
     "char_lot_area",
@@ -457,6 +469,19 @@ def train_baseline(
         pred_lgb_ref = apply_vertical_calibration(pred_lgb_ref, calibration)
     pred_lgb = np.exp(pred_lgb_ref - test_adj)
 
+    # CQR quantile heads (Stage 3b): q05/q95 boosters on the SAME fit slice —
+    # the validation slice must stay unseen by them, because it is the CQR
+    # calibration set at screen time (models/cqr.py). Persisted with the run
+    # so the coherence gate covers them and scoring needs no retraining.
+    quantile_heads = {}
+    for q in QUANTILE_HEAD_LEVELS:
+        head = lgb.train(
+            {**params, "objective": "quantile", "alpha": q},
+            train_set,
+            num_boost_round=QUANTILE_HEAD_ROUNDS,
+        )
+        quantile_heads[q] = head
+
     ridge_numeric = list(RIDGE_NUMERIC_BASE) + ([] if time_adjusted else ["time_sale_epoch_days"])
     ridge, ridge_matrix = _train_ridge(fit_df, y["fit"], ridge_numeric)
     pred_ridge_ref = ridge.predict(ridge_matrix(test_df))
@@ -509,6 +534,8 @@ def train_baseline(
     run_dir = root / "models" / f"run_id={run_id}"
     run_dir.mkdir(parents=True, exist_ok=False)
     booster.save_model(run_dir / "model_lightgbm.txt")
+    for q, head in quantile_heads.items():
+        head.save_model(run_dir / QUANTILE_HEAD_FILES[q])
     (run_dir / "params.json").write_text(
         json.dumps(
             {
