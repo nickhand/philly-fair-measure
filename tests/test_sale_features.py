@@ -147,9 +147,30 @@ def test_block_rolling_mean_and_parcel_priors():
 def test_event_features_do_not_leak_the_future():
     sales = [_sale("s", "p1", 200_000.0, datetime(2020, 1, 1))]
     permits = [
-        {"opa_account_num": "p1", "permitissuedate_parsed": datetime(2019, 6, 1)},  # counts
-        {"opa_account_num": "p1", "permitissuedate_parsed": datetime(2020, 6, 1)},  # future!
-        {"opa_account_num": "p1", "permitissuedate_parsed": datetime(2013, 1, 1)},  # > 5y ago
+        # counts; renovation-class (Alterations)
+        {
+            "opa_account_num": "p1",
+            "permitissuedate_parsed": datetime(2019, 6, 1),
+            "typeofwork": "Alterations",
+        },
+        # future! — must not leak into either count
+        {
+            "opa_account_num": "p1",
+            "permitissuedate_parsed": datetime(2020, 6, 1),
+            "typeofwork": "Addition and/or Alteration",
+        },
+        # > 5y ago — out of the window
+        {
+            "opa_account_num": "p1",
+            "permitissuedate_parsed": datetime(2013, 1, 1),
+            "typeofwork": "MAJOR",
+        },
+        # in-window but maintenance, not renovation
+        {
+            "opa_account_num": "p1",
+            "permitissuedate_parsed": datetime(2019, 8, 1),
+            "typeofwork": "EZPLUM",
+        },
     ]
     violations = [
         {
@@ -170,8 +191,11 @@ def test_event_features_do_not_leak_the_future():
     ]
     by_id = _assemble(sales, [_opa("p1")], permits=permits, violations=violations)
     row = by_id["s"]
-    assert row["evt_n_permits_5y_before"] == 1
-    assert row["evt_days_since_last_permit"] == 214
+    assert row["evt_n_permits_5y_before"] == 2  # alteration + EZ plumbing
+    assert row["evt_days_since_last_permit"] == 153  # the EZ permit is nearest
+    # renovation-class only: the EZ trade permit and the future/old ones drop
+    assert row["evt_n_reno_permits_5y_before"] == 1
+    assert row["evt_days_since_last_reno_permit"] == 214
     assert row["evt_n_violations_5y_before"] == 2
     assert row["evt_n_open_violations_at_sale"] == 1
 

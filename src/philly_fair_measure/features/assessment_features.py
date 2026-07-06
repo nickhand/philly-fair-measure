@@ -43,6 +43,7 @@ from philly_fair_measure.features.sale_features import (
     distress_tenure_features,
     era_expr,
     financing_features,
+    is_reno_permit,
     join_delinquencies,
     join_parcel_shapes,
     join_proximity,
@@ -247,6 +248,8 @@ def assemble_assessment_features(
         how="left",
     )
 
+    # minimal fixtures may omit typeofwork; treat as non-renovation
+    has_typeofwork = "typeofwork" in permits.collect_schema().names()
     permit_events = (
         permits.filter(
             pl.col("opa_account_num").is_not_null()
@@ -258,12 +261,20 @@ def assemble_assessment_features(
             (pl.lit(valuation_date) - pl.col("permitissuedate_parsed"))
             .dt.total_days()
             .alias("days_before"),
+            (is_reno_permit() if has_typeofwork else pl.lit(False)).alias("is_reno"),
         )
         .collect()
         .group_by("parcel_id")
         .agg(
             (pl.col("days_before") <= ROLL_WINDOW_DAYS).sum().alias("evt_n_permits_5y_before"),
             pl.col("days_before").min().alias("evt_days_since_last_permit"),
+            ((pl.col("days_before") <= ROLL_WINDOW_DAYS) & pl.col("is_reno"))
+            .sum()
+            .alias("evt_n_reno_permits_5y_before"),
+            pl.col("days_before")
+            .filter(pl.col("is_reno"))
+            .min()
+            .alias("evt_days_since_last_reno_permit"),
         )
     )
     violation_events = (
@@ -428,6 +439,7 @@ def assemble_assessment_features(
             .cast(pl.Float64)
             .alias("char_new_build"),
             pl.col("evt_n_permits_5y_before").fill_null(0),
+            pl.col("evt_n_reno_permits_5y_before").fill_null(0),
             pl.col("evt_n_violations_5y_before").fill_null(0),
             pl.col("evt_n_open_violations_at_sale").fill_null(0),
             pl.col("evt_n_severe_violations_5y_before").fill_null(0),

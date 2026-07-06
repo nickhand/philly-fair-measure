@@ -32,6 +32,8 @@ def _frame():
             "char_new_build": [0.0, 1.0, 0.0],
             "mkt_newbuild_premium": [0.0, 0.35, 0.0],
             "mkt_newbuild_knn_n": [4, 1, 0],
+            "evt_n_reno_permits_5y_before": [0.0, 2.0, 0.0],
+            "evt_days_since_last_reno_permit": [None, 400.0, None],
             "char_exterior_condition": ["4", "3", None],
             "char_interior_condition": ["4", None, "5"],
             "loc_market_area": ["ma_001", "ma_001", "ma_002"],

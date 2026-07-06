@@ -101,6 +101,20 @@ SHP_COLUMNS = [
 # L&I case-priority ladder; everything above STANDARD indicates real distress
 SEVERE_PRIORITIES = ["HAZARDOUS", "UNSAFE", "IMMINENTLY DANGEROUS", "UNFIT"]
 
+
+def is_reno_permit() -> pl.Expr:
+    """Renovation-class permits by L&I typeofwork: alterations (incl.
+    "Addition and/or Alteration(s)"), MAJOR, and change of use. Deliberately
+    excludes EZ trade permits (plumbing/electrical/roof replacement —
+    maintenance, not renovation) and pure new construction, which the
+    new-build machinery handles. The latent renovated-vs-shell state is the
+    unobserved quality the assessment-gap literature blames for
+    within-neighborhood errors; permits are its public trace."""
+    tw = pl.col("typeofwork").cast(pl.String).str.to_lowercase()
+    is_reno = tw.str.contains("alter") | (tw == "major") | tw.str.contains("change of use")
+    return is_reno.fill_null(False)
+
+
 DIST_COLUMNS = [
     "dist_tax_delinquent",
     "dist_tax_years_owed",
@@ -749,6 +763,8 @@ def assemble_sale_features(
 
     base = pool.filter(pl.col("sale_year") >= min_sale_year)
 
+    # minimal fixtures may omit typeofwork; treat as non-renovation
+    has_typeofwork = "typeofwork" in permits.collect_schema().names()
     permit_events = (
         permits.filter(
             pl.col("opa_account_num").is_not_null() & pl.col("permitissuedate_parsed").is_not_null()
@@ -756,6 +772,7 @@ def assemble_sale_features(
         .select(
             pl.col("opa_account_num").alias("parcel_id"),
             pl.col("permitissuedate_parsed").alias("event_date"),
+            (is_reno_permit() if has_typeofwork else pl.lit(False)).alias("is_reno"),
         )
         .collect()
     )
@@ -770,6 +787,13 @@ def assemble_sale_features(
         .agg(
             (pl.col("days_before") <= EVENT_WINDOW_DAYS).sum().alias("evt_n_permits_5y_before"),
             pl.col("days_before").min().alias("evt_days_since_last_permit"),
+            ((pl.col("days_before") <= EVENT_WINDOW_DAYS) & pl.col("is_reno"))
+            .sum()
+            .alias("evt_n_reno_permits_5y_before"),
+            pl.col("days_before")
+            .filter(pl.col("is_reno"))
+            .min()
+            .alias("evt_days_since_last_reno_permit"),
         )
     )
 
@@ -922,6 +946,7 @@ def assemble_sale_features(
             .cast(pl.Float64)
             .alias("char_new_build"),
             pl.col("evt_n_permits_5y_before").fill_null(0),
+            pl.col("evt_n_reno_permits_5y_before").fill_null(0),
             pl.col("evt_n_violations_5y_before").fill_null(0),
             pl.col("evt_n_open_violations_at_sale").fill_null(0),
             pl.col("evt_n_severe_violations_5y_before").fill_null(0),

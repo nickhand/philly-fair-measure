@@ -239,6 +239,8 @@ photos can see interiors.
 |---|---|
 | `evt_n_permits_5y_before` | L&I permits issued in the 5y strictly before the sale (18.7% of sales have ≥1) |
 | `evt_days_since_last_permit` | Days since most recent permit before the sale (any age) |
+| `evt_n_reno_permits_5y_before` | Renovation-class permits (alterations, MAJOR, change of use — excludes EZ trade permits and new construction) in the 5y strictly before the sale |
+| `evt_days_since_last_reno_permit` | Days since most recent renovation-class permit before the sale (any age; null = never) |
 | `evt_n_violations_5y_before` | Violations opened in the 5y strictly before the sale |
 | `evt_n_open_violations_at_sale` | Violations open (unresolved) on the sale date |
 

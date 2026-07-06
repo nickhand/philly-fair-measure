@@ -127,6 +127,10 @@ RESIDENTIAL_SPEC = FamilySpec(
         # exists — the newbuild_thin sigma term carries that honesty)
         "char_new_build",
         "mkt_newbuild_premium",
+        # renovation-class permits before the valuation/sale date: the public
+        # trace of renovated-vs-shell, the latent state behind within-block
+        # disagreement between the arms (Stage 4)
+        "evt_n_reno_permits_5y_before",
     ],
     ordinals=["char_exterior_condition", "char_interior_condition"],
     missing=[
@@ -150,6 +154,10 @@ RESIDENTIAL_SPEC = FamilySpec(
         # a new build with no new-build sales nearby is irreducibly uncertain
         # on public data — widen honestly instead of flagging confidently
         "newbuild_thin",
+        # a renovation permit in the last ~3 years: the home may be mid-gut or
+        # freshly finished — the recorded characteristics are least reliable
+        # exactly then, so widen instead of guessing which state it's in
+        "reno_recent",
     ],
 )
 
@@ -407,6 +415,11 @@ def _sigma_design(df: pl.DataFrame, family: str = "residential") -> np.ndarray:
     style = df["char_style"].cast(pl.String).fill_null("unknown").to_numpy()
     new_build = df["char_new_build"].cast(pl.Float64).fill_null(0.0).to_numpy()
     newbuild_n = df["mkt_newbuild_knn_n"].cast(pl.Float64).fill_null(0.0).to_numpy()
+    reno_days = (
+        df["evt_days_since_last_reno_permit"].cast(pl.Float64).fill_null(np.inf).to_numpy()
+        if "evt_days_since_last_reno_permit" in df.columns
+        else np.full(df.height, np.inf)
+    )
     return np.column_stack(
         [
             missing,
@@ -420,6 +433,8 @@ def _sigma_design(df: pl.DataFrame, family: str = "residential") -> np.ndarray:
             ((style == "other") | (style == "unknown")).astype(np.float64),
             # new build with thin new-construction evidence nearby
             ((new_build > 0) & (newbuild_n < 3)).astype(np.float64),
+            # renovation permit within ~3 years (see reno_recent in the spec)
+            (reno_days <= 3 * 365.25).astype(np.float64),
         ]
     )
 
@@ -485,9 +500,7 @@ def _fit_posterior(
             mu_slope = pm.Normal("mu_slope", 0.0, 0.05)
             tau_slope = pm.HalfNormal("tau_slope", 0.05)
             z_slope = pm.Normal("z_slope", 0.0, 1.0, dims="area")
-            slope_area = pm.Deterministic(
-                "slope_area", mu_slope + tau_slope * z_slope, dims="area"
-            )
+            slope_area = pm.Deterministic("slope_area", mu_slope + tau_slope * z_slope, dims="area")
             mu = mu + slope_area[area_idx] * t_c
         if parcel_mapped is not None:
             # per-parcel latent quality, identified by repeats (non-centered);
