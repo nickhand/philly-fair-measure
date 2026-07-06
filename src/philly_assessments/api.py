@@ -416,9 +416,14 @@ def _histories(root: Path, parcel_id: str) -> tuple[list[YearValue], list[SaleRo
 
 
 def create_app(data_dir: Path | None = None) -> FastAPI:
+    from fastapi.middleware.gzip import GZipMiddleware
+
     root = data_dir if data_dir is not None else config.data_dir()
     frame, screen_built = _load_frame(root)
     app = FastAPI(title="Philly Assessment Check API", docs_url="/api/docs")
+    # the citywide overview payload is ~51k GeoJSON points (~6 MB raw, ~10x
+    # smaller gzipped); everything else compresses as a free bonus
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     @app.get("/api/stats", response_model=Stats)
     def stats() -> Stats:
@@ -497,13 +502,18 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
 
     @app.get("/api/parcels/flagged")
     def parcels_flagged() -> dict[str, Any]:
-        """Every flagged (over/under) home citywide — small enough (~9k points)
-        to ship whole, so the map can show the pattern at low zoom. Built once
-        and cached; the within-range half-million stays viewport-only."""
+        """The citywide overview payload: every flagged (over/under) home plus
+        the watch tier (within range, near its edge) — ~51k points, shipped
+        whole (gzipped ~10x) so the map can show the pattern at low zoom.
+        Built once and cached; coordinates rounded to ~1 m so the comfortable
+        within-range half-million stays the only viewport-gated data."""
         if not flagged_cache:
             sub = frame.filter(
-                pl.col("assessment_flag").is_in(
-                    [str(AssessmentFlag.OVER), str(AssessmentFlag.UNDER)]
+                (
+                    pl.col("assessment_flag").is_in(
+                        [str(AssessmentFlag.OVER), str(AssessmentFlag.UNDER)]
+                    )
+                    | pl.col("attention").is_not_null()
                 )
                 & pl.col("loc_lon").is_not_null()
             )
@@ -514,18 +524,24 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                         "type": "Feature",
                         "geometry": {
                             "type": "Point",
-                            "coordinates": [r["loc_lon"], r["loc_lat"]],
+                            "coordinates": [round(r["loc_lon"], 5), round(r["loc_lat"], 5)],
                         },
                         "properties": {
                             "id": r["parcel_id"],
                             "flag": r["assessment_flag"],
+                            "attention": r["attention"],
                             # condo flags come from the condo-unit model and
                             # cluster in towers; the map lets users separate them
                             "family": r["model_family"],
                         },
                     }
                     for r in sub.select(
-                        "parcel_id", "loc_lon", "loc_lat", "assessment_flag", "model_family"
+                        "parcel_id",
+                        "loc_lon",
+                        "loc_lat",
+                        "assessment_flag",
+                        "attention",
+                        "model_family",
                     ).to_dicts()
                 ],
             }

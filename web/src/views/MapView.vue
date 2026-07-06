@@ -50,8 +50,9 @@ function applyDotFilter() {
   if (m.getLayer('fm-dots-base')) m.setFilter('fm-dots-base', tierFilter(['base']))
   // watch tints share the top layer so they paint above the gray majority
   if (m.getLayer('fm-dots-flagged')) m.setFilter('fm-dots-flagged', tierFilter(['strong', 'watch']))
-  // the citywide payload only contains strong flags
+  // citywide: watch texture below, strong flags on top
   if (m.getLayer('fm-dots-far')) m.setFilter('fm-dots-far', tierFilter(['strong']))
+  if (m.getLayer('fm-dots-far-watch')) m.setFilter('fm-dots-far-watch', tierFilter(['watch']))
 }
 
 function toggleCondos() {
@@ -145,10 +146,22 @@ function ensureParcelLayer(m: maplibregl.Map) {
     m.addLayer({ ...dotsSpec!, id: 'fm-dots-base', minzoom: MIN_PARCEL_ZOOM })
     m.addLayer({ ...dotsSpec!, id: 'fm-dots-flagged', minzoom: MIN_PARCEL_ZOOM })
     m.addLayer({ ...selectedSpec!, minzoom: MIN_PARCEL_ZOOM })
-    // Citywide pattern layer: every flagged home (~9k points, one cached
-    // payload) drawn below street zoom so over/under clustering reads at a
-    // glance; the viewport layer takes over past MIN_PARCEL_ZOOM.
+    // Citywide pattern layers: every flagged + watch-tier home (~51k points,
+    // one cached gzipped payload) drawn below street zoom so the clustering
+    // reads at a glance; the viewport layer takes over past MIN_PARCEL_ZOOM.
+    // Watch dots render first as a small faint texture, strong flags on top.
     m.addSource('flagged', { type: 'geojson', data: '/api/parcels/flagged' })
+    m.addLayer({
+      id: 'fm-dots-far-watch',
+      type: 'circle',
+      source: 'flagged',
+      maxzoom: MIN_PARCEL_ZOOM,
+      paint: {
+        'circle-color': flagColor as unknown as string,
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 1.4, 13, 2.4, 14.5, 3.4],
+        'circle-opacity': 0.55,
+      },
+    })
     m.addLayer({
       id: 'fm-dots-far',
       type: 'circle',
@@ -156,18 +169,14 @@ function ensureParcelLayer(m: maplibregl.Map) {
       maxzoom: MIN_PARCEL_ZOOM,
       paint: {
         'circle-color': flagColor as unknown as string,
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2, 13, 3.2, 14.5, 4.5],
-        'circle-opacity': 0.8,
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2.2, 13, 3.4, 14.5, 4.5],
+        'circle-opacity': 0.9,
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 0.4, 13, 1],
       },
     })
-    m.on('click', 'fm-dots-far', (e) => {
-      const id = e.features?.[0]?.properties?.id as string | undefined
-      if (id) openParcel(id)
-    })
-    m.on('mouseenter', 'fm-dots-far', () => (m.getCanvas().style.cursor = 'pointer'))
-    m.on('mouseleave', 'fm-dots-far', () => (m.getCanvas().style.cursor = ''))
     applyDotFilter()
-    for (const layerId of ['fm-dots-base', 'fm-dots-flagged']) {
+    for (const layerId of ['fm-dots-base', 'fm-dots-flagged', 'fm-dots-far', 'fm-dots-far-watch']) {
       m.on('click', layerId, (e) => {
         const id = e.features?.[0]?.properties?.id as string | undefined
         if (id) openParcel(id)
@@ -283,7 +292,7 @@ onBeforeUnmount(() => {
       class="pointer-events-none absolute left-1/2 top-[118px] z-10 w-max max-w-[92vw] -translate-x-1/2 rounded-full bg-[rgba(22,36,58,0.85)] px-3.5 py-1.5 text-center text-caption font-semibold text-white"
       role="status"
     >
-      Showing flagged homes citywide — zoom in to see every home
+      Showing flagged homes and ones worth a look citywide — zoom in to see every home
     </div>
     <div
       v-if="loadError"

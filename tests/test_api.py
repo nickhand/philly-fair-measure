@@ -172,13 +172,16 @@ def test_report_degrades_without_model_artifacts(tmp_path):
     assert body["sale_history"] == []
 
 
-def test_flagged_parcels_returns_only_over_under(tmp_path):
+def test_flagged_parcels_returns_flags_and_watch_tier(tmp_path):
     c = _client(tmp_path)
     fc = c.get("/api/parcels/flagged").json()
     flags = {f["properties"]["flag"] for f in fc["features"]}
     ids = {f["properties"]["id"] for f in fc["features"]}
     assert flags == {"over_assessed_candidate", "under_assessed_candidate"}
-    assert ids == {"p2", "p3"}  # the within-range majority stays out
+    assert ids == {"p2", "p3"}  # comfortable within-range majority stays out
+    # watch tier rides along when present (fixture has none: p1 has |z| < 1),
+    # but the property is always emitted for the map's tier styling
+    assert all("attention" in f["properties"] for f in fc["features"])
     # cached second call returns the same payload
     assert c.get("/api/parcels/flagged").json() == fc
 
