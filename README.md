@@ -12,10 +12,13 @@ comparisons — is published in a per-property report.
 · **Model documentation:** [docs/model.md](docs/model.md)
 
 As of the July 2026 run (Tax Year 2027 assessments), the screen covers
-**496,975** residential properties and condos: **2,023** flagged as likely
-over-assessed, **9,023** as likely under-assessed, and **48,668** inside the
-interval but near its edge ("worth a look"). 93 records with no recorded
-livable area are reported as insufficient rather than valued.
+**496,975** residential properties and condos: **1,772** flagged as likely
+over-assessed, **7,911** as likely under-assessed, and **49,615** inside the
+interval but near its edge ("worth a look"). A residential flag requires two
+independent uncertainty methods — the Bayesian posterior interval and a
+spatially weighted conformal band — to both place the city's value outside on
+the same side. 93 records with no recorded livable area are reported as
+insufficient rather than valued.
 
 ## What it does
 

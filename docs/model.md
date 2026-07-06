@@ -205,12 +205,20 @@ to one standard deviation). The interval method is chosen per family to be
 self-consistent with the point estimate:
 
 - **Houses** — the hierarchical Bayesian posterior predictive interval
-  (`interval_method="bayesian_posterior"`).
+  (`interval_method="bayesian_posterior"`), with a spatially weighted
+  conformal band around the LightGBM point as the second machine: an
+  over/under flag requires **both** to place OPA outside on the same side
+  (measured 2026-07-06: the conformal band disputed 30% of Bayesian-only
+  flags, concentrated on gentrification-edge blocks where the two arms
+  disagree about the price level; disputed rows demote to the attention
+  tier). Surfaces display the band both machines support — their
+  intersection when it contains the median, the posterior band otherwise.
 - **Condos** — split-conformal, kNN-locally-weighted offsets around the condo
-  LightGBM prediction (`interval_method="conformal_knn"`). The Bayesian condo
-  arm exists as a research artifact but does not drive flags: its district
-  index over-adjusts homogeneous condo stock, and its linear form is too stiff
-  to absorb unit-level evidence such as a prior sale of the same unit.
+  LightGBM prediction (`interval_method="conformal_knn"`), a single
+  self-consistent machine. The Bayesian condo arm exists as a research
+  artifact but does not drive flags: its district index over-adjusts
+  homogeneous condo stock, and its linear form is too stiff to absorb
+  unit-level evidence such as a prior sale of the same unit.
 
 Guards keep the flags honest where the record, not the value, is the problem:
 
@@ -227,8 +235,8 @@ Guards keep the flags honest where the record, not the value, is the problem:
   stated uncertainty.
 
 As of run `20260706T004017Z` (Tax Year 2027 roll): 496,975 properties
-screened — 2,023 over-assessed candidates, 9,023 under-assessed candidates,
-48,668 in the attention tier, 93 insufficient records. A coherence gate
+screened — 1,772 over-assessed candidates, 7,911 under-assessed candidates,
+49,615 in the attention tier, 93 insufficient records. A coherence gate
 refuses to screen against feature marts and model runs from different
 generations (`StaleRunError`) rather than silently mixing them.
 
@@ -245,12 +253,11 @@ Two value conventions are surfaced explicitly:
 ## 8. What makes it defensible
 
 Independence from OPA (no `asmt_*` inputs) · no demographic valuation features ·
-strict out-of-time evaluation · uncertainty-gated flags (OPA's value must fall
-outside the model's stated 90% interval for that specific property, with the
-conformal arm retained as a methodological cross-check on the Bayesian
-intervals) · published channel discounts rather than opaque adjustments ·
-deterministic, reproducible pipeline · a full model-vs-OPA benchmark on every
-run.
+strict out-of-time evaluation · uncertainty-gated flags requiring two
+independent interval methods (Bayesian posterior and spatially weighted
+conformal) to place OPA outside on the same side · published channel
+discounts rather than opaque adjustments · deterministic, reproducible
+pipeline · a full model-vs-OPA benchmark on every run.
 
 ## 9. Known limitations
 

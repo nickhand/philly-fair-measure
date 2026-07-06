@@ -255,6 +255,43 @@ def test_finalize_screen_attention_tier():
     assert out["mid"]["attention"] is None
 
 
+def test_finalize_screen_agreement_gate_and_display_band():
+    # Interval 150k-600k around a 300k Bayesian median everywhere; the
+    # conformal band around the LightGBM point is the second machine.
+    df = pl.DataFrame(
+        {
+            "parcel_id": ["agreed_over", "disputed_over", "disputed_under", "med_outside"],
+            "opa_market_value": [900_000.0, 900_000.0, 100_000.0, 310_000.0],
+            "pred_lightgbm_calibrated": [300_000.0] * 4,
+            "model_median": [300_000.0] * 4,
+            "model_pi_low_90": [150_000.0] * 4,
+            "model_pi_high_90": [600_000.0] * 4,
+            # agreed_over: conformal also has OPA above (hi 700k < 900k).
+            # disputed_over: conformal reaches 1.2M — OPA plausible there.
+            # disputed_under: conformal reaches down to 80k — OPA plausible.
+            # med_outside: bands overlap on 400k-600k, which EXCLUDES the
+            #   300k median — display must fall back to the native band.
+            "conformal_pi_low_90": [200_000.0, 250_000.0, 80_000.0, 400_000.0],
+            "conformal_pi_high_90": [700_000.0, 1_200_000.0, 500_000.0, 900_000.0],
+        }
+    )
+    out = {row["parcel_id"]: row for row in finalize_screen(df).to_dicts()}
+    # both machines outside on the same side -> flag stands
+    assert out["agreed_over"]["assessment_flag"] == "over_assessed_candidate"
+    # one machine's word is not enough: disputed flags demote to the
+    # attention tier (|z| > 1.64 by construction, so they stay visible)
+    assert out["disputed_over"]["assessment_flag"] == "within_range"
+    assert out["disputed_over"]["attention"] == "high"
+    assert out["disputed_under"]["assessment_flag"] == "within_range"
+    assert out["disputed_under"]["attention"] == "low"
+    # display band = intersection when it contains the median...
+    assert out["agreed_over"]["display_pi_low_90"] == pytest.approx(200_000.0)
+    assert out["agreed_over"]["display_pi_high_90"] == pytest.approx(600_000.0)
+    # ...but never a band that excludes the shown estimate
+    assert out["med_outside"]["display_pi_low_90"] == pytest.approx(150_000.0)
+    assert out["med_outside"]["display_pi_high_90"] == pytest.approx(600_000.0)
+
+
 def test_screen_refuses_stale_runs(tmp_path):
     # a run older than the mart it scores must refuse (relearned market areas
     # relabel geography under the model — measured 10x false-flag explosion),

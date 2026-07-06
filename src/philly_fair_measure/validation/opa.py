@@ -35,9 +35,11 @@ Two model families share the mart, distinguished by `model_family` +
 Residential rows also carry `conformal_pi_low_90`/`conformal_pi_high_90`
 (spatially weighted conformal band around the LightGBM point — the frequentist
 cross-check) and every row a `display_pi_low_90`/`display_pi_high_90`: the
-range both machines support (Bayesian ∩ conformal for residential, the native
-band elsewhere). Surfaces should show the display band; flags stay anchored to
-`model_pi_*`.
+range both machines support (Bayesian ∩ conformal for residential when that
+intersection also contains the median, the native band elsewhere). Surfaces
+should show the display band. Residential over/under flags require BOTH
+machines to put OPA outside on the same side (the agreement gate in
+finalize_screen); `screen_z` stays anchored to `model_pi_*`.
 
 `screen_z` expresses the disagreement in predictive-uncertainty units
 (log(OPA/median) scaled by the interval's log-width / 3.29, i.e. ~standard
@@ -155,18 +157,38 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
         if {"char_year_built", "valuation_date"}.issubset(df.columns)
         else pl.lit(False)
     )
+    # Agreement gate: where a second uncertainty machine exists (residential
+    # rows carry a conformal band around the LightGBM point), a flag requires
+    # BOTH machines to put OPA outside on the same side. Measured 2026-07-06:
+    # the conformal band disputed 30% of Bayesian-only flags (253 over /
+    # 1,070 under), concentrated on gentrification-edge blocks where the two
+    # arms disagree about the price level — one machine's word is not enough
+    # to tell an owner to appeal. Disputed rows land within-range, where the
+    # attention tier picks them up (|z| > 1.64 by construction, so every
+    # demoted flag surfaces as "worth a look"). Rows without conformal
+    # columns (condos, minimal fixtures) gate on their native band alone.
+    if {"conformal_pi_low_90", "conformal_pi_high_90"}.issubset(df.columns):
+        conformal_agrees_over = pl.col("conformal_pi_high_90").is_null() | (
+            pl.col("opa_market_value") > pl.col("conformal_pi_high_90")
+        )
+        conformal_agrees_under = pl.col("conformal_pi_low_90").is_null() | (
+            pl.col("opa_market_value") < pl.col("conformal_pi_low_90")
+        )
+    else:
+        conformal_agrees_over = pl.lit(True)
+        conformal_agrees_under = pl.lit(True)
     flag = (
         pl.when(insufficient)
         .then(pl.lit(AssessmentFlag.INSUFFICIENT))
         .when(~has_assessment)
         .then(pl.lit(AssessmentFlag.NONE))
-        .when(pl.col("opa_market_value") > pl.col("model_pi_high_90"))
+        .when((pl.col("opa_market_value") > pl.col("model_pi_high_90")) & conformal_agrees_over)
         .then(
             pl.when(new_build)
             .then(pl.lit(AssessmentFlag.WITHIN))
             .otherwise(pl.lit(AssessmentFlag.OVER))
         )
-        .when(pl.col("opa_market_value") < pl.col("model_pi_low_90"))
+        .when((pl.col("opa_market_value") < pl.col("model_pi_low_90")) & conformal_agrees_under)
         .then(pl.lit(AssessmentFlag.UNDER))
         .otherwise(pl.lit(AssessmentFlag.WITHIN))
     )
@@ -182,13 +204,19 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     # Display band: the range BOTH uncertainty machines support. For
     # residential that's the Bayesian posterior ∩ conformal-knn intersection;
     # condo rows (and fixtures without conformal columns) keep their native
-    # band. An empty intersection means the methods disagree outright — fall
-    # back to the flag-anchoring Bayesian band rather than invent a range.
+    # band. The intersection must also CONTAIN the displayed median — an
+    # intersection that excludes it reads as "estimate $996k, range
+    # $711k–$797k" (measured 2026-07-06: 28,837 rows) — otherwise fall back
+    # to the flag-anchoring band rather than show an incoherent pair.
     # Flags and screen_z stay on model_pi_*; this is presentation-layer truth.
     if {"conformal_pi_low_90", "conformal_pi_high_90"}.issubset(df.columns):
         cross_lo = pl.max_horizontal("model_pi_low_90", "conformal_pi_low_90")
         cross_hi = pl.min_horizontal("model_pi_high_90", "conformal_pi_high_90")
-        agree = cross_lo < cross_hi
+        agree = (
+            (cross_lo < cross_hi)
+            & (pl.col("model_median") >= cross_lo)
+            & (pl.col("model_median") <= cross_hi)
+        )
         display_lo = pl.when(agree).then(cross_lo).otherwise(pl.col("model_pi_low_90"))
         display_hi = pl.when(agree).then(cross_hi).otherwise(pl.col("model_pi_high_90"))
     else:
