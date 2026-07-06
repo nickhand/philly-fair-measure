@@ -297,11 +297,12 @@ function printPage() {
             <DriverBars :drivers="report.drivers.drivers" />
             <div class="no-print">
               <InfoTip>
-                Our model starts from a typical home (about
-                {{ money(report.drivers.base_value) }}) and adjusts for this home’s facts — size,
-                location, condition signals, and recent sales nearby. These bars show the largest
-                adjustments. They explain the estimate; they do not judge whether the city’s value is
-                fair.
+                Each bar shows roughly how many dollars one fact adds to or takes away from this
+                home’s estimate. The effects stack like percentages, not simple addition — so the
+                bars alone won’t add up to the gap from a typical Philadelphia
+                {{ core.model_family === 'condo' ? 'condo' : 'home' }} (about
+                {{ money(report.drivers.base_value) }} in today’s market). They explain the
+                estimate; they do not judge whether the city’s value is fair.
               </InfoTip>
             </div>
           </template>

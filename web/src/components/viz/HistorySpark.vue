@@ -113,56 +113,88 @@ const labels = computed<PlacedLabel[]>(() => {
   if (last.value) {
     const lx = x.value(last.value.year)
     const ly = y.value(last.value.value)
-    obstacles.push({ x0: lx - 6, x1: lx + 6, y0: ly - 6, y1: ly + 6 })
+    obstacles.push({ x0: lx - 7, x1: lx + 7, y0: ly - 7, y1: ly + 7 })
   }
   for (const s of pricedSales.value) {
     const sx = x.value(s.year)
     const sy = y.value(s.price as number)
-    obstacles.push({ x0: sx - 7, x1: sx + 7, y0: sy - 7, y1: sy + 7 })
+    obstacles.push({ x0: sx - 9, x1: sx + 9, y0: sy - 9, y1: sy + 9 })
   }
-  const overlaps = (a: Rect, b: Rect) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1
-  const collides = (cand: PlacedLabel): boolean => {
+  // 2px clearance margin: touching rects read as overlapping at dot scale
+  const overlaps = (a: Rect, b: Rect) =>
+    a.x0 < b.x1 + 2 && b.x0 < a.x1 + 2 && a.y0 < b.y1 + 2 && b.y0 < a.y1 + 2
+  const conflicts = (cand: PlacedLabel): number => {
     const r = labelRect(cand)
-    if (placed.some((p) => overlaps(r, labelRect(p)))) return true
-    if (obstacles.some((o) => overlaps(r, o))) return true
+    let n = placed.filter((p) => overlaps(r, labelRect(p))).length
+    n += obstacles.filter((o) => overlaps(r, o)).length
     // the assessment line, sampled at the label's center
     const ly = lineYAt(x.value.invert((r.x0 + r.x1) / 2))
-    return ly != null && r.y0 < ly + 4 && ly - 4 < r.y1
+    if (ly != null && r.y0 < ly + 4 && ly - 4 < r.y1) n += 1
+    return n
   }
-  const place = (cand: PlacedLabel) => {
-    for (const dy of [0, 15, -15, 30, -30, 45, -45]) {
-      const attempt = { ...cand, y: Math.min(BASE - 2, Math.max(11, cand.y + dy)) }
-      if (!collides(attempt)) {
-        placed.push(attempt)
-        return
+  const place = (cand: PlacedLabel, markerX: number, markerY: number) => {
+    // candidates: natural spot, then beside the marker (dense chart tops
+    // often leave no vertical slot), each swept over clamped y offsets; if
+    // nothing is fully clear, take the least-conflicted spot
+    const beside = { y: markerY + 4, weight: cand.weight, size: cand.size }
+    const bases: PlacedLabel[] = [
+      cand,
+      { ...cand, ...beside, anchor: 'end', x: markerX - 12 },
+      { ...cand, ...beside, anchor: 'start', x: markerX + 12 },
+    ]
+    let best: PlacedLabel | null = null
+    let bestScore = Infinity
+    for (const base of bases) {
+      for (const dy of [0, 15, -15, 30, -30, 45, -45, 60, -60]) {
+        const attempt = { ...base, y: Math.min(BASE - 2, Math.max(11, base.y + dy)) }
+        const score = conflicts(attempt)
+        if (score === 0) {
+          placed.push(attempt)
+          return
+        }
+        if (score < bestScore) {
+          best = attempt
+          bestScore = score
+        }
       }
     }
-    placed.push(cand) // dense beyond saving — keep the natural spot
+    placed.push(best ?? cand)
   }
   if (last.value) {
-    place({
-      key: 'today',
-      text: `${moneyCompact(last.value.value)} today`,
-      x: x.value(last.value.year),
-      y: Math.max(11, y.value(last.value.value) - 8),
-      anchor: 'end',
-      fill: '#0f4d90',
-      weight: 700,
-      size: 12.5,
-    })
+    const lx = x.value(last.value.year)
+    const ly = y.value(last.value.value)
+    place(
+      {
+        key: 'today',
+        text: `${moneyCompact(last.value.value)} today`,
+        x: lx,
+        y: Math.max(11, ly - 8),
+        anchor: 'end',
+        fill: '#0f4d90',
+        weight: 700,
+        size: 12.5,
+      },
+      lx,
+      ly,
+    )
   }
   for (const s of [...pricedSales.value].sort((a, b) => a.year - b.year)) {
     const sx = x.value(s.year)
-    place({
-      key: `sale-${s.date}`,
-      text: `Sold ${moneyCompact(s.price as number)}`,
-      x: sx,
-      y: y.value(s.price as number) - 12,
-      anchor: saleAnchor(sx),
-      fill: '#8a6100',
-      weight: 600,
-      size: 12,
-    })
+    const sy = y.value(s.price as number)
+    place(
+      {
+        key: `sale-${s.date}`,
+        text: `Sold ${moneyCompact(s.price as number)}`,
+        x: sx,
+        y: sy - 12,
+        anchor: saleAnchor(sx),
+        fill: '#8a6100',
+        weight: 600,
+        size: 12,
+      },
+      sx,
+      sy,
+    )
   }
   return placed
 })
