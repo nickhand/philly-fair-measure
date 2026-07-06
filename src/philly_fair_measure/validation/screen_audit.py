@@ -57,17 +57,21 @@ def disputed_flag_count(df: pl.DataFrame) -> int:
     ).height
 
 
+def _shown_estimate(df: pl.DataFrame) -> pl.Expr:
+    """The estimate surfaces display (display_median since the Stage 5 role
+    separation; model_median on older marts/fixtures)."""
+    return pl.col("display_median" if "display_median" in df.columns else "model_median")
+
+
 def incoherent_display_count(df: pl.DataFrame) -> int:
     """Rows whose displayed estimate falls outside their displayed range."""
     if not {"display_pi_low_90", "display_pi_high_90"}.issubset(df.columns):
         return 0
+    est = _shown_estimate(df)
     return df.filter(
-        pl.col("model_median").is_not_null()
+        est.is_not_null()
         & pl.col("display_pi_low_90").is_not_null()
-        & (
-            (pl.col("model_median") < pl.col("display_pi_low_90"))
-            | (pl.col("model_median") > pl.col("display_pi_high_90"))
-        )
+        & ((est < pl.col("display_pi_low_90")) | (est > pl.col("display_pi_high_90")))
     ).height
 
 
@@ -114,13 +118,14 @@ def audit_screen(df: pl.DataFrame) -> dict[str, Any]:
         & (pl.col("model_median") < 30_000)
     )
     # estimate pinned to a display edge (within 0.5%): "estimate $X, range
-    # $X–$Y" — the presentation bug the fallback headroom pad exists to prevent
+    # $X–$Y" — the presentation bug the headroom clamp exists to prevent
+    est = _shown_estimate(df)
     pinned = df.filter(
-        pl.col("model_median").is_not_null()
+        est.is_not_null()
         & (pl.col("display_pi_low_90") > 0)
         & (
-            ((pl.col("model_median") / pl.col("display_pi_low_90")) < 1.005)
-            | ((pl.col("display_pi_high_90") / pl.col("model_median")) < 1.005)
+            ((est / pl.col("display_pi_low_90")) < 1.005)
+            | ((pl.col("display_pi_high_90") / est) < 1.005)
         )
     ).height
     return {

@@ -213,49 +213,39 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     # conformal band minimally expanded to include the median. Neither
     # dominates — the posterior's parametric sigma blows up on rare covariate
     # combos (115x on 3416 Sansom St), while expanding the conformal band
-    # re-imports the full level gap where the two arms disagree about price
-    # level (measured: 384x max if always-conformal). Show whichever is
-    # narrower per row. Flags and screen_z stay on model_pi_*; this is
-    # presentation-layer truth.
-    if {"conformal_pi_low_90", "conformal_pi_high_90"}.issubset(df.columns):
-        cross_lo = pl.max_horizontal("model_pi_low_90", "conformal_pi_low_90")
-        cross_hi = pl.min_horizontal("model_pi_high_90", "conformal_pi_high_90")
-        agree = (
-            (cross_lo < cross_hi)
-            & (pl.col("model_median") >= cross_lo)
-            & (pl.col("model_median") <= cross_hi)
-        )
-        # Expansion gives the median HEADROOM (>=10% on the deficient side),
-        # not bare containment: pinning the band edge to the median rendered
-        # "estimate $535k, range $535k-$1.12M" on 13k reports (measured
-        # 2026-07-06, 2314 Wallace St) — technically coherent, visually
-        # nonsense. Real bands are ±57%+ wide, so the pad only engages at
-        # the synthetic edge.
-        conf_lo = pl.min_horizontal("conformal_pi_low_90", pl.col("model_median") * 0.9)
-        conf_hi = pl.max_horizontal("conformal_pi_high_90", pl.col("model_median") * 1.1)
-        use_conf = (
-            pl.col("conformal_pi_low_90").is_not_null()
-            & (conf_lo > 0)
-            & ((conf_hi / conf_lo) < (pl.col("model_pi_high_90") / pl.col("model_pi_low_90")))
-        )
-        fallback_lo = pl.when(use_conf).then(conf_lo).otherwise(pl.col("model_pi_low_90"))
-        fallback_hi = pl.when(use_conf).then(conf_hi).otherwise(pl.col("model_pi_high_90"))
-        display_lo = pl.when(agree).then(cross_lo).otherwise(fallback_lo)
-        display_hi = pl.when(agree).then(cross_hi).otherwise(fallback_hi)
+    # Display = ROLE SEPARATION (Stage 5, measured 2026-07-06): the shown
+    # estimate is the calibrated LightGBM point — the machine the drivers and
+    # comps panels explain — and the shown band is its own CQR band. One
+    # self-consistent pair, no intersection: intersecting two 90% bands only
+    # guarantees 80% (union bound), and the shipped intersection measured
+    # 86.0% overall / 72.9% in q1 against its "90%" label, while CQR-only
+    # measured 89.1% at the narrowest valid width. The Bayesian arm keeps its
+    # two jobs untouched: the agreement gate and the watch tier (model_*,
+    # screen_z, flags are all still Bayesian-anchored). Condo rows and
+    # fixtures have one machine, whose native band already IS this pairing.
+    if "pred_lightgbm_calibrated" in df.columns:
+        display_median = pl.coalesce("pred_lightgbm_calibrated", "model_median")
     else:
-        display_lo = pl.col("model_pi_low_90")
-        display_hi = pl.col("model_pi_high_90")
-    # Universal headroom clamp, last: WHATEVER branch produced the band
-    # (intersection, fallback, native), the shown range extends at least 10%
-    # past the shown estimate on each side. The first pad only covered the
-    # fallback candidates; the invariant then caught 908 rows pinned at the
-    # INTERSECTION edge (median exactly at max(model_lo, conformal_lo)). No
-    # estimate in this domain honestly carries <10% one-sided uncertainty —
-    # every real band is ±57%+ — so the clamp only engages at synthetic edges.
-    display_lo = pl.min_horizontal(display_lo, pl.col("model_median") * 0.9)
-    display_hi = pl.max_horizontal(display_hi, pl.col("model_median") * 1.1)
+        display_median = pl.col("model_median")
+    band_lo = (
+        pl.coalesce("conformal_pi_low_90", "model_pi_low_90")
+        if "conformal_pi_low_90" in df.columns
+        else pl.col("model_pi_low_90")
+    )
+    band_hi = (
+        pl.coalesce("conformal_pi_high_90", "model_pi_high_90")
+        if "conformal_pi_high_90" in df.columns
+        else pl.col("model_pi_high_90")
+    )
+    # Safety clamp: the CQR band brackets the quantile heads, not the isotonic
+    # -calibrated point, so the point can rarely sit at/outside an edge — the
+    # shown range always extends >=10% past the shown estimate (audit
+    # invariant median_pinned_to_display_edge enforces this every build).
+    display_lo = pl.min_horizontal(band_lo, display_median * 0.9)
+    display_hi = pl.max_horizontal(band_hi, display_median * 1.1)
     return (
         df.with_columns(
+            display_median.alias("display_median"),
             display_lo.alias("display_pi_low_90"),
             display_hi.alias("display_pi_high_90"),
             flag.alias("assessment_flag"),
@@ -263,6 +253,9 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
             new_build.alias("new_build"),
             unpriceable_null.otherwise(pl.col("opa_market_value") / pl.col("model_median")).alias(
                 "opa_vs_model_ratio"
+            ),
+            unpriceable_null.otherwise(pl.col("opa_market_value") / display_median).alias(
+                "display_ratio"
             ),
             unpriceable_null.otherwise(
                 pl.col("opa_market_value") / pl.col("pred_lightgbm_calibrated")

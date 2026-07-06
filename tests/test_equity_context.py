@@ -36,7 +36,9 @@ def _screen(tmp_path):
         },  # ratio 0.50
     ]
     df = pl.DataFrame(rows).with_columns(
-        (pl.col("opa_market_value") / pl.col("model_median")).alias("opa_vs_model_ratio")
+        (pl.col("opa_market_value") / pl.col("model_median")).alias("opa_vs_model_ratio"),
+        pl.col("model_median").alias("display_median"),
+        (pl.col("opa_market_value") / pl.col("model_median")).alias("display_ratio"),
     )
     write_derived_table(
         df, tmp_path, "marts", "assessment_screen", [InputRef(dataset="t", fetched_at="t")]
@@ -65,5 +67,5 @@ def test_equity_context_flags_over_and_under(tmp_path):
 
 def test_equity_context_none_without_ratio(tmp_path):
     _screen(tmp_path)
-    row = {"parcel_id": "x", "loc_zip5": "19100", "model_median": None, "opa_vs_model_ratio": None}
+    row = {"parcel_id": "x", "loc_zip5": "19100", "display_median": None, "display_ratio": None}
     assert equity_context(row, tmp_path, min_peers=20) is None

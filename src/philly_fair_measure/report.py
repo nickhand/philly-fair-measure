@@ -94,7 +94,7 @@ def gather(parcel_id: str, data_dir: Path | None = None) -> ReportData:
             from philly_fair_measure.models.scoring import latest_run_dir
 
             exp = explain(latest_run_dir("baseline", data_dir), feat)[0]
-            headline = screen.get("model_median")
+            headline = screen.get("display_median") or screen.get("model_median")
             if isinstance(headline, (int, float)) and headline > 0:
                 exp = exp.anchored_to(float(headline))
             explanation = exp
@@ -422,9 +422,11 @@ def render_html(data: ReportData) -> str:
         f"<p><span class='flag' style='background:{color}'>{label}</span></p>",
         "<h2>Assessment vs model</h2><div class='kv'>",
         f"<div><b>OPA market value</b>{_fmt_money(s.get('opa_market_value'))}</div>",
-        f"<div><b>Model estimate</b>{_fmt_money(s.get('model_median'))}</div>",
+        "<div><b>Model estimate</b>"
+        f"{_fmt_money(s.get('display_median') or s.get('model_median'))}</div>",
         f"<div><b>Estimated range</b>{_fmt_money(display_lo)} – {_fmt_money(display_hi)}</div>",
-        f"<div><b>OPA / model</b>{_fmt(s.get('opa_vs_model_ratio'))}</div>",
+        "<div><b>OPA / model</b>"
+        f"{_fmt(s.get('display_ratio') or s.get('opa_vs_model_ratio'))}</div>",
         f"<div><b>Disagreement z</b>{_fmt(s.get('screen_z'))}</div>",
         "</div>",
         f"<p class='note'>{band_note} The estimate comes from a "
@@ -441,14 +443,10 @@ def render_html(data: ReportData) -> str:
         points = appeal_points(data.explanation, c)
         if points:
             parts += _render_appeal(points)
-    # the retail/cash panel leans on the LightGBM point alone; when that point
-    # has drifted well away from the interval-anchoring median, the panel's
-    # precision is fake (measured 2026-07-06: a $1.03M retail line on a home
-    # whose comp support tops out ~$810k) — suppress rather than caveat
-    point_agrees = True
-    if s.get("pred_lightgbm") and s.get("model_median"):
-        point_agrees = 0.85 <= s["pred_lightgbm"] / s["model_median"] <= 1.20
-    if s.get("retail_value") is not None and point_agrees:
+    # the retail/cash panel is LightGBM-derived; since Stage 5 the headline
+    # estimate is too, so the old suppress-on-disagreement gate (which
+    # compared the point to the Bayesian median) no longer applies
+    if s.get("retail_value") is not None:
         parts += [
             "<h2>Two value conventions</h2><div class='kv'>",
             f"<div><b>Retail value</b>{_fmt_money(s.get('retail_value'))}</div>",

@@ -28,8 +28,9 @@ area are reported as insufficient rather than valued.
 - Classifies sale validity (arm's-length vs. distressed/related-party/nominal)
   following the Cook County Assessor's published methodology.
 - Trains valuation models on public data only: a LightGBM point model with
-  financed-market calibration, a hierarchical Bayesian model for predictive
-  intervals on houses, and split-conformal intervals for condos.
+  financed-market calibration and conformalized-quantile-regression intervals
+  (what the site displays), cross-examined by a hierarchical Bayesian model —
+  a flag requires both methods to agree.
 - Screens every assessment: OPA's value is compared against the model's 90%
   interval, and the disagreement is expressed in predictive-uncertainty units
   (`screen_z`), so a flag always accounts for how certain the model is about

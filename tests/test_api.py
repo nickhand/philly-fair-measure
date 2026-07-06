@@ -19,6 +19,10 @@ def _screen_rows() -> list[dict]:
             "model_pi_low_90": model * 0.7,
             "model_pi_high_90": model * 1.4,
             "opa_vs_model_ratio": ratio,
+            # Stage 5 role separation: surfaces read display_*; the fixture
+            # keeps both machines identical so expectations stay simple
+            "display_median": model,
+            "display_ratio": ratio,
             "screen_z": z,
             "assessment_flag": flag,
             "attention": ("high" if z > 1 else "low" if z < -1 else None)

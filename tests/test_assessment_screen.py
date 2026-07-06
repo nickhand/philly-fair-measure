@@ -288,17 +288,17 @@ def test_finalize_screen_agreement_gate_and_display_band():
     assert out["disputed_over"]["attention"] == "high"
     assert out["disputed_under"]["assessment_flag"] == "within_range"
     assert out["disputed_under"]["attention"] == "low"
-    # display band = intersection when it contains the median...
+    # Stage 5 role separation: the display pair is the calibrated LightGBM
+    # point + its own CQR band (no intersection); the headroom clamp keeps
+    # the shown estimate >=10% inside the shown range on both sides
+    assert all(r["display_median"] == pytest.approx(300_000.0) for r in out.values())
     assert out["agreed_over"]["display_pi_low_90"] == pytest.approx(200_000.0)
-    assert out["agreed_over"]["display_pi_high_90"] == pytest.approx(600_000.0)
-    # ...but never a band that excludes the shown estimate: the narrower of
-    # the two coherent candidates (native band vs conformal expanded PAST the
-    # median with >=10% headroom — an edge pinned to the estimate reads as
-    # "estimate $X, range $X-$Y") wins per row
+    assert out["agreed_over"]["display_pi_high_90"] == pytest.approx(700_000.0)
+    # clamp engages where the band would exclude or pin the estimate
     assert out["med_outside"]["display_pi_low_90"] == pytest.approx(270_000.0)
     assert out["med_outside"]["display_pi_high_90"] == pytest.approx(900_000.0)
-    assert out["gap"]["display_pi_low_90"] == pytest.approx(150_000.0)
-    assert out["gap"]["display_pi_high_90"] == pytest.approx(600_000.0)
+    assert out["gap"]["display_pi_low_90"] == pytest.approx(30_000.0)
+    assert out["gap"]["display_pi_high_90"] == pytest.approx(330_000.0)
 
 
 def test_screen_audit_invariants_and_report():

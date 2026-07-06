@@ -229,14 +229,19 @@ to one standard deviation). The interval method is chosen per family to be
 self-consistent with the point estimate:
 
 - **Houses** — the hierarchical Bayesian posterior predictive interval
-  (`interval_method="bayesian_posterior"`), with a spatially weighted
-  conformal band around the LightGBM point as the second machine: an
+  (`interval_method="bayesian_posterior"`), with the spatially weighted CQR
+  band around the LightGBM quantile heads as the second machine: an
   over/under flag requires **both** to place OPA outside on the same side
-  (measured 2026-07-06: the conformal band disputed 30% of Bayesian-only
+  (measured 2026-07-06: the second machine disputed 30% of Bayesian-only
   flags, concentrated on gentrification-edge blocks where the two arms
   disagree about the price level; disputed rows demote to the attention
-  tier). Surfaces display the band both machines support — their
-  intersection when it contains the median, the posterior band otherwise.
+  tier). **Surfaces show one self-consistent pair** (`display_median` /
+  `display_pi_*`): the calibrated LightGBM point — the machine the drivers
+  and comps panels explain — with its own CQR band. Intersecting the two
+  bands was measured and retired: two 90% bands intersected guarantee only
+  80% (union bound), and the shipped intersection realized 86.0% overall /
+  72.9% in q1 against its "90%" label, while the CQR band alone realizes
+  89.1% at the narrowest valid width.
 - **Condos** — split-conformal, kNN-locally-weighted offsets around the condo
   LightGBM prediction (`interval_method="conformal_knn"`), a single
   self-consistent machine. The Bayesian condo arm exists as a research

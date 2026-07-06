@@ -256,7 +256,14 @@ def _core(s: dict[str, Any]) -> PropertyCore:
         model_family=s.get("model_family"),
         interval_method=s.get("interval_method"),
         opa_market_value=_f(s.get("opa_market_value")),
-        model_median=_f(s.get("model_median")),
+        # the headline estimate is display_median (Stage 5: the calibrated
+        # LightGBM point, the machine the drivers/comps explain); model_*
+        # stays the Bayesian gate machine, served for the methods footnote
+        model_median=_f(
+            s.get("display_median")
+            if s.get("display_median") is not None
+            else s.get("model_median")
+        ),
         model_pi_low_90=_f(s.get("model_pi_low_90")),
         model_pi_high_90=_f(s.get("model_pi_high_90")),
         display_pi_low_90=_f(
@@ -269,7 +276,11 @@ def _core(s: dict[str, Any]) -> PropertyCore:
             if s.get("display_pi_high_90") is not None
             else s.get("model_pi_high_90")
         ),
-        ratio=_f(s.get("opa_vs_model_ratio")),
+        ratio=_f(
+            s.get("display_ratio")
+            if s.get("display_ratio") is not None
+            else s.get("opa_vs_model_ratio")
+        ),
         screen_z=_f(s.get("screen_z")),
         flag=str(s.get("assessment_flag") or AssessmentFlag.NONE),
         attention=s.get("attention"),
@@ -297,20 +308,20 @@ def _peer_histogram(frame: pl.DataFrame, s: dict[str, Any]) -> list[HistBin]:
     never describe different populations."""
     from philly_fair_measure.equity_context import peer_predicate
 
-    zip5, median = s.get("loc_zip5"), _f(s.get("model_median"))
+    zip5, median = s.get("loc_zip5"), _f(s.get("display_median") or s.get("model_median"))
     if not zip5 or not median:
         return []
     family = str(s.get("model_family") or "residential")
     frame = frame.filter(peer_predicate(family, s.get("parcel_id"), zip5, s.get("building_id")))
     peers = frame.filter(
-        pl.col("opa_vs_model_ratio").is_between(_HIST_LO, _HIST_HI)
-        & pl.col("model_median").is_between(median / _VALUE_BAND, median * _VALUE_BAND)
+        pl.col("display_ratio").is_between(_HIST_LO, _HIST_HI)
+        & pl.col("display_median").is_between(median / _VALUE_BAND, median * _VALUE_BAND)
     )
     if peers.height < 10:
-        peers = frame.filter(pl.col("opa_vs_model_ratio").is_between(_HIST_LO, _HIST_HI))
+        peers = frame.filter(pl.col("display_ratio").is_between(_HIST_LO, _HIST_HI))
     if not peers.height:
         return []
-    ratios = peers["opa_vs_model_ratio"].to_numpy()
+    ratios = peers["display_ratio"].to_numpy()
     width = (_HIST_HI - _HIST_LO) / _HIST_BINS
     bins: list[HistBin] = []
     for b in range(_HIST_BINS):
@@ -340,7 +351,7 @@ def _drivers(root: Path, parcel_id: str, s: dict[str, Any]) -> Drivers | None:
     if not feat.height:
         return None
     exp = explain(latest_run_dir(run_kind, root), feat)[0]
-    headline = _f(s.get("model_median"))
+    headline = _f(s.get("display_median") or s.get("model_median"))
     if headline and headline > 0:
         exp = exp.anchored_to(headline)
     characteristics = feat.to_dicts()[0]
@@ -542,7 +553,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
             over=int((flags == AssessmentFlag.OVER).sum()),
             under=int((flags == AssessmentFlag.UNDER).sum()),
             watch=int(frame["attention"].is_not_null().sum()),
-            median_ratio=_f(frame["opa_vs_model_ratio"].median()),
+            median_ratio=_f(frame["display_ratio"].median()),
             screen_built=screen_built,
         )
 
@@ -591,7 +602,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                     "flag": r["assessment_flag"],
                     "attention": r["attention"],
                     "opa": r["opa_market_value"],
-                    "model": r["model_median"],
+                    "model": r["display_median"],
                     "family": r["model_family"],
                 },
             }
@@ -603,7 +614,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                 "assessment_flag",
                 "attention",
                 "opa_market_value",
-                "model_median",
+                "display_median",
                 "model_family",
             ).to_dicts()
             if r["loc_lon"] is not None
@@ -738,8 +749,8 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                 parcel_id=str(r["parcel_id"]),
                 address=str(r["address"]),
                 opa_market_value=_f(r.get("opa_market_value")),
-                model_median=_f(r.get("model_median")),
-                ratio=_f(r.get("opa_vs_model_ratio")),
+                model_median=_f(r.get("display_median") or r.get("model_median")),
+                ratio=_f(r.get("display_ratio") or r.get("opa_vs_model_ratio")),
                 screen_z=_f(r.get("screen_z")),
                 twin_n=_i(r.get("twin_n")),
                 twin_ratio=_f(r.get("opa_vs_twin_median")),

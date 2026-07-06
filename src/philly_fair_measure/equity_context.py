@@ -33,7 +33,7 @@ _IN_LINE = 0.05  # within +/- 5% of the peer median reads as "in line"
 
 @dataclass(frozen=True)
 class EquityContext:
-    ratio: float  # this home's OPA / estimated market value
+    ratio: float  # this home's OPA / displayed estimate (display_median)
     peer_median_ratio: float
     peer_n: int
     percentile: float  # share of peers assessed at a lower ratio than this home (0-100)
@@ -64,8 +64,8 @@ def peer_predicate(
         (pl.col("model_family") == family)
         & (pl.col("parcel_id") != parcel_id)
         & (pl.col("opa_market_value") > 0)
-        & (pl.col("model_median") > 0)
-        & pl.col("opa_vs_model_ratio").is_not_null()
+        & (pl.col("display_median") > 0)
+        & pl.col("display_ratio").is_not_null()
     )
     if zip5 is not None:
         expr &= pl.col("loc_zip5") == zip5
@@ -79,8 +79,8 @@ def equity_context(
 ) -> EquityContext | None:
     """Peer-relative equity context for one property, or None if it lacks a
     ratio or has too few comparable homes even after the neighborhood fallback."""
-    ratio = _num(screen_row.get("opa_vs_model_ratio"))
-    model = _num(screen_row.get("model_median"))
+    ratio = _num(screen_row.get("display_ratio"))
+    model = _num(screen_row.get("display_median"))
     if ratio is None or model is None or model <= 0:
         return None
 
@@ -95,18 +95,16 @@ def equity_context(
     )
     lo, hi = model / _VALUE_BAND, model * _VALUE_BAND
 
-    band = (
-        res.filter(pl.col("model_median").is_between(lo, hi)).select("opa_vs_model_ratio").collect()
-    )
+    band = res.filter(pl.col("display_median").is_between(lo, hi)).select("display_ratio").collect()
     if band.height >= min_peers:
         peers, scope = band, "similar value"
     else:  # thin tier — fall back to the whole neighborhood
-        neighborhood = res.select("opa_vs_model_ratio").collect()
+        neighborhood = res.select("display_ratio").collect()
         if neighborhood.height < min_peers:
             return None
         peers, scope = neighborhood, "all values"
 
-    peer_ratios = peers["opa_vs_model_ratio"]
+    peer_ratios = peers["display_ratio"]
     peer_median = as_float(peer_ratios.median())
     percentile = as_float((peer_ratios < ratio).mean()) * 100.0
     if ratio > peer_median * (1 + _IN_LINE):
