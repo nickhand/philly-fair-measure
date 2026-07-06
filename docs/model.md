@@ -191,16 +191,48 @@ Honest caveats:
   report the shortfall rather than hide it.
 
 Stability is checked by temporal cross-validation (rolling out-of-time folds)
-and spatial cross-validation (leave-one-district-out); see the `philly
+and spatial cross-validation (leave-one-district-out); see the `fair-measure
 temporal-cv` / `spatial-cv` commands and [equity-diagnostics.md](equity-diagnostics.md).
 
 ## 7. Application: the assessment screen
 
-Scoring the full roll yields, per parcel: the point value, a 90% predictive
-interval, and an `over_assessed_candidate` / `under_assessed_candidate` /
-`within_range` flag driven by whether OPA's value falls outside the interval —
-gated on **dual-model agreement** (Bayesian ∩ conformal). Two value conventions
-are surfaced explicitly:
+Scoring the full roll yields, per parcel: a point value, a 90% predictive
+interval, an `over_assessed_candidate` / `under_assessed_candidate` /
+`within_range` flag driven by whether OPA's value falls outside that interval,
+and `screen_z` — the disagreement expressed in predictive-uncertainty units
+(log-ratio of OPA to the estimate, divided by the interval's log-width scaled
+to one standard deviation). The interval method is chosen per family to be
+self-consistent with the point estimate:
+
+- **Houses** — the hierarchical Bayesian posterior predictive interval
+  (`interval_method="bayesian_posterior"`).
+- **Condos** — split-conformal, kNN-locally-weighted offsets around the condo
+  LightGBM prediction (`interval_method="conformal_knn"`). The Bayesian condo
+  arm exists as a research artifact but does not drive flags: its district
+  index over-adjusts homogeneous condo stock, and its linear form is too stiff
+  to absorb unit-level evidence such as a prior sale of the same unit.
+
+Guards keep the flags honest where the record, not the value, is the problem:
+
+- **New construction** (year built within two years of the valuation year)
+  never flags as over-assessed — the sale history the model learns from lags
+  the finished building. Such homes demote to within-range, surface in the
+  attention tier instead, and carry an explicit caveat on their report.
+- **Insufficient records** (no recorded livable area) are reported as
+  `insufficient_record` and are not valued at all rather than being priced as
+  if the missing size were real.
+- **Attention tier** ("worth a look"): properties inside the interval but in
+  its outer part (|`screen_z`| > 1) are labeled high/low attention rather than
+  flagged, so the strong flags stay reserved for cases outside the model's
+  stated uncertainty.
+
+As of run `20260706T004017Z` (Tax Year 2027 roll): 496,975 properties
+screened — 2,023 over-assessed candidates, 9,023 under-assessed candidates,
+48,668 in the attention tier, 93 insufficient records. A coherence gate
+refuses to screen against feature marts and model runs from different
+generations (`StaleRunError`) rather than silently mixing them.
+
+Two value conventions are surfaced explicitly:
 
 - **Blend** — predicts the actual (cash-and-financed) market; matches realized
   sale prices.
@@ -213,10 +245,12 @@ are surfaced explicitly:
 ## 8. What makes it defensible
 
 Independence from OPA (no `asmt_*` inputs) · no demographic valuation features ·
-strict out-of-time evaluation · uncertainty-gated flags requiring two
-independent interval methods to agree · published channel discounts rather than
-opaque adjustments · deterministic, reproducible pipeline · a full model-vs-OPA
-benchmark on every run.
+strict out-of-time evaluation · uncertainty-gated flags (OPA's value must fall
+outside the model's stated 90% interval for that specific property, with the
+conformal arm retained as a methodological cross-check on the Bayesian
+intervals) · published channel discounts rather than opaque adjustments ·
+deterministic, reproducible pipeline · a full model-vs-OPA benchmark on every
+run.
 
 ## 9. Known limitations
 

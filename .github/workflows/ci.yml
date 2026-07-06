@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  check:
+  python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,12 +15,33 @@ jobs:
         with:
           enable-cache: true
       - name: Set up Python
-        run: uv python install 3.12
+        run: uv python install 3.13
       - name: Install dependencies
         run: uv sync --dev
+      - name: Format (ruff)
+        run: uv run ruff format --check src tests
       - name: Lint (ruff)
         run: uv run ruff check src tests
       - name: Type check (mypy)
         run: uv run mypy src
       - name: Tests (offline)
         run: uv run pytest
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Tests (vitest)
+        run: npm run test:unit -- --run
+      - name: Type check + build
+        run: npm run build

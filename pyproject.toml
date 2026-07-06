@@ -1,8 +1,11 @@
 [project]
 name = "philly-fair-measure"
 version = "0.1.0"
-description = "Philadelphia property assessment data package: verified public-data ingestion, snapshotting, and valuation modeling"
+description = "Independent open-data check of Philadelphia property assessments: verified public-data pipeline, valuation models, and a per-property assessment screen"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Nick Hand" }]
 requires-python = ">=3.12"
 dependencies = [
     "assesspy>=2.0.2",
@@ -22,6 +25,11 @@ dependencies = [
     "tenacity>=8.3",
     "uvicorn>=0.50.0",
 ]
+
+[project.urls]
+Homepage = "https://nickhand.dev/fair-measure/"
+Repository = "https://github.com/nickhand/philly-fair-measure"
+Documentation = "https://github.com/nickhand/philly-fair-measure/blob/main/docs/model.md"
 
 [project.scripts]
 fair-measure = "philly_fair_measure.cli:main"

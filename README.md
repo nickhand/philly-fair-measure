@@ -1,105 +1,214 @@
-# philly-fair-measure
+# Fair Measure — Philadelphia property assessment check
 
-A public-data-driven property assessment and valuation system for Philadelphia.
-The first deliverable is a reliable, reproducible, versioned data package built
-from verified OpenDataPhilly sources; valuation modeling, OPA comparison, and
-comp analysis come after the data foundation is stable. See [AGENTS.md](AGENTS.md)
-for the full project brief and [docs/ccao-lessons.md](docs/ccao-lessons.md) for
-the design patterns borrowed from the Cook County Assessor's open-source stack.
+An independent, open-data check of Philadelphia's property assessments. The
+system ingests the city's own published records, trains automated valuation
+models on them, and compares the Office of Property Assessment's (OPA) value
+for every residential property against a model estimate with a 90% predictive
+interval. Where the city's value falls outside that interval, the property is
+flagged, and the evidence — comparable sales, assessment history, peer
+comparisons — is published in a per-property report.
 
-## Quickstart
+**Live site:** [nickhand.dev/fair-measure](https://nickhand.dev/fair-measure/)
+· **Model documentation:** [docs/model.md](docs/model.md)
 
-Requires [uv](https://docs.astral.sh/uv/).
+As of the July 2026 run (Tax Year 2027 assessments), the screen covers
+**496,975** residential properties and condos: **2,023** flagged as likely
+over-assessed, **9,023** as likely under-assessed, and **48,668** inside the
+interval but near its edge ("worth a look"). 93 records with no recorded
+livable area are reported as insufficient rather than valued.
+
+## What it does
+
+- Snapshots verified [OpenDataPhilly](https://opendataphilly.org/) datasets
+  (property characteristics, assessment history, deed transfers, permits) into
+  an immutable, manifest-tracked local data lake.
+- Classifies sale validity (arm's-length vs. distressed/related-party/nominal)
+  following the Cook County Assessor's published methodology.
+- Trains valuation models on public data only: a LightGBM point model with
+  financed-market calibration, a hierarchical Bayesian model for predictive
+  intervals on houses, and split-conformal intervals for condos.
+- Screens every assessment: OPA's value is compared against the model's 90%
+  interval, and the disagreement is expressed in predictive-uncertainty units
+  (`screen_z`), so a flag always accounts for how certain the model is about
+  that specific property.
+- Serves the results as a public dashboard (Vue 3 + MapLibre) backed by a
+  FastAPI JSON API, with a per-property report designed around Philadelphia's
+  First Level Review and formal appeal process.
+
+## Results
+
+Out-of-time test set (n = 19,484), run `20260706T004017Z-baseline`. The same
+homes, the same treatment; OPA's assessed values are the incumbent benchmark.
+
+On the IAAO ratio-study basis (financed, arm's-length sales — the standard
+assessment offices are evaluated on):
+
+| | Median ratio | COD | PRD | PRB | MAPE |
+|---|---|---|---|---|---|
+| This model | 1.002 | 19.9 | 1.012 | +0.024 | 19.9% |
+| OPA | 0.848 | 24.7 | 1.070 | −0.058 | 24.9% |
+
+On the full untrimmed sample, including cash and distressed sales:
+
+| | Median ratio | COD | PRD | PRB | MAPE |
+|---|---|---|---|---|---|
+| This model | 1.036 | 25.8 | 1.071 | −0.059 | 27.0% |
+| OPA | 0.983 | 34.5 | 1.190 | −0.234 | 34.0% |
+
+IAAO targets for reference: median ratio 0.90–1.10, COD ≤ 15 (single-family),
+PRD 0.98–1.03, |PRB| ≤ 0.05. The model meets the median-ratio and PRD/PRB
+bands on the IAAO basis; neither the model nor OPA meets the COD target on the
+full sample, which includes the cash/distressed tail. PRD above 1 and PRB
+below 0 indicate regressivity — cheaper homes over-assessed relative to
+expensive ones — and the persistent finding is that the model is substantially
+less regressive than OPA on identical data.
+
+Full methodology, caveats (including interval undercoverage in the cheapest
+quintile and condo parity with OPA), and stability checks are in
+[docs/model.md](docs/model.md) and the
+[vertical-equity report card](docs/vertical-equity-report-card.md).
+
+## How it works
+
+```
+snapshot (CARTO → Parquet + manifest)
+  → stage (typed / deduped / classified, polars)
+  → sale validity (CCAO-style reason codes)
+  → feature marts (sales + assessment-date frames; docs/features.md)
+  → models (LightGBM point + calibration; Bayesian / conformal intervals)
+  → assessment screen (flag + screen_z + attention tier per parcel)
+  → API + dashboard (FastAPI; Vue 3)
+```
+
+Three rules shape the modeling (details in [docs/model.md](docs/model.md)):
+
+1. **Independence from OPA.** No assessment field is a model input; OPA's
+   values enter only as the benchmark on the test set.
+2. **No demographic features.** Race, income, and similar variables are never
+   valuation inputs; they are used only in after-the-fact equity diagnostics.
+3. **Strict out-of-time evaluation.** Models are trained on earlier sales and
+   evaluated on later ones, matching how an assessment is actually used.
+
+## Reproducing it
+
+Requires [uv](https://docs.astral.sh/uv/) (Python 3.13) and Node 20+ for the
+dashboard. All data comes from public APIs; no credentials are needed.
 
 ```bash
 uv sync
 
-# Smoke-test the snapshot pipeline with a small fetch
-uv run fair-measure snapshot carto opa_properties_public --limit 1000
-
-# The full pipeline: raw snapshots -> staged tables -> sale-validity mart
-uv run fair-measure snapshot-all      # capture all core tables (or: fair-measure snapshot carto <table>)
-uv run fair-measure stage             # typed/deduped/classified staged tables (polars)
+# Data pipeline: raw snapshots → staged tables → sale-validity mart
+uv run fair-measure snapshot-all      # capture all core tables
+uv run fair-measure stage             # typed/deduped/classified staged tables
 uv run fair-measure validate-sales    # marts/sale_validity.parquet with reason codes
-uv run fair-measure build-features    # marts/sale_features.parquet (registry: docs/features.md)
-uv run fair-measure train-baseline    # LightGBM + Ridge baselines, benchmarked against OPA
-uv run fair-measure train-bayesian    # hierarchical Bayesian model with predictive intervals
-uv run fair-measure screen-assessments  # flag OPA values outside each property's predictive interval
-uv run fair-measure comps "108 ELFRETHS ALY"  # comparable sales for a property (parcel id or address)
-uv run fair-measure freshness         # heartbeat: exit 1 if snapshots are missing/stale
 
-# The public dashboard (see docs/frontend.md): API + Vue app
-uv run fair-measure api                      # JSON API on :8000
-(cd web && npm install && npm run dev) # front door on :5173
+# Features and models
+uv run fair-measure build-features        # residential feature marts
+uv run fair-measure build-condo-features  # condo feature marts
+uv run fair-measure train-baseline        # LightGBM + Ridge, benchmarked against OPA
+uv run fair-measure train-baseline --market retail   # financed-only variant
+uv run fair-measure train-bayesian        # hierarchical Bayesian intervals
+uv run fair-measure train-condo           # condo LightGBM + conformal intervals
 
-# See what's on disk, then query it (views: raw_<dataset>, stg_<table>, mart_<table>)
+# The screen and the site's statistics
+uv run fair-measure screen-assessments   # flag OPA values outside each interval
+uv run fair-measure export-web-stats     # regenerate web/src/data/siteStats.json
+
+# The public dashboard: API + Vue app
+uv run fair-measure api                  # JSON API on :8000
+npm --prefix web install && npm --prefix web run dev   # site on :5173
+
+# Inspect what's on disk (DuckDB views: raw_<dataset>, stg_<table>, mart_<table>)
 uv run fair-measure catalog
-uv run fair-measure sql "
-  SELECT a.year, a.market_value, o.total_livable_area
-  FROM raw_assessments a
-  JOIN raw_opa_properties_public o USING (parcel_number)
-  WHERE o.location = '108 ELFRETHS ALY'
-  ORDER BY a.year"
+uv run fair-measure sql "SELECT ... FROM mart_assessment_screen LIMIT 5"
 ```
 
-See [docs/operations.md](docs/operations.md) for the weekly launchd schedule.
+A `Justfile` wraps the common sequences (`just retrain-all`, `just gates`,
+`just fly-deploy`); run `just` to list recipes. `fm` is a shorthand alias for
+the `fair-measure` command. Snapshots land under
+`data/raw/source=carto/dataset=<table>/fetched_at=<utc>/` as zstd-compressed
+Parquet plus a `manifest.json` recording the query, schema, row counts, and
+file checksums; raw data is never modified after write. The screen refuses to
+run against mismatched model runs (a coherence gate compares run manifests)
+rather than silently mixing generations.
 
-Snapshots land under `data/raw/source=carto/dataset=<table>/fetched_at=<utc>/`
-as zstd-compressed Parquet plus a `manifest.json` recording the query, schema,
-row counts, timing, and file checksums. Raw data is never modified after write.
-
-## Layout
+## Repository layout
 
 ```
 src/philly_fair_measure/
   config.py            # data dir resolution + core snapshot table registry
   sources/carto.py     # CARTO SQL API client (schema, counts, keyset pagination)
-  ingest/manifests.py  # snapshot + derived-table manifest schemas (pydantic)
-  ingest/snapshots.py  # snapshot writer (pages -> Parquet + manifest)
-  staging/             # raw -> typed/deduped/classified tables (polars)
+  ingest/              # snapshot writer + manifest schemas (pydantic)
+  staging/             # raw → typed/deduped/classified tables (polars)
   validation/sales.py  # CCAO-style sale-validity classification
-  validation/opa.py    # assessment screen: OPA vs model predictive intervals
-  features/            # model-ready feature marts (see docs/features.md)
-  models/              # LightGBM/Bayesian models, scoring, IAAO ratio metrics
+  validation/opa.py    # assessment screen: flags, screen_z, attention tier
+  features/            # model-ready feature marts (registry: docs/features.md)
+  models/              # LightGBM/Bayesian/conformal models, scoring, IAAO metrics
+  equity_context.py    # peer-group definitions shared by stats and reports
+  web_stats.py         # exports the site's committed statistics JSON
   catalog.py           # DuckDB views over raw snapshots + staged/mart tables
-  api.py               # FastAPI backing the public dashboard (docs/frontend.md)
-  cli.py               # `philly` command-line entry point
-web/                   # public dashboard: Vue 3 + TS + Tailwind + MapLibre
-docs/
-  model.md             # model architecture, methodology, and results
-  frontend.md          # public dashboard + API architecture and deploy notes
-  vertical-equity-report-card.md  # our metrics vs OPA vs IAAO bands (full + trimmed)
-  historical-redistribution.md    # what OPA's regressivity shifted, 2016-2025, in $
-  features.md          # input feature registry
-  source_inventory.md  # verified dataset inventory (Milestone 1)
-  ccao-lessons.md      # patterns adopted from ccao-data
-  operations.md        # recurring snapshot schedule + freshness heartbeat
-data/                  # local data lake (gitignored): raw/ staged/ marts/
+  api.py               # FastAPI app backing the public dashboard
+  cli.py               # `fair-measure` / `fm` command-line entry point
+web/                   # public dashboard: Vue 3 + TypeScript + Tailwind + MapLibre
+scripts/               # deploy-bundle builder + serve-only API smoke test
+docs/                  # documentation (see below)
+data/                  # local data lake (gitignored): raw/ staged/ marts/ runs/
 ```
 
-## Tech stack
+## Documentation
 
-Modern, minimal, and pandas-free by policy:
+| Document | Contents |
+|---|---|
+| [docs/model.md](docs/model.md) | Model architecture, methodology, results — the site's "model documentation" link |
+| [docs/features.md](docs/features.md) | Input feature registry |
+| [docs/source_inventory.md](docs/source_inventory.md) | Verified public dataset inventory |
+| [docs/vertical-equity-report-card.md](docs/vertical-equity-report-card.md) | Model vs. OPA vs. IAAO bands, full and trimmed samples |
+| [docs/report-assessment-equity.md](docs/report-assessment-equity.md) | Equity findings: who is over- and under-assessed |
+| [docs/equity-diagnostics.md](docs/equity-diagnostics.md) | Diagnostic methodology (demographics excluded from valuation) |
+| [docs/historical-redistribution.md](docs/historical-redistribution.md) | What OPA's regressivity shifted 2016–2025, in dollars |
+| [docs/ccao-lessons.md](docs/ccao-lessons.md) | Patterns adopted from the Cook County Assessor's open-source stack |
+| [docs/frontend.md](docs/frontend.md) | Dashboard + API architecture and deployment |
+| [docs/operations.md](docs/operations.md) | Recurring snapshot schedule + freshness checks |
+| [docs/research-notes.md](docs/research-notes.md) | Literature and design notes behind the choices |
 
-| Layer | Choice | Notes |
-|---|---|---|
-| Package/env manager | **uv** (+ `uv_build` backend) | Python 3.13 pinned via `.python-version` |
-| HTTP | **httpx** (+ **tenacity** retries) | mocked in tests with **respx** |
-| Columnar data | **pyarrow** → zstd **Parquet** | ingest streams API pages straight to Arrow |
-| Analytical SQL | **DuckDB** | query engine over raw Parquet snapshots |
-| DataFrames | **Polars** (not pandas) | enters with the staging/feature layer; ingest and verification need only Arrow + SQL |
-| Validation/config | **pydantic v2** | snapshot manifests |
-| Lint/test | **ruff**, **pytest** | offline-by-default test suite |
-
-Planned additions as milestones land: `dbt-duckdb` (staged/mart models),
-`assesspy` (IAAO ratio statistics), LightGBM (baseline model), PyMC (Bayesian
-hierarchical model), DVC (modeling pipeline versioning). pandas and requests
-are deliberately excluded; if a dependency drags pandas in transitively, it
-stays out of our code paths.
-
-## Tests
+## Development
 
 ```bash
-uv run pytest            # offline tests (HTTP mocked)
-uv run pytest -m live    # live smoke tests against the real CARTO API
+just gates    # ruff + mypy (strict) + pytest, then web tests + production build
+uv run pytest             # offline tests (HTTP mocked)
+uv run pytest -m live     # live smoke tests against the real CARTO API
+npm --prefix web run test:unit
 ```
+
+CI runs lint, strict type checks, and the offline test suite on every push and
+pull request. Contribution guidelines, including the project's dependency
+policies, are in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Limitations
+
+- Model estimates are statistical, not appraisals. A flag means the city's
+  value is outside what public data supports — it is a reason to check the
+  record, not proof of an error.
+- Cash-market price dispersion is partly irreducible from public data; the
+  full-sample COD reflects that.
+- Predictive intervals undercover in the cheapest quintile (~76–79% realized
+  vs. 90% nominal); the site reports interval-based results with that caveat.
+- Condo accuracy roughly ties OPA rather than beating it.
+- OPA's interior-condition fields are stale and cannot be independently
+  verified; the model routes around them with distress and permit signals.
+- Single metro; no cross-city validation.
+
+## License
+
+[MIT](LICENSE). The underlying records belong to their publishers and are
+redistributed under the City of Philadelphia's open data terms; this
+repository contains code and documentation only, never the data itself.
+
+## Acknowledgments
+
+The data discipline and sale-validity methodology draw heavily on the
+[Cook County Assessor's Office open-source stack](https://github.com/ccao-data)
+(see [docs/ccao-lessons.md](docs/ccao-lessons.md)). Data comes from
+[OpenDataPhilly](https://opendataphilly.org/) and the City of Philadelphia's
+CARTO API. IAAO ratio statistics are computed with
+[assesspy](https://github.com/ccao-data/assesspy).

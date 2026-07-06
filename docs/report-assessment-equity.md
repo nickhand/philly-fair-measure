@@ -112,7 +112,7 @@ fixable? Would better data help? Are cheap homes simply worth less?*
 - **Convention.** Ratios are OPA value for the sale year ÷ the later sale price
   (an out-of-time test). Levels shift under other conventions; between-group
   *gaps*, which are the subject here, are robust to the choice. All figures are
-  reproducible via the open-source `philly` command-line tool named in the
+  reproducible via the open-source `fair-measure` command-line tool named in the
   Appendix.
 
 ---
@@ -412,8 +412,8 @@ This analysis is honest about what it cannot claim:
 
 ## Appendix: reproducibility
 
-Every figure above is regenerated from public data by the open-source `philly`
-tool:
+Every figure above is regenerated from public data by the open-source
+`fair-measure` tool:
 
 | Finding | Command |
 |---|---|
