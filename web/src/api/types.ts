@@ -5,6 +5,7 @@ export type Flag =
   | 'under_assessed_candidate'
   | 'within_range'
   | 'no_assessment'
+  | 'insufficient_record'
 
 /** Within-range but in the outer part of the interval — "worth a closer
  * look", deliberately weaker language than a flag. */
@@ -40,6 +41,9 @@ export interface PropertyCore {
   screen_z: number | null
   flag: Flag
   attention: Attention
+  /** Built within ~a year of the valuation date — comp models run low on
+   * new construction, so the report shows a caveat. */
+  new_build: boolean
   twin_n: number | null
   twin_ratio: number | null
   lon: number | null

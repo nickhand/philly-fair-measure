@@ -219,7 +219,7 @@ function printPage() {
                 {{ money(core.opa_market_value) }}
               </dd>
             </div>
-            <div>
+            <div v-if="core.flag !== 'insufficient_record'">
               <dt class="text-caption text-muted">Our estimate</dt>
               <dd class="money text-2xl font-extrabold tracking-tight text-brand-600">
                 {{ money(core.model_median) }}
@@ -227,7 +227,7 @@ function printPage() {
             </div>
           </dl>
 
-          <div v-if="hasInterval" class="mt-4">
+          <div v-if="hasInterval && core.flag !== 'insufficient_record'" class="mt-4">
             <IntervalStrip
               :low="core.model_pi_low_90!"
               :high="core.model_pi_high_90!"
@@ -247,6 +247,22 @@ function printPage() {
             </div>
           </div>
 
+          <!-- new-construction honesty note: comp evidence reflects the older
+               stock the build replaced, so the model's range can run low -->
+          <div
+            v-if="core.new_build && core.flag !== 'insufficient_record'"
+            class="mt-3.5 flex gap-2.5 rounded-md border border-line-soft bg-paper px-3.5 py-3"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5d6b7c" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mt-0.5 shrink-0"><path d="M4 11 12 4l8 7" /><path d="M6 10v9h12v-9" /><path d="M12 19v-5" /></svg>
+            <p class="text-body-sm leading-normal text-body">
+              <strong class="text-ink">Newly built home.</strong> City records say this home is
+              brand new. New construction is the hardest case for a sale-comparison model like
+              ours — until the home itself sells, nearby sales mostly reflect older homes, so our
+              estimate and range can run low. The city’s value may rest on information we can’t
+              see, like the builder’s own numbers.
+            </p>
+          </div>
+
           <div class="mt-3.5 flex gap-2.5 rounded-md border border-gold-tint-border bg-gold-tint px-3.5 py-3">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a6100" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mt-0.5 shrink-0"><line x1="4" y1="12" x2="19" y2="12" /><path d="M13 6l6 6-6 6" /></svg>
             <p class="text-body-sm font-semibold leading-normal text-body">{{ verdict.nextStep }}</p>
@@ -262,7 +278,7 @@ function printPage() {
           subtitle="The biggest things pushing this home’s estimated value up or down, compared with a typical Philadelphia home."
         >
           <SkeletonBlock v-if="reportLoading" />
-          <template v-else-if="report?.drivers">
+          <template v-else-if="report?.drivers && core.flag !== 'insufficient_record'">
             <DriverBars :drivers="report.drivers.drivers" />
             <div class="no-print">
               <InfoTip>
@@ -285,7 +301,7 @@ function printPage() {
           subtitle="Equal treatment check: your assessment level next to similar homes in your area."
         >
           <SkeletonBlock v-if="reportLoading" />
-          <template v-else-if="report?.equity">
+          <template v-else-if="report?.equity && core.flag !== 'insufficient_record'">
             <PeerHistogram
               :histogram="report.equity.histogram"
               :you="report.equity.ratio"

@@ -9,6 +9,14 @@ compared against its current OPA market value:
     under_assessed_candidate  OPA value below the interval
     within_range              OPA value inside the interval
     no_assessment             OPA value missing/zero — nothing to compare
+    insufficient_record       no recorded living area (usually brand-new
+                              construction still being written up) — the
+                              model cannot price it, so no verdict
+
+Newly built homes (year built within a year of the valuation date) never
+flag "over": comp evidence reflects the older stock they replaced and runs
+low, so an over call is not defensible; they land in the attention tier
+instead, and the report carries a new-construction caveat (`new_build`).
 
 Two model families share the mart, distinguished by `model_family` +
 `interval_method`:
@@ -115,31 +123,64 @@ def _require_coherent(
 def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     """Pure classification/ranking step; expects prediction columns to be present."""
     has_assessment = (pl.col("opa_market_value").fill_null(0) > 0) & (pl.col("model_median") > 0)
+    # Record completeness: a home with no recorded living area cannot be
+    # priced — the model takes the zero literally (measured 2026-07-05: $3k
+    # medians against $500k assessments, 19 of the top-100 z leads). Usually
+    # brand-new construction the city is still writing up; no verdict.
+    # (The column guards tolerate minimal test fixtures.)
+    insufficient = (
+        pl.col("char_livable_area").fill_null(0) <= 0
+        if "char_livable_area" in df.columns
+        else pl.lit(False)
+    )
+    # New construction: until the home itself sells, nearby sales mostly
+    # reflect the older stock it replaced, so a sale-comparison model runs
+    # low (measured: new-build over-flag assessments at 3.2x our medians,
+    # with listings agreeing with OPA). An "over" call is not defensible
+    # here — it demotes to within-range, where the attention tier picks it
+    # up as "worth a look"; the report carries a plain-language caveat.
+    # Under-flags stay: a new build the city still prices as the old parcel
+    # is a genuine lead.
+    new_build = (
+        (pl.col("char_year_built").fill_null(0) >= pl.col("valuation_date").dt.year() - 1)
+        if {"char_year_built", "valuation_date"}.issubset(df.columns)
+        else pl.lit(False)
+    )
     flag = (
-        pl.when(~has_assessment)
+        pl.when(insufficient)
+        .then(pl.lit(AssessmentFlag.INSUFFICIENT))
+        .when(~has_assessment)
         .then(pl.lit(AssessmentFlag.NONE))
         .when(pl.col("opa_market_value") > pl.col("model_pi_high_90"))
-        .then(pl.lit(AssessmentFlag.OVER))
+        .then(
+            pl.when(new_build)
+            .then(pl.lit(AssessmentFlag.WITHIN))
+            .otherwise(pl.lit(AssessmentFlag.OVER))
+        )
         .when(pl.col("opa_market_value") < pl.col("model_pi_low_90"))
         .then(pl.lit(AssessmentFlag.UNDER))
         .otherwise(pl.lit(AssessmentFlag.WITHIN))
     )
     screen_z = (
-        pl.when(has_assessment)
+        pl.when(has_assessment & ~insufficient)
         .then(
             (pl.col("opa_market_value").log() - pl.col("model_median").log())
             / ((pl.col("model_pi_high_90") / pl.col("model_pi_low_90")).log() / _Z_SCALE)
         )
         .alias("screen_z")
     )
+    unpriceable_null = pl.when(insufficient).then(pl.lit(None, dtype=pl.Float64))
     return (
         df.with_columns(
             flag.alias("assessment_flag"),
             screen_z,
-            (pl.col("opa_market_value") / pl.col("model_median")).alias("opa_vs_model_ratio"),
-            (pl.col("opa_market_value") / pl.col("pred_lightgbm_calibrated")).alias(
-                "opa_vs_lightgbm_ratio"
+            new_build.alias("new_build"),
+            unpriceable_null.otherwise(pl.col("opa_market_value") / pl.col("model_median")).alias(
+                "opa_vs_model_ratio"
             ),
+            unpriceable_null.otherwise(
+                pl.col("opa_market_value") / pl.col("pred_lightgbm_calibrated")
+            ).alias("opa_vs_lightgbm_ratio"),
         )
         .with_columns(pl.col("screen_z").abs().alias("screen_abs_z"))
         .with_columns(

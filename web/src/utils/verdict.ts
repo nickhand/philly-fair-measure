@@ -74,6 +74,17 @@ export const VERDICTS: Record<Flag, Verdict> = {
     badgeClass: 'bg-fair-soft text-fair',
     hex: '#8593a4',
   },
+  insufficient_record: {
+    flag: 'insufficient_record',
+    headline: 'The city’s record here is incomplete',
+    detail:
+      'The city has not recorded basic facts for this home — like its living area — so no model can fairly check its value. This usually means brand-new construction the city is still writing up.',
+    nextStep:
+      'Check what the city has on file for this address. Once the record is complete, we can check it.',
+    textClass: 'text-fair',
+    badgeClass: 'bg-fair-soft text-fair',
+    hex: '#8593a4',
+  },
 }
 
 /** Watch tier: within the interval but near its edge (|screen_z| > 1).

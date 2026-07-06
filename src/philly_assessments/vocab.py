@@ -47,6 +47,9 @@ class AssessmentFlag(StrEnum):
     UNDER = "under_assessed_candidate"
     WITHIN = "within_range"
     NONE = "no_assessment"
+    # the city's record lacks the basics (no recorded living area) — usually
+    # brand-new construction still being written up; unpriceable, no verdict
+    INSUFFICIENT = "insufficient_record"
 
 
 class AttentionTier(StrEnum):

@@ -203,6 +203,37 @@ def test_finalize_screen_flags_and_ranking():
     assert out2.filter(pl.col("model_family") == "residential")["bldg_n_units"].is_null().all()
 
 
+def test_finalize_screen_insufficient_record_and_newbuild_guard():
+    df = pl.DataFrame(
+        {
+            "parcel_id": ["no_area", "new_over", "old_over", "new_under"],
+            "opa_market_value": [500_000.0, 900_000.0, 900_000.0, 100_000.0],
+            "pred_lightgbm_calibrated": [300_000.0] * 4,
+            "model_median": [3_000.0, 300_000.0, 300_000.0, 300_000.0],
+            "model_pi_low_90": [1_500.0, 150_000.0, 150_000.0, 150_000.0],
+            "model_pi_high_90": [6_000.0, 600_000.0, 600_000.0, 600_000.0],
+            "char_livable_area": [0.0, 3_182.0, 1_200.0, 2_000.0],
+            "char_year_built": [2025, 2025, 1925, 2025],
+            "valuation_date": [datetime(2026, 7, 1)] * 4,
+        }
+    )
+    out = {row["parcel_id"]: row for row in finalize_screen(df).to_dicts()}
+    # no recorded living area -> unpriceable, no verdict, no ranking score
+    assert out["no_area"]["assessment_flag"] == "insufficient_record"
+    assert out["no_area"]["screen_z"] is None
+    assert out["no_area"]["opa_vs_model_ratio"] is None
+    # a new build never flags over: demoted to within-range, caught by the
+    # attention tier, and marked for the report caveat
+    assert out["new_over"]["assessment_flag"] == "within_range"
+    assert out["new_over"]["attention"] == "high"
+    assert out["new_over"]["new_build"] is True
+    # the same numbers on an old home still flag
+    assert out["old_over"]["assessment_flag"] == "over_assessed_candidate"
+    assert out["old_over"]["new_build"] is False
+    # a new build the city prices below the model stays a real lead
+    assert out["new_under"]["assessment_flag"] == "under_assessed_candidate"
+
+
 def test_finalize_screen_attention_tier():
     # interval 150k-600k around a 300k median: log-width 1.386, sd ≈ 0.421.
     # watch_high: opa 497k → z ≈ +1.2, inside the interval → attention "high";

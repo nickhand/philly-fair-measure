@@ -49,4 +49,10 @@ describe('verdictFor', () => {
   it('falls back safely for unknown flags', () => {
     expect(verdictFor('no_assessment').headline).toBe('No city value on record')
   })
+
+  it('gives incomplete city records a no-verdict explanation, not a judgment', () => {
+    const v = verdictFor('insufficient_record')
+    expect(v.headline).toBe('The city’s record here is incomplete')
+    expect(v.detail).toMatch(/brand-new construction/)
+  })
 })

@@ -89,6 +89,9 @@ class PropertyCore(BaseModel):
     # within-range but in the outer part of the interval ("high"/"low") —
     # weaker evidence than a flag, shown as "worth a closer look"
     attention: str | None = None
+    # built within ~a year of the valuation date: comp evidence runs low on
+    # new construction, so the report shows a caveat
+    new_build: bool = False
     twin_n: int | None
     twin_ratio: float | None
     lon: float | None
@@ -251,6 +254,7 @@ def _core(s: dict[str, Any]) -> PropertyCore:
         screen_z=_f(s.get("screen_z")),
         flag=str(s.get("assessment_flag") or AssessmentFlag.NONE),
         attention=s.get("attention"),
+        new_build=bool(s.get("new_build")),
         twin_n=_i(s.get("twin_n")),
         twin_ratio=_f(s.get("opa_vs_twin_median")),
         lon=_f(s.get("loc_lon")),

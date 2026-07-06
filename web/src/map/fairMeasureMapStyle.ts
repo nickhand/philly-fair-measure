@@ -133,6 +133,7 @@ export const legend = [
       'any',
       ['all', flagIs('within_range'), attentionIs('')],
       flagIs('no_assessment'),
+      flagIs('insufficient_record'),
     ],
   },
   {
