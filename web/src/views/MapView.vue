@@ -80,6 +80,19 @@ const selected = ref<PropertyCore | null>(null)
 const zoomedOut = ref(true)
 const loadError = ref(false)
 
+/** Opaque cover until the first full render — basemap tiles AND the citywide
+ * flagged payload (~650 KB gzipped, seconds on mobile) — so the map never
+ * shows a half-empty city. The timeout uncovers it anyway if a tile/glyph
+ * CDN stalls ('idle', like 'load', never fires in that case). */
+const mapReady = ref(false)
+let readyTimer: number | undefined
+function markMapReady() {
+  window.clearTimeout(readyTimer)
+  mapReady.value = true
+}
+/** Viewport fetch in flight (street zoom) — drives the "loading homes" pill. */
+const fetching = ref(false)
+
 /** Stacked dots: condo towers put many homes on one coordinate, so a click
  * can hit dozens of units. When it does, the sheet shows this pick-a-home
  * list instead of silently cycling; closing a picked home returns to it. */
@@ -111,15 +124,20 @@ async function refreshParcels() {
   }
   controller?.abort()
   controller = new AbortController()
+  const mine = controller // an aborted call must not clear the newer call's pill
   const b = m.getBounds()
+  fetching.value = true
   try {
     const fc = await api.parcels(
       [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()],
       controller.signal,
     )
     source.setData(fc)
+    loadError.value = false
   } catch (err) {
     if ((err as Error).name !== 'AbortError') loadError.value = true
+  } finally {
+    if (controller === mine) fetching.value = false
   }
 }
 
@@ -277,6 +295,8 @@ onMounted(() => {
 
   m.on('styledata', () => ensureParcelLayer(m))
   m.on('moveend', refreshParcels) // independent of style readiness
+  m.once('idle', markMapReady) // first idle = tiles + flagged payload rendered
+  readyTimer = window.setTimeout(markMapReady, 8000)
   map.value = m
   // deep link from the report page: /map?parcel=<id> opens + centers the home
   const initial = router.currentRoute.value.query.parcel
@@ -288,6 +308,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.clearTimeout(readyTimer)
   controller?.abort()
   map.value?.remove()
 })
@@ -361,20 +382,40 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <!-- zoom hint -->
+    <!-- zoom hint / fetch pill: bottom-center so they never cover the legend
+         column or the map itself (the old top-center bar blanketed both on
+         phones); the two states are mutually exclusive by zoom level -->
     <div
       v-if="zoomedOut"
-      class="pointer-events-none absolute left-1/2 top-[118px] z-10 w-max max-w-[92vw] -translate-x-1/2 rounded-full bg-[rgba(22,36,58,0.85)] px-3.5 py-1.5 text-center text-caption font-semibold text-white"
+      class="pointer-events-none absolute bottom-8 left-1/2 z-10 w-max max-w-[min(92vw,560px)] -translate-x-1/2 rounded-xl bg-[rgba(22,36,58,0.85)] px-3.5 py-1.5 text-center text-caption font-semibold text-white"
       role="status"
     >
-      Showing flagged homes and ones worth a look citywide — zoom in to see every home
+      Showing flagged homes and ones worth a look — zoom in to see every home
+    </div>
+    <div
+      v-else-if="fetching"
+      class="pointer-events-none absolute bottom-8 left-1/2 z-10 flex w-max -translate-x-1/2 items-center gap-2 rounded-full bg-[rgba(22,36,58,0.85)] px-3.5 py-1.5 text-caption font-semibold text-white"
+      aria-hidden="true"
+    >
+      <span class="spinner spinner-sm"></span>
+      Loading homes…
     </div>
     <div
       v-if="loadError"
-      class="absolute inset-x-0 bottom-24 z-10 mx-auto w-fit rounded-full bg-over px-4 py-2 text-body-sm font-semibold text-white"
+      class="absolute inset-x-0 bottom-20 z-10 mx-auto w-fit max-w-[92vw] rounded-full bg-over px-4 py-2 text-center text-body-sm font-semibold text-white"
       role="alert"
     >
       Could not load homes for this area. Pan or zoom to retry.
+    </div>
+
+    <!-- opaque cover until the first full render (see mapReady) -->
+    <div
+      v-if="!mapReady"
+      class="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-paper"
+      role="status"
+    >
+      <span class="spinner" aria-hidden="true"></span>
+      <p class="text-body-sm font-semibold text-muted">Loading the map…</p>
     </div>
 
     <!-- bottom sheet -->
@@ -426,5 +467,31 @@ onBeforeUnmount(() => {
 /* Keep the map's own controls clear of the floating search bar. */
 :deep(.maplibregl-ctrl-top-right) {
   top: 4.25rem;
+}
+
+.spinner {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  border: 3px solid #dbe7f5;
+  border-top-color: #0f4d90;
+  animation: spin 0.8s linear infinite;
+}
+.spinner-sm {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-width: 2px;
+  border-color: rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2s;
+  }
 }
 </style>

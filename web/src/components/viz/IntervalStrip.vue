@@ -26,6 +26,9 @@ const width = ref(640)
 let observer: ResizeObserver | undefined
 
 onMounted(() => {
+  // seed from the live layout so the first paint is right even where
+  // ResizeObserver is unavailable or never fires (some embedded WebViews)
+  if (wrapper.value?.clientWidth) width.value = Math.max(280, wrapper.value.clientWidth)
   observer = new ResizeObserver((entries) => {
     const w = entries[0]?.contentRect.width
     if (w) width.value = Math.max(280, w)
@@ -34,7 +37,6 @@ onMounted(() => {
 })
 onBeforeUnmount(() => observer?.disconnect())
 
-const HEIGHT = 140
 const PAD = 18
 const BAND_Y = 72
 const BAND_H = 24
@@ -53,6 +55,26 @@ const opaLabelAnchor = computed(() => {
   return frac < 0.18 ? 'start' : frac > 0.82 ? 'end' : 'middle'
 })
 
+/** Phone-width layout: the full label strings ("City value …", "Our
+ * estimate …") plus the bound labels need ~450px before they stop colliding
+ * or running off the edges, so below that the labels shorten and the bounds
+ * move into the caption line. */
+const narrow = computed(() => width.value < 460)
+const cityLabel = computed(
+  () => `${narrow.value ? 'City' : 'City value'} ${moneyCompact(props.opa)}`,
+)
+const estLabel = computed(
+  () => `${narrow.value ? 'Ours' : 'Our estimate'} ${moneyCompact(props.median)}`,
+)
+const caption = computed(() =>
+  narrow.value
+    ? `range we're 90% sure about: ${moneyCompact(props.low)}–${moneyCompact(props.high)}`
+    : "range we're 90% sure about",
+)
+/** Narrow gets a taller canvas: the within-range estimate label sits below
+ * the band there, and at 140px it runs into the caption row. */
+const height = computed(() => (narrow.value ? 152 : 140))
+
 /** Estimate label: flip anchor near the chart edges (no cut-off text), and
  * when the city marker is close, slide to the far side of its drop line so
  * the dashed line never strikes through the label. */
@@ -61,7 +83,7 @@ const estAnchor = computed<'start' | 'middle' | 'end'>(() => {
   const frac = (medX.value - PAD) / Math.max(1, width.value - 2 * PAD)
   if (frac < 0.15) return 'start'
   if (frac > 0.85) return 'end'
-  if (Math.abs(medX.value - opaX.value) < 95) {
+  if (Math.abs(medX.value - opaX.value) < (narrow.value ? 80 : 95)) {
     // far side of the city drop line — unless that side runs into the
     // low/high bound labels at the strip's edges, then take the near side
     const farSide = medX.value <= opaX.value ? 'end' : 'start'
@@ -89,8 +111,8 @@ const ariaLabel = computed(
   <div ref="wrapper" class="w-full">
     <svg
       :width="width"
-      :height="HEIGHT"
-      :viewBox="`0 0 ${width} ${HEIGHT}`"
+      :height="height"
+      :viewBox="`0 0 ${width} ${height}`"
       role="img"
       :aria-label="ariaLabel"
       class="block w-full font-sans"
@@ -101,12 +123,12 @@ const ariaLabel = computed(
           :text-anchor="opaLabelAnchor"
           :x="opaLabelAnchor === 'end' ? 10 : opaLabelAnchor === 'start' ? -10 : 0"
           y="14"
-          font-size="14"
+          :font-size="narrow ? 13 : 14"
           font-weight="700"
           :fill="verdict.hex"
           style="font-variant-numeric: tabular-nums"
         >
-          City value {{ moneyCompact(props.opa) }}
+          {{ cityLabel }}
         </text>
         <path d="M 0 22 L 6 31 L -6 31 Z" :fill="verdict.hex" />
         <line x1="0" x2="0" y1="31" :y2="BAND_Y + BAND_H + 6" :stroke="verdict.hex" stroke-width="2" stroke-dasharray="3 4" />
@@ -137,23 +159,25 @@ const ariaLabel = computed(
         :x="estLabelX"
         :y="inside ? BAND_Y + BAND_H + 27 : BAND_Y - 16"
         :text-anchor="estAnchor"
-        font-size="14"
+        :font-size="narrow ? 13 : 14"
         font-weight="700"
         fill="#0f4d90"
         style="font-variant-numeric: tabular-nums"
       >
-        Our estimate {{ moneyCompact(props.median) }}
+        {{ estLabel }}
       </text>
 
-      <!-- range end labels + caption -->
-      <text :x="x(props.low)" :y="BAND_Y + BAND_H + 22" text-anchor="middle" font-size="13" fill="#5d6b7c" style="font-variant-numeric: tabular-nums">
-        {{ moneyCompact(props.low) }}
-      </text>
-      <text :x="x(props.high)" :y="BAND_Y + BAND_H + 22" text-anchor="middle" font-size="13" fill="#5d6b7c" style="font-variant-numeric: tabular-nums">
-        {{ moneyCompact(props.high) }}
-      </text>
-      <text :x="width / 2" :y="HEIGHT - 4" text-anchor="middle" font-size="11.5" fill="#8593a4">
-        range we're 90% sure about
+      <!-- range end labels (into the caption on phones) + caption -->
+      <template v-if="!narrow">
+        <text :x="x(props.low)" :y="BAND_Y + BAND_H + 22" text-anchor="middle" font-size="13" fill="#5d6b7c" style="font-variant-numeric: tabular-nums">
+          {{ moneyCompact(props.low) }}
+        </text>
+        <text :x="x(props.high)" :y="BAND_Y + BAND_H + 22" text-anchor="middle" font-size="13" fill="#5d6b7c" style="font-variant-numeric: tabular-nums">
+          {{ moneyCompact(props.high) }}
+        </text>
+      </template>
+      <text :x="width / 2" :y="height - 4" text-anchor="middle" :font-size="narrow ? 12 : 11.5" :fill="narrow ? '#5d6b7c' : '#8593a4'" style="font-variant-numeric: tabular-nums">
+        {{ caption }}
       </text>
     </svg>
 

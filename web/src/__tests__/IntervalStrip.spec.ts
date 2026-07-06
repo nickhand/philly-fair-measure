@@ -53,4 +53,34 @@ describe('IntervalStrip', () => {
     expect(x).toBeGreaterThan(0)
     expect(x).toBeLessThan(640)
   })
+
+  it('shortens labels and folds the bounds into the caption on phone widths', async () => {
+    // a ResizeObserver that reports a phone-sized wrapper on observe()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        cb: ResizeObserverCallback
+        constructor(cb: ResizeObserverCallback) {
+          this.cb = cb
+        }
+        observe() {
+          this.cb(
+            [{ contentRect: { width: 340 } } as ResizeObserverEntry],
+            this as unknown as ResizeObserver,
+          )
+        }
+        unobserve() {}
+        disconnect() {}
+      },
+    )
+    const w = mount(IntervalStrip, { props: base })
+    await w.vm.$nextTick()
+    const svgText = w.find('svg').text()
+    expect(svgText).toContain('City $442k')
+    expect(svgText).toContain('Ours $520k')
+    expect(svgText).not.toContain('City value')
+    expect(svgText).not.toContain('Our estimate')
+    // the bounds live in the caption, not as edge labels that get cut off
+    expect(svgText).toContain("range we're 90% sure about: $400k–$700k")
+  })
 })

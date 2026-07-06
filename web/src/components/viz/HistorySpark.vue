@@ -21,6 +21,9 @@ const wrapper = ref<HTMLDivElement | null>(null)
 const width = ref(343)
 let observer: ResizeObserver | undefined
 onMounted(() => {
+  // seed from the live layout so the first paint is right even where
+  // ResizeObserver is unavailable or never fires (some embedded WebViews)
+  if (wrapper.value?.clientWidth) width.value = Math.max(280, wrapper.value.clientWidth)
   observer = new ResizeObserver((entries) => {
     const w = entries[0]?.contentRect.width
     if (w) width.value = Math.max(280, w)
