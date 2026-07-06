@@ -1,0 +1,31 @@
+# Netlify config for the Fair Measure site. Same pattern as
+# philly-gun-violence-dashboard: this repo deploys as its own Netlify site,
+# built under a subpath, and nickhand.dev fronts it at /fair-measure/.
+# Pushes to main trigger automatic builds.
+
+[build]
+base = "web"
+command = "npm ci && npm run build-only"
+publish = "dist"
+
+[build.environment]
+VITE_PUBLIC_BASE = "/fair-measure/"
+VITE_API_BASE = "https://fair-measure-api.fly.dev"
+
+# Serve Vite-built assets when requested under the subpath
+[[redirects]]
+from = "/fair-measure/assets/*"
+to = "/assets/:splat"
+status = 200
+
+# SPA fallback for history-mode routes under the subpath
+[[redirects]]
+from = "/fair-measure/*"
+to = "/index.html"
+status = 200
+
+# SPA fallback at the site root (direct visits to the bare Netlify URL)
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200

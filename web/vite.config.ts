@@ -7,6 +7,9 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // production builds are served under a subpath of nickhand.dev (the same
+  // pattern as the gun-violence dashboard); dev stays at the root
+  base: process.env.VITE_PUBLIC_BASE || '/',
   plugins: [vue(), vueDevTools(), tailwindcss()],
   resolve: {
     alias: {

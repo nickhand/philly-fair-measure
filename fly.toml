@@ -1,0 +1,31 @@
+# Fly.io config for the Fair Measure API (see Justfile: `just fly-deploy`).
+# The ~500k-row screen frame loads into memory at startup, so the machine
+# needs headroom beyond the default 512 MB.
+
+app = "fair-measure-api"
+primary_region = "iad"
+
+[build]
+dockerfile = "Dockerfile"
+
+[env]
+PORT = "8080"
+PHILLY_ENV = "prod"
+
+[http_service]
+internal_port = 8080
+force_https = true
+auto_stop_machines = "stop"
+auto_start_machines = true
+min_machines_running = 0
+
+[[http_service.checks]]
+grace_period = "30s"
+interval = "15s"
+method = "GET"
+path = "/health"
+timeout = "5s"
+
+[[vm]]
+size = "shared-cpu-2x"
+memory = "2gb"

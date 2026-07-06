@@ -1,6 +1,8 @@
-/** Small typed fetch layer. All endpoints are same-origin `/api/*` (vite proxies
- * to the Python API in dev). Callers pass an AbortSignal to cancel stale
- * requests (the address search does this on every keystroke). */
+/** Small typed fetch layer. Endpoints are `/api/*` — same-origin in dev (vite
+ * proxies to the Python API), prefixed with VITE_API_BASE in production
+ * builds (the Netlify site calls the Fly.io API cross-origin). Callers pass
+ * an AbortSignal to cancel stale requests (the address search does this on
+ * every keystroke). */
 
 import type {
   CompRow,
@@ -22,8 +24,14 @@ export class ApiError extends Error {
   }
 }
 
+/** Absolute URL for an /api path (also used for non-fetch consumers like the
+ * map's GeoJSON source). Empty base = same origin. */
+export function apiUrl(path: string): string {
+  return `${import.meta.env.VITE_API_BASE ?? ''}${path}`
+}
+
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(path, { signal, headers: { Accept: 'application/json' } })
+  const res = await fetch(apiUrl(path), { signal, headers: { Accept: 'application/json' } })
   if (!res.ok) throw new ApiError(res.status, `${res.status} for ${path}`)
   return (await res.json()) as T
 }

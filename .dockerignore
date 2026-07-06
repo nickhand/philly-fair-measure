@@ -1,0 +1,6 @@
+# Only the package source + the curated deploy bundle enter the image.
+*
+!pyproject.toml
+!README.md
+!src
+!deploy/data

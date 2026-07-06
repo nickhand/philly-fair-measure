@@ -13,7 +13,7 @@ import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { api } from '@/api/client'
+import { api, apiUrl } from '@/api/client'
 import { track } from '@/lib/analytics'
 import type { Attention, Flag, PropertyCore, SearchHit } from '@/api/types'
 import { applyFairMeasurePaint, dotLayers, flagColor, legend } from '@/map/fairMeasureMapStyle'
@@ -185,7 +185,7 @@ function ensureParcelLayer(m: maplibregl.Map) {
     // one cached gzipped payload) drawn below street zoom so the clustering
     // reads at a glance; the viewport layer takes over past MIN_PARCEL_ZOOM.
     // Watch dots render first as a small faint texture, strong flags on top.
-    m.addSource('flagged', { type: 'geojson', data: '/api/parcels/flagged' })
+    m.addSource('flagged', { type: 'geojson', data: apiUrl('/api/parcels/flagged') })
     m.addLayer({
       id: 'fm-dots-far-watch',
       type: 'circle',

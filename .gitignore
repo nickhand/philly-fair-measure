@@ -1,6 +1,8 @@
 # Data is never committed; raw snapshots and derived tables live locally (see AGENTS.md)
 # Root-anchored: web/src/data/ (the exported site stats the app imports) IS committed.
 /data/
+# The deploy bundle is derived from /data by `just bundle-data`
+/deploy/
 
 __pycache__/
 *.py[cod]

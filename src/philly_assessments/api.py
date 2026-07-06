@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from philly_assessments import config
@@ -462,6 +462,9 @@ def _histories(root: Path, parcel_id: str) -> tuple[list[YearValue], list[SaleRo
 
 
 def create_app(data_dir: Path | None = None) -> FastAPI:
+    import os
+
+    from fastapi.middleware.cors import CORSMiddleware
     from fastapi.middleware.gzip import GZipMiddleware
 
     root = data_dir if data_dir is not None else config.data_dir()
@@ -470,6 +473,32 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
     # the citywide overview payload is ~51k GeoJSON points (~6 MB raw, ~10x
     # smaller gzipped); everything else compresses as a free bonus
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+    # public read-only data service: the site is served from another origin
+    # (Netlify / nickhand.dev) and calls the Fly API directly. GET-only, no
+    # credentials, so a permissive default is appropriate; override with a
+    # comma-separated PHILLY_CORS_ORIGINS if it ever needs narrowing.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[o.strip() for o in os.environ.get("PHILLY_CORS_ORIGINS", "*").split(",")],
+        allow_methods=["GET"],
+        allow_headers=["*"],
+    )
+
+    def _require_admin(x_admin_token: str | None) -> None:
+        """Admin endpoints are staff worklists. Locally (no PHILLY_ENV) they
+        stay open; in prod they require the PHILLY_ADMIN_TOKEN header and are
+        denied outright if no token was configured."""
+        token = os.environ.get("PHILLY_ADMIN_TOKEN")
+        if token:
+            if x_admin_token != token:
+                raise HTTPException(status_code=403, detail="admin token required")
+        elif os.environ.get("PHILLY_ENV") == "prod":
+            raise HTTPException(status_code=404, detail="not found")
+
+    @app.get("/health")
+    def health() -> dict[str, Any]:
+        """Fly.io health checks (cheap: the frame loaded at startup)."""
+        return {"status": "ok", "rows": frame.height, "screen_built": screen_built}
 
     @app.get("/api/stats", response_model=Stats)
     def stats() -> Stats:
@@ -657,8 +686,11 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
         kind: str = Query(pattern="^(over|under|nonuniform)$"),
         n: int = Query(default=25, le=100),
         extremes: bool = False,
+        x_admin_token: str | None = Header(default=None),
     ) -> list[LeaderRow]:
-        """Staff worklists. NOT authenticated — add real auth before any deploy."""
+        """Staff worklists. Open locally; in prod requires X-Admin-Token
+        (PHILLY_ADMIN_TOKEN secret) and 404s if no token is configured."""
+        _require_admin(x_admin_token)
         from philly_assessments.report import leaderboards
 
         boards = leaderboards(root, n=n, plausible=not extremes)
