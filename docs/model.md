@@ -174,12 +174,12 @@ the screen currently keeps the 5.6 fixed-offset variant.
 
 ## 6. Results
 
-Out-of-time test set, n≈19.5k, run `20260706T004017Z-baseline`. Identical test
+Out-of-time test set, n≈19.5k, run `20260706T194138Z-baseline`. Identical test
 set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
 |---|---|---|---|---|---|---|---|
-| **LightGBM** | **0.337** | **27.0%** | 1.036 | **25.8** | **1.071** | **−0.060** | 0.934 |
+| **LightGBM** | **0.338** | **27.1%** | 1.035 | **26.0** | **1.072** | **−0.061** | 0.932 |
 | Ridge | 0.436 | 37.7% | 1.022 | 36.9 | 1.038 | −0.054 | 1.022 |
 | **OPA (incumbent)** | 0.449 | 34.0% | 0.983 | 34.5 | 1.190 | −0.234 | 0.787 |
 
@@ -202,9 +202,10 @@ Honest caveats:
   (RMSE 0.280 vs 0.278, COD 22.4 vs 18.8; 2026-07-04). Condos are homogeneous
   and sell frequently — where OPA's mass appraisal already does well.
 - **Interval undercoverage in the cheap tail:** at nominal 90%, realized
-  coverage is ~89% overall but only **~76–79% in the cheapest quintile** for
-  both interval methods. Q1 dispersion is partly irreducible; both machines
-  report the shortfall rather than hide it.
+  coverage is ~89–91% overall but only **~81–86% in the cheapest quintile**
+  across every interval method built (Bayesian 0.81, fixed-offset conformal
+  0.86, CQR 0.85 — see §5.7). Q1 dispersion is partly irreducible; the
+  machines report the shortfall rather than hide it.
 
 Stability is checked by temporal cross-validation (rolling out-of-time folds)
 and spatial cross-validation (leave-one-district-out); see the `fair-measure
@@ -250,11 +251,14 @@ Guards keep the flags honest where the record, not the value, is the problem:
   flagged, so the strong flags stay reserved for cases outside the model's
   stated uncertainty.
 
-As of run `20260706T004017Z` (Tax Year 2027 roll): 496,975 properties
-screened — 1,772 over-assessed candidates, 7,911 under-assessed candidates,
-49,615 in the attention tier, 93 insufficient records. A coherence gate
+As of run `20260706T194138Z` (Tax Year 2027 roll): 496,975 properties
+screened — 1,923 over-assessed candidates, 11,484 under-assessed candidates,
+53,293 in the attention tier, 93 insufficient records. A coherence gate
 refuses to screen against feature marts and model runs from different
-generations (`StaleRunError`) rather than silently mixing them.
+generations (`StaleRunError`) rather than silently mixing them, and every
+build must pass the structural invariants in `validation/screen_audit.py`
+(no flag the second machine disputes; no display band that excludes its own
+median) plus a run-over-run audit (`fair-measure screen-audit`).
 
 Two value conventions are surfaced explicitly:
 

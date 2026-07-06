@@ -1,11 +1,11 @@
 {
   "meta": {
     "generated_at": "2026-07-06",
-    "model_run_id": "20260706T004017Z-baseline",
-    "interval_run_id": "20260706T160448Z-bayesian",
+    "model_run_id": "20260706T194138Z-baseline",
+    "interval_run_id": "20260706T200133Z-bayesian",
     "n_test": 19484,
     "interval_nominal_pct": 90,
-    "interval_coverage_pct": 90
+    "interval_coverage_pct": 91
   },
   "full_card": {
     "opa": {
@@ -16,10 +16,10 @@
       "mape_pct": 34.0
     },
     "model": {
-      "median_ratio": 1.036,
-      "cod": 25.8,
-      "prd": 1.071,
-      "prb": -0.059,
+      "median_ratio": 1.035,
+      "cod": 25.9,
+      "prd": 1.072,
+      "prb": -0.061,
       "mape_pct": 27.0
     }
   },
@@ -32,11 +32,11 @@
       "mape_pct": 24.9
     },
     "model": {
-      "median_ratio": 1.002,
-      "cod": 19.9,
-      "prd": 1.012,
-      "prb": 0.024,
-      "mape_pct": 19.9
+      "median_ratio": 1.0,
+      "cod": 20.0,
+      "prd": 1.013,
+      "prb": 0.023,
+      "mape_pct": 20.0
     }
   },
   "tiers_financed": {
