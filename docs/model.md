@@ -130,6 +130,22 @@ geography-conditional width). Measured on the out-of-time condo test slice
 uses this posterior for condo intervals when a `bayesian-condo` run exists,
 falling back to conformal offsets (§5.6) otherwise.
 
+### 5.5b New construction
+A sale-comparison model prices a brand-new build against the older stock it
+replaced and runs low (measured: new-build over-flag assessments at 3.2x our
+medians, with active listings agreeing with OPA). Public-data response, all
+from the deed data we already hold: a dedicated as-of kNN surface over sales
+of *then-new* homes only (`mkt_newbuild_knn_*`, k=10, same leakage discipline
+as §4's surface), an explicit `char_new_build` dummy plus the local
+new-vs-old premium as features, and a `newbuild_thin` term in the Bayesian σ
+design so a new build with <3 new-build comps nearby gets a wider, honest
+interval. Measured on the 370 out-of-time new-build test sales: LightGBM
+median ratio 0.90 → 0.98 (bias gone), Bayesian coverage 0.93 → 0.95 at width
+1.81; citywide metrics unchanged. Screen policy on top: homes built within
+two years of the valuation date never flag "over" (they demote to the
+attention tier with a report caveat), and records with no recorded living
+area get `insufficient_record` instead of a verdict.
+
 ### 5.6 Conformal intervals — frequentist cross-check
 Split-conformal intervals around the LightGBM point model, sharing **nothing**
 with the Bayesian arm except the feature mart — different model, different

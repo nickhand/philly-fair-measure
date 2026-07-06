@@ -32,6 +32,12 @@ DIST_SOFTENING_M = 100.0
 SCORE_WINDOW_DAYS = 1825
 _EXTRA = 4  # over-query to survive same-parcel exclusion
 
+# New-construction comp surface: a home is "new at sale" when built within a
+# year of selling. New-build sales are ~4% of the pool, so their k is smaller
+# and their mean neighbor distance is the model's evidence-density signal.
+NEW_BUILD_LAG_YEARS = 1
+NEWBUILD_KNN_K = 10
+
 
 def _weighted_knn(
     tree: cKDTree,
@@ -65,10 +71,19 @@ def _weighted_knn(
     return out_val, out_n, out_dist
 
 
-def knn_ppsf_for_sales(points: pl.DataFrame, *, k: int = KNN_K) -> pl.DataFrame:
+def knn_ppsf_for_sales(
+    points: pl.DataFrame,
+    *,
+    k: int = KNN_K,
+    prefix: str = "mkt_knn",
+    tree_col: str | None = None,
+) -> pl.DataFrame:
     """Per-sale surface features from strictly earlier sales (quarter-blocked).
 
     `points` columns: sale_id, parcel_id, x_m, y_m, sale_date, adj_log_ppsf.
+    `tree_col` names an optional boolean column restricting which sales may
+    serve as *evidence* (every row is still a query) — e.g. the new-build
+    surface queries all sales against a tree of new-construction sales only.
     """
     from scipy.spatial import cKDTree
 
@@ -79,13 +94,18 @@ def knn_ppsf_for_sales(points: pl.DataFrame, *, k: int = KNN_K) -> pl.DataFrame:
     parcels = pts["parcel_id"].to_numpy()
     values = pts["adj_log_ppsf"].to_numpy()
     quarters = pts["_quarter"].to_numpy()
+    eligible = (
+        pts[tree_col].fill_null(False).to_numpy()
+        if tree_col is not None
+        else np.ones(len(pts), dtype=bool)
+    )
 
     out_val = np.full(len(pts), np.nan)
     out_n = np.zeros(len(pts), dtype=np.int32)
     out_dist = np.full(len(pts), np.nan)
     boundaries = np.unique(quarters)
     for quarter in boundaries:
-        past = quarters < quarter
+        past = (quarters < quarter) & eligible
         current = quarters == quarter
         if not past.any():
             continue
@@ -98,9 +118,9 @@ def knn_ppsf_for_sales(points: pl.DataFrame, *, k: int = KNN_K) -> pl.DataFrame:
         out_dist[current] = dist
 
     return pts.select("sale_id").with_columns(
-        pl.Series("mkt_knn_log_ppsf", out_val).fill_nan(None),
-        pl.Series("mkt_knn_n", out_n),
-        pl.Series("mkt_knn_mean_dist_m", out_dist).fill_nan(None),
+        pl.Series(f"{prefix}_log_ppsf", out_val).fill_nan(None),
+        pl.Series(f"{prefix}_n", out_n),
+        pl.Series(f"{prefix}_mean_dist_m", out_dist).fill_nan(None),
     )
 
 
@@ -111,10 +131,13 @@ def knn_ppsf_at_date(
     *,
     k: int = KNN_K,
     window_days: int = SCORE_WINDOW_DAYS,
+    prefix: str = "mkt_knn",
+    tree_col: str | None = None,
 ) -> pl.DataFrame:
     """Per-parcel surface features at a valuation date (single trailing-window tree).
 
     `targets` columns: parcel_id, x_m, y_m. Own-parcel sales are excluded.
+    `tree_col` optionally restricts the evidence sales (see knn_ppsf_for_sales).
     """
     from scipy.spatial import cKDTree
 
@@ -122,12 +145,14 @@ def knn_ppsf_at_date(
         (pl.col("sale_date") < valuation_date)
         & ((pl.lit(valuation_date) - pl.col("sale_date")).dt.total_days() <= window_days)
     )
+    if tree_col is not None:
+        window = window.filter(pl.col(tree_col).fill_null(False))
     tree = cKDTree(window.select("x_m", "y_m").to_numpy()) if window.height else None
     if tree is None or tree.n == 0:
         return targets.select("parcel_id").with_columns(
-            pl.lit(None, dtype=pl.Float64).alias("mkt_knn_log_ppsf"),
-            pl.lit(0).alias("mkt_knn_n"),
-            pl.lit(None, dtype=pl.Float64).alias("mkt_knn_mean_dist_m"),
+            pl.lit(None, dtype=pl.Float64).alias(f"{prefix}_log_ppsf"),
+            pl.lit(0).alias(f"{prefix}_n"),
+            pl.lit(None, dtype=pl.Float64).alias(f"{prefix}_mean_dist_m"),
         )
     val, n, dist = _weighted_knn(
         tree,
@@ -138,7 +163,7 @@ def knn_ppsf_at_date(
         k,
     )
     return targets.select("parcel_id").with_columns(
-        pl.Series("mkt_knn_log_ppsf", val).fill_nan(None),
-        pl.Series("mkt_knn_n", n),
-        pl.Series("mkt_knn_mean_dist_m", dist).fill_nan(None),
+        pl.Series(f"{prefix}_log_ppsf", val).fill_nan(None),
+        pl.Series(f"{prefix}_n", n),
+        pl.Series(f"{prefix}_mean_dist_m", dist).fill_nan(None),
     )

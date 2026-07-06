@@ -115,6 +115,11 @@ RESIDENTIAL_SPEC = FamilySpec(
         # sales that are repeats. Paired with a missing indicator so non-repeats
         # aren't imputed to a misleading "average previous price".
         "mkt_parcel_prev_log_price_ref",
+        # new construction: the dummy carries the level shift, the premium the
+        # local new-vs-old gap (0 for old homes or when no new-build evidence
+        # exists — the newbuild_thin sigma term carries that honesty)
+        "char_new_build",
+        "mkt_newbuild_premium",
     ],
     ordinals=["char_exterior_condition", "char_interior_condition"],
     missing=[
@@ -127,6 +132,9 @@ RESIDENTIAL_SPEC = FamilySpec(
         "style_twin",
         "style_detached",
         "style_other",
+        # a new build with no new-build sales nearby is irreducibly uncertain
+        # on public data — widen honestly instead of flagging confidently
+        "newbuild_thin",
     ],
 )
 
@@ -355,6 +363,8 @@ def _sigma_design(df: pl.DataFrame, family: str = "residential") -> np.ndarray:
         return np.column_stack([missing, np.log1p(dist) / 10.0])
     missing = df["mkt_block_roll_mean_price"].is_null().to_numpy().astype(np.float64)
     style = df["char_style"].cast(pl.String).fill_null("unknown").to_numpy()
+    new_build = df["char_new_build"].cast(pl.Float64).fill_null(0.0).to_numpy()
+    newbuild_n = df["mkt_newbuild_knn_n"].cast(pl.Float64).fill_null(0.0).to_numpy()
     return np.column_stack(
         [
             missing,
@@ -362,6 +372,8 @@ def _sigma_design(df: pl.DataFrame, family: str = "residential") -> np.ndarray:
             (style == "twin").astype(np.float64),
             (style == "detached").astype(np.float64),
             ((style == "other") | (style == "unknown")).astype(np.float64),
+            # new build with thin new-construction evidence nearby
+            ((new_build > 0) & (newbuild_n < 3)).astype(np.float64),
         ]
     )
 

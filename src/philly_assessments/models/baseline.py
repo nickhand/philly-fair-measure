@@ -78,6 +78,13 @@ NUMERIC_FEATURES: Final = (
     "mkt_knn_log_ppsf",
     "mkt_knn_n",
     "mkt_knn_mean_dist_m",
+    # new-construction comp surface: what then-new homes sold for nearby —
+    # the pool a brand-new build actually belongs to (features/spatial.py)
+    "char_new_build",
+    "mkt_newbuild_knn_log_ppsf",
+    "mkt_newbuild_knn_n",
+    "mkt_newbuild_knn_mean_dist_m",
+    "mkt_newbuild_premium",
     "mkt_area_level_log_ppsf",
     "mkt_parcel_n_prior_sales",
     "mkt_parcel_days_since_prev",

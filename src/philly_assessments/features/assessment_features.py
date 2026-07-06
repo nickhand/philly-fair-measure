@@ -48,7 +48,11 @@ from philly_assessments.features.sale_features import (
     join_proximity,
     style_expr,
 )
-from philly_assessments.features.spatial import knn_ppsf_at_date
+from philly_assessments.features.spatial import (
+    NEW_BUILD_LAG_YEARS,
+    NEWBUILD_KNN_K,
+    knn_ppsf_at_date,
+)
 from philly_assessments.models.baseline import RESIDENTIAL_CATEGORIES
 
 
@@ -130,6 +134,7 @@ def assemble_assessment_features(
         "loc_block_id",
         "loc_district",
         pl.col("total_livable_area").alias("livable_area"),
+        pl.col("year_built_parsed").alias("year_built"),
         "lon",
         "lat",
         "lonlat_status",
@@ -204,7 +209,9 @@ def assemble_assessment_features(
         .drop("last_sale_date")
     )
 
-    # kNN surface from the trailing window (own parcel excluded inside)
+    # kNN surfaces from the trailing window (own parcel excluded inside):
+    # the general surface plus the new-construction surface, whose evidence
+    # is restricted to sales of then-new homes (features/spatial.py)
     knn_points = (
         pool.filter(
             (pl.col("lonlat_status") == "ok") & pl.col("livable_area").is_between(lo_a, hi_a)
@@ -214,8 +221,12 @@ def assemble_assessment_features(
         .with_columns(
             (pl.col("ppsf").log() + pl.col("time_adj_log")).alias("adj_log_ppsf"),
             *project_xy(pl.col("lon"), pl.col("lat")),
+            (
+                pl.col("year_built").fill_null(0)
+                >= pl.col("sale_date").dt.year() - NEW_BUILD_LAG_YEARS
+            ).alias("_new_at_sale"),
         )
-        .select("parcel_id", "x_m", "y_m", "sale_date", "adj_log_ppsf")
+        .select("parcel_id", "x_m", "y_m", "sale_date", "adj_log_ppsf", "_new_at_sale")
     )
     knn_targets = (
         base.filter(pl.col("lonlat_status") == "ok")
@@ -223,7 +234,18 @@ def assemble_assessment_features(
         .with_columns(*project_xy(pl.col("lon"), pl.col("lat")))
         .select("parcel_id", "x_m", "y_m")
     )
-    knn = knn_ppsf_at_date(knn_points, knn_targets, valuation_date)
+    knn = knn_ppsf_at_date(knn_points, knn_targets, valuation_date).join(
+        knn_ppsf_at_date(
+            knn_points,
+            knn_targets,
+            valuation_date,
+            k=NEWBUILD_KNN_K,
+            prefix="mkt_newbuild_knn",
+            tree_col="_new_at_sale",
+        ),
+        on="parcel_id",
+        how="left",
+    )
 
     permit_events = (
         permits.filter(
@@ -400,7 +422,11 @@ def assemble_assessment_features(
             era_expr(),
             pl.col("mkt_block_roll_n").fill_null(0),
             pl.col("mkt_knn_n").fill_null(0),
+            pl.col("mkt_newbuild_knn_n").fill_null(0),
             pl.col("mkt_parcel_n_prior_sales").fill_null(0),
+            (pl.col("char_year_built").fill_null(0) >= valuation_date.year - NEW_BUILD_LAG_YEARS)
+            .cast(pl.Float64)
+            .alias("char_new_build"),
             pl.col("evt_n_permits_5y_before").fill_null(0),
             pl.col("evt_n_violations_5y_before").fill_null(0),
             pl.col("evt_n_open_violations_at_sale").fill_null(0),
@@ -415,6 +441,13 @@ def assemble_assessment_features(
             pl.lit((valuation_date.month - 1) // 3 + 1).alias("time_quarter"),
             pl.lit(valuation_date.month).alias("time_month"),
             pl.lit(valuation_date.isoweekday()).alias("time_weekday"),
+        )
+        .with_columns(
+            # new-construction premium (see features/sale_features.py)
+            (
+                pl.col("char_new_build")
+                * (pl.col("mkt_newbuild_knn_log_ppsf") - pl.col("mkt_knn_log_ppsf")).fill_null(0.0)
+            ).alias("mkt_newbuild_premium"),
         )
         .drop("house_number_parsed", strict=False)
     )

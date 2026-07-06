@@ -13,7 +13,7 @@ compared against its current OPA market value:
                               construction still being written up) — the
                               model cannot price it, so no verdict
 
-Newly built homes (year built within a year of the valuation date) never
+Newly built homes (year built within two years of the valuation date) never
 flag "over": comp evidence reflects the older stock they replaced and runs
 low, so an over call is not defensible; they land in the attention tier
 instead, and the report carries a new-construction caveat (`new_build`).
@@ -140,9 +140,11 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     # here — it demotes to within-range, where the attention tier picks it
     # up as "worth a look"; the report carries a plain-language caveat.
     # Under-flags stay: a new build the city still prices as the old parcel
-    # is a genuine lead.
+    # is a genuine lead. Two-year window: OPA's recorded year wobbles within
+    # a single development (202 vs 204/206 Kalos St differ by a year on
+    # identical rows), and an unsold two-year-old build is still comp-less.
     new_build = (
-        (pl.col("char_year_built").fill_null(0) >= pl.col("valuation_date").dt.year() - 1)
+        (pl.col("char_year_built").fill_null(0) >= pl.col("valuation_date").dt.year() - 2)
         if {"char_year_built", "valuation_date"}.issubset(df.columns)
         else pl.lit(False)
     )
@@ -331,6 +333,10 @@ def build_assessment_screen(
         optional["appeals"],
         optional["mortgages"],
     )
+    # pin row order: interval draws are seeded by row position, and polars
+    # joins are not order-stable across runs — without this, borderline
+    # parcels flip flags between otherwise-identical builds
+    features = features.sort("parcel_id")
     logger.info("scoring %s residential properties", f"{features.height:,}")
     # persist the full feature frame: the comps CLI prices arbitrary parcels
     # from it without re-running feature assembly (models/comps.py)
@@ -503,6 +509,8 @@ def _condo_screen_frame(
         pl.read_parquet(paths["price_index"]),
         pl.scan_parquet(proximity_path) if proximity_path.exists() else None,
     )
+    # pin row order for reproducible interval draws (see the residential arm)
+    features = features.sort("parcel_id")
     logger.info("scoring %s residential condo units", f"{features.height:,}")
     features_path, _ = write_derived_table(
         features,

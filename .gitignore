@@ -1,5 +1,6 @@
 # Data is never committed; raw snapshots and derived tables live locally (see AGENTS.md)
-data/
+# Root-anchored: web/src/data/ (the exported site stats the app imports) IS committed.
+/data/
 
 __pycache__/
 *.py[cod]

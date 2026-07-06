@@ -599,9 +599,16 @@ def _parcel_prior_sale_features(pool: pl.DataFrame) -> pl.DataFrame:
 
 
 def _knn_surface(pool: pl.DataFrame) -> pl.DataFrame:
-    """As-of kNN $/sqft surface for every pooled sale (see features/spatial.py)."""
+    """As-of kNN $/sqft surfaces for every pooled sale (see features/spatial.py):
+    the general surface over all arms-length sales, plus a new-construction
+    surface whose evidence is restricted to sales of then-new homes — the
+    comp pool a brand-new build actually belongs to."""
     from philly_assessments.features.market_areas import project_xy
-    from philly_assessments.features.spatial import knn_ppsf_for_sales
+    from philly_assessments.features.spatial import (
+        NEW_BUILD_LAG_YEARS,
+        NEWBUILD_KNN_K,
+        knn_ppsf_for_sales,
+    )
 
     lo, hi = PPSF_AREA_BOUNDS
     points = (
@@ -611,8 +618,12 @@ def _knn_surface(pool: pl.DataFrame) -> pl.DataFrame:
         .with_columns(
             (pl.col("ppsf").log() + pl.col("time_adj_log")).alias("adj_log_ppsf"),
             *project_xy(pl.col("lon"), pl.col("lat")),
+            (
+                pl.col("year_built").fill_null(0)
+                >= pl.col("sale_date").dt.year() - NEW_BUILD_LAG_YEARS
+            ).alias("_new_at_sale"),
         )
-        .select("sale_id", "parcel_id", "x_m", "y_m", "sale_date", "adj_log_ppsf")
+        .select("sale_id", "parcel_id", "x_m", "y_m", "sale_date", "adj_log_ppsf", "_new_at_sale")
     )
     if points.height == 0:
         return pl.DataFrame(
@@ -621,9 +632,18 @@ def _knn_surface(pool: pl.DataFrame) -> pl.DataFrame:
                 "mkt_knn_log_ppsf": pl.Float64,
                 "mkt_knn_n": pl.Int32,
                 "mkt_knn_mean_dist_m": pl.Float64,
+                "mkt_newbuild_knn_log_ppsf": pl.Float64,
+                "mkt_newbuild_knn_n": pl.Int32,
+                "mkt_newbuild_knn_mean_dist_m": pl.Float64,
             }
         )
-    return knn_ppsf_for_sales(points)
+    return knn_ppsf_for_sales(points).join(
+        knn_ppsf_for_sales(
+            points, k=NEWBUILD_KNN_K, prefix="mkt_newbuild_knn", tree_col="_new_at_sale"
+        ),
+        on="sale_id",
+        how="left",
+    )
 
 
 def assemble_sale_features(
@@ -706,6 +726,7 @@ def assemble_sale_features(
                 "street_code",
                 "house_number_parsed",
                 pl.col("total_livable_area").alias("livable_area"),
+                pl.col("year_built_parsed").alias("year_built"),
                 "lon",
                 "lat",
                 "lonlat_status",
@@ -895,7 +916,11 @@ def assemble_sale_features(
             pl.col("sale_date").dt.weekday().alias("time_weekday"),
             pl.col("mkt_block_roll_n").fill_null(0),
             pl.col("mkt_knn_n").fill_null(0),
+            pl.col("mkt_newbuild_knn_n").fill_null(0),
             pl.col("mkt_parcel_n_prior_sales").fill_null(0),
+            (pl.col("char_year_built").fill_null(0) >= pl.col("sale_year") - 1)
+            .cast(pl.Float64)
+            .alias("char_new_build"),
             pl.col("evt_n_permits_5y_before").fill_null(0),
             pl.col("evt_n_violations_5y_before").fill_null(0),
             pl.col("evt_n_open_violations_at_sale").fill_null(0),
@@ -912,7 +937,17 @@ def assemble_sale_features(
             )
             .alias("asmt_value_yoy_change"),
         )
-        .drop("asmt_year", "house_number_parsed", "livable_area", strict=False)
+        .with_columns(
+            # new-construction premium: how much new builds trade above the
+            # general surface locally, applied only to new builds (0 when no
+            # new-build evidence exists — the model reads evidence density
+            # from mkt_newbuild_knn_n / _mean_dist_m)
+            (
+                pl.col("char_new_build")
+                * (pl.col("mkt_newbuild_knn_log_ppsf") - pl.col("mkt_knn_log_ppsf")).fill_null(0.0)
+            ).alias("mkt_newbuild_premium"),
+        )
+        .drop("asmt_year", "house_number_parsed", "livable_area", "year_built", strict=False)
     )
     features = join_parcel_shapes(features, parcels)
     features = join_delinquencies(features, delinquencies)
