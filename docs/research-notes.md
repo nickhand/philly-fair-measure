@@ -107,7 +107,7 @@ q1 limit).
 you add to them.**
 - Multimodal survey ([arXiv:2503.22119](https://arxiv.org/abs/2503.22119)):
   XGBoost/LightGBM/RF dominate tabular appraisal; imagery/text are active
-  add-ons (later-stage for us per AGENTS.md).
+  add-ons (later-stage for this project).
 - Interpretable mass cadastral valuation
   ([arXiv:2506.15723](https://arxiv.org/abs/2506.15723)): interpretability as a
   first-class constraint in official valuation, echoing IAAO practice.

@@ -4,7 +4,8 @@ One row per validated arms-length sale (2016+ by default; the full arms-length
 pool back to the start of RTT records feeds the rolling windows). Built by
 `fair-measure build-features` from staged tables + the sale-validity mart.
 
-Temporal quality follows the AGENTS.md contract. Prefixes encode it:
+Every feature declares its temporal quality — whether its value was knowable
+as of the sale date — and the prefixes encode it:
 
 | Prefix | Temporal quality | Meaning |
 |---|---|---|
@@ -305,6 +306,7 @@ structure, and characteristics, not more geography.
 
 Informed by: `docs/ccao-lessons.md` (their production feature table, their
 negative results, the condo rolling-average design), live profiling recorded in
-`docs/source_inventory.md`, and AGENTS.md's temporal/missingness/interpretability
-constraints. Features earn their place empirically from here: cross-validation
-by geography and time (Milestone 6) prunes this list.
+`docs/source_inventory.md`, and the temporal/missingness/interpretability
+constraints stated above and in `docs/model.md`. Features earn their place
+empirically from here: cross-validation by geography and time (Milestone 6)
+prunes this list.

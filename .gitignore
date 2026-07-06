@@ -1,6 +1,9 @@
-# Data is never committed; raw snapshots and derived tables live locally (see AGENTS.md)
+# Data is never committed; raw snapshots and derived tables live locally.
 # Root-anchored: web/src/data/ (the exported site stats the app imports) IS committed.
 /data/
+
+# Local working brief for coding agents; not part of the public repo.
+/AGENTS.md
 # The deploy bundle is derived from /data by `just bundle-data`
 /deploy/
 
