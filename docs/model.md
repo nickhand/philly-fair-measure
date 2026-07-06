@@ -158,19 +158,23 @@ method's assumptions.
 
 ## 6. Results
 
-Out-of-time test set, n≈19.5k, run `20260705T015912Z-baseline`. Identical test
+Out-of-time test set, n≈19.5k, run `20260706T004017Z-baseline`. Identical test
 set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
 |---|---|---|---|---|---|---|---|
-| **LightGBM** | **0.335** | **25.4%** | 0.975 | **25.9** | **1.071** | **−0.060** | 0.933 |
+| **LightGBM** | **0.337** | **27.0%** | 1.036 | **25.8** | **1.071** | **−0.060** | 0.934 |
 | Ridge | 0.436 | 37.7% | 1.022 | 36.9 | 1.038 | −0.054 | 1.022 |
 | **OPA (incumbent)** | 0.449 | 34.0% | 0.983 | 34.5 | 1.190 | −0.234 | 0.787 |
 
-The model is **more accurate** (RMSE 0.335 vs 0.449), **more uniform**
-(COD 25.9 vs 34.5), and **markedly less regressive** (PRD 1.07 vs 1.19; PRB
-−0.06 vs −0.23) than OPA on the same homes. IAAO ratio statistics (COD, PRD,
-PRB, MKI) come from assesspy; definitions in [ccao-lessons.md](ccao-lessons.md).
+The model is **more accurate** (RMSE 0.337 vs 0.449), **more uniform**
+(COD 25.8 vs 34.5), and **markedly less regressive** (PRD 1.07 vs 1.19; PRB
+−0.06 vs −0.23) than OPA on the same homes. The raw-sample median ratio runs
+1.04 (the financed-calibrated booster sits above the cash-heavy raw test
+slice); on the IAAO financed/TASP basis the median is 1.002 with COD 19.9
+(see `philly export-web-stats` / the site's ratio card). IAAO ratio
+statistics (COD, PRD, PRB, MKI) come from assesspy; definitions in
+[ccao-lessons.md](ccao-lessons.md).
 
 Honest caveats:
 
