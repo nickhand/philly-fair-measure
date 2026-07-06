@@ -25,11 +25,11 @@ const runDate = new Date(`${stats.meta.generated_at}T00:00:00Z`).toLocaleDateStr
 
   <header class="border-b border-line bg-white">
     <nav
-      class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3"
+      class="mx-auto flex max-w-5xl items-center justify-between gap-1.5 px-4 py-3 sm:gap-4"
       aria-label="Main"
     >
-      <RouterLink to="/" class="flex items-center gap-2.5" aria-label="Fair Measure (beta) — home">
-        <svg width="26" height="17" viewBox="0 0 26 17" aria-hidden="true">
+      <RouterLink to="/" class="flex items-center gap-1.5 min-[480px]:gap-2.5" aria-label="Fair Measure (beta) — home">
+        <svg width="26" height="17" viewBox="0 0 26 17" aria-hidden="true" class="shrink-0">
           <rect x="1" y="6" width="24" height="7" rx="3.5" fill="#b9d2ee" />
           <rect x="11" y="2" width="3.5" height="15" rx="1.2" fill="#0f4d90" />
           <circle cx="21" cy="3" r="2.6" fill="#f3c613" />
@@ -39,38 +39,37 @@ const runDate = new Date(`${stats.meta.generated_at}T00:00:00Z`).toLocaleDateStr
           <span class="text-base font-extrabold tracking-tight text-ink">Fair Measure</span>
           <span class="mt-0.5 text-[9.5px] font-semibold uppercase tracking-[0.09em] text-muted">Philadelphia</span>
         </span>
-        <!-- quiet beta chip: remove when the model settles (footer line
-             explains what beta means; keep beta out of titles/OG). Hidden on
-             small phones with the wordmark — the chip's width re-wraps the
-             nav links the mark-only mode exists to fit. -->
+        <!-- quiet beta chip: rides the glyph so it shows even in the mark-only
+             mobile header (footer line explains what beta means; kept out of
+             titles/OG). Remove when the model settles. -->
         <span
           aria-hidden="true"
-          class="hidden rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-brand-600 min-[480px]:inline-block"
+          class="shrink-0 rounded-full bg-brand-50 px-1 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-brand-600 min-[480px]:px-1.5"
           >Beta</span
         >
       </RouterLink>
       <div class="flex items-center gap-0.5 text-body-sm font-semibold sm:gap-1.5">
         <RouterLink
           to="/map"
-          class="rounded-sm px-2 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
+          class="rounded-sm px-1 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
           active-class="bg-brand-50 text-brand-600"
           >Map</RouterLink
         >
         <RouterLink
           to="/findings"
-          class="rounded-sm px-2 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
+          class="rounded-sm px-1 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
           active-class="bg-brand-50 text-brand-600"
           >Findings</RouterLink
         >
         <RouterLink
           to="/methodology"
-          class="rounded-sm px-2 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
+          class="rounded-sm px-1 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
           active-class="bg-brand-50 text-brand-600"
           >Methods</RouterLink
         >
         <RouterLink
           to="/trust"
-          class="rounded-sm px-2 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
+          class="rounded-sm px-1 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
           active-class="bg-brand-50 text-brand-600"
           >The Proof</RouterLink
         >
