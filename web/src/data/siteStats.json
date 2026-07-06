@@ -2,8 +2,10 @@
   "meta": {
     "generated_at": "2026-07-06",
     "model_run_id": "20260706T004017Z-baseline",
+    "interval_run_id": "20260706T004644Z-bayesian",
     "n_test": 19484,
-    "interval_nominal_pct": 90
+    "interval_nominal_pct": 90,
+    "interval_coverage_pct": 90
   },
   "full_card": {
     "opa": {

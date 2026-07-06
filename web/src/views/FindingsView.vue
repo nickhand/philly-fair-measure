@@ -20,6 +20,13 @@ const redis = stats.redistribution
 /** Full years only for the chart (the partial current year would mislead). */
 const shifted = redis.years.filter((y) => !y.partial).map((y) => ({ year: y.year, m: y.millions }))
 const SHIFT_MAX = Math.max(...shifted.map((s) => Math.abs(s.m)), 1) * 1.1
+/** Worst full year, for the copy — derived, never hand-entered. */
+const worstYearM = Math.max(...shifted.map((s) => s.m), 0)
+/** Screen-reader description of the bar chart, built from the same data. */
+const shiftAria =
+  'Tax burden shifted from lower to higher value homes, by year, in millions: ' +
+  shifted.map((s) => `${s.m < 0 ? 'minus ' : ''}${Math.abs(s.m)} in ${s.year}`).join(', ') +
+  '.'
 
 const cash = stats.cash
 const cashAllOf10 = Math.round(cash.share_all_pct / 10)
@@ -108,12 +115,12 @@ function colH(m: number): number {
         Comparing each year’s roll to a fair one, lower-value homes over-paid about
         <strong>${{ redis.total_financed_musd }} million</strong> from
         {{ redis.year_span.replace('–', ' to ') }} (about ${{ redis.per_resident_usd }} per
-        Philadelphian) — roughly <strong>$300–350 a year per lower-value home</strong> in the
-        worst years. On a stricter all-sales benchmark the total is closer to
+        Philadelphian) — <strong>${{ worstYearM }} million in the worst single year</strong>. On
+        a stricter all-sales benchmark the total is closer to
         <strong>${{ redis.total_raw_musd }} million</strong>.
       </p>
 
-      <div class="mt-4" role="img" aria-label="Tax burden shifted from lower to higher value homes, by year, in millions: 55 in 2016, 59 in 2017, 57 in 2018, 30 in 2019, 15 in 2020, 1 in 2021, minus 2 in 2022, 38 in 2023, 38 in 2024, 64 in 2025.">
+      <div class="mt-4" role="img" :aria-label="shiftAria">
         <div class="flex h-28 gap-1" aria-hidden="true">
           <div v-for="s in shifted" :key="s.year" class="flex h-full flex-1 flex-col items-center justify-end">
             <span v-if="Math.abs(s.m) >= 30" class="money text-caption font-bold text-ink">{{ s.m }}</span>

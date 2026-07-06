@@ -153,12 +153,25 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
         ),
     }
 
+    # measured interval coverage from the latest bayesian run — the "sales
+    # landing inside our stated range" row on the methods page must be a
+    # measurement, not a promise
+    bayes_dir = latest_run_dir("bayesian", root)
+    bayes_overall = (
+        pl.read_parquet(bayes_dir / "evaluation.parquet")
+        .filter(pl.col("segment_type") == "overall")
+        .to_dicts()[0]
+    )
+    coverage_pct = round(float(bayes_overall["coverage_90"]) * 100)
+
     stats: dict[str, Any] = {
         "meta": {
             "generated_at": datetime.now(UTC).strftime("%Y-%m-%d"),
             "model_run_id": run_id,
+            "interval_run_id": bayes_dir.name.removeprefix("run_id="),
             "n_test": int(ok.sum()),
             "interval_nominal_pct": 90,
+            "interval_coverage_pct": coverage_pct,
         },
         "full_card": full_card,
         "iaao_card": iaao_card,
