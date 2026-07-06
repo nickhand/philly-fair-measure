@@ -77,19 +77,21 @@ def test_condo_family_spec_encoder_and_sigma():
             "mkt_knn_log_ppsf": [5.8, 6.0, None],
             "mkt_area_level_log_ppsf": [0.2, -0.1, 0.0],
             "mkt_knn_mean_dist_m": [60.0, 200.0, None],
+            "mkt_parcel_prev_log_price_ref": [11.8, None, 12.2],
             "char_exterior_condition": ["4", None, "3"],
             "char_interior_condition": ["4", "3", None],
         }
     )
     encoder = CovariateEncoder.fit(df, CONDO_SPEC)
     assert encoder.family == "condo"
-    # one trailing missing indicator: the building roll (no prev-price analog)
-    assert encoder.feature_names[-1] == "bldg_roll_missing"
+    # trailing missing indicators: building roll, then the prior-sale carry-forward
+    assert encoder.feature_names[-2:] == ["bldg_roll_missing", "prev_price_missing"]
     assert "log_unit_area" in encoder.feature_names
     x = encoder.transform(df)
     assert x.shape == (3, len(encoder.feature_names))
     assert np.isfinite(x).all()
     assert x[:, encoder.feature_names.index("bldg_roll_missing")].tolist() == [0.0, 1.0, 0.0]
+    assert x[:, encoder.feature_names.index("prev_price_missing")].tolist() == [0.0, 1.0, 0.0]
     # condo sigma design: evidence terms only, no style dummies
     z = _sigma_design(df, "condo")
     assert z.shape == (3, len(CONDO_SPEC.sigma_terms))

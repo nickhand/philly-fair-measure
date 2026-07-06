@@ -290,7 +290,7 @@ function printPage() {
         <!-- drivers -->
         <SectionCard
           title="What shapes our estimate"
-          subtitle="The biggest things pushing this home’s estimated value up or down, compared with a typical Philadelphia home."
+          :subtitle="`The biggest things pushing this home’s estimated value up or down, compared with a typical Philadelphia ${core.model_family === 'condo' ? 'condo' : 'home'}.`"
         >
           <SkeletonBlock v-if="reportLoading" />
           <template v-else-if="report?.drivers && core.flag !== 'insufficient_record'">

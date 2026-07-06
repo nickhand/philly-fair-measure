@@ -53,6 +53,12 @@ CONDO_NUMERIC = [
     "mkt_knn_log_ppsf",
     "mkt_knn_n",
     "mkt_knn_mean_dist_m",
+    # repeat-sales carry-forward, as in the residential model: a unit's own
+    # prior sale beats building averages that mix very different unit tiers
+    "mkt_parcel_n_prior_sales",
+    "mkt_parcel_days_since_prev",
+    "mkt_parcel_prev_price",
+    "mkt_parcel_prev_log_price_ref",
     "mkt_area_level_log_ppsf",
     "prox_dist_rapid_transit_m",
     "prox_dist_regional_rail_m",

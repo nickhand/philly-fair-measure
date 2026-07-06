@@ -294,6 +294,13 @@ def assemble_condo_features(
 
     rolling = _building_rolling(pool)
 
+    # repeat-sales carry-forward, exactly as in the residential mart: a unit's
+    # own prior sale is the single most informative datum a tower unit has
+    # (building rolls average across very different unit tiers)
+    from philly_assessments.features.sale_features import _parcel_prior_sale_features
+
+    prior = _parcel_prior_sale_features(pool)
+
     # condo-kNN fallback surface: the Philly condo market is thin (12.6k sales
     # across 7.6k buildings), so most units lack recent building history; the
     # nearest prior CONDO sales give every unit a neighborhood condo price level
@@ -347,6 +354,7 @@ def assemble_condo_features(
     features = (
         base.join(rolling, on="sale_id", how="left")
         .join(knn, on="sale_id", how="left")
+        .join(prior, on="sale_id", how="left")
         .rename(
             {
                 "unit_area": "char_unit_area",
@@ -359,6 +367,7 @@ def assemble_condo_features(
             era_expr(),
             pl.col("mkt_bldg_roll_n").fill_null(0),
             pl.col("mkt_knn_n").fill_null(0),
+            pl.col("mkt_parcel_n_prior_sales").fill_null(0),
             pl.col("sale_date").dt.quarter().alias("time_quarter"),
             pl.col("sale_date").dt.month().alias("time_month"),
         )
@@ -481,6 +490,27 @@ def assemble_condo_assessment_features(
         pl.len().alias("own_n"),
     )
 
+    # repeat-sales carry-forward at the valuation date (pool is already
+    # restricted to sales <= valuation_date, so this is leakage-safe)
+    prior_sales = (
+        pool.sort("parcel_id", "sale_date")
+        .group_by("parcel_id")
+        .agg(
+            pl.len().alias("mkt_parcel_n_prior_sales"),
+            pl.col("sale_date").last().alias("last_sale_date"),
+            pl.col("sale_price").last().alias("mkt_parcel_prev_price"),
+            (pl.col("sale_price").log() + pl.col("time_adj_log"))
+            .last()
+            .alias("mkt_parcel_prev_log_price_ref"),
+        )
+        .with_columns(
+            (pl.lit(valuation_date) - pl.col("last_sale_date"))
+            .dt.total_days()
+            .alias("mkt_parcel_days_since_prev")
+        )
+        .drop("last_sale_date")
+    )
+
     knn_points = (
         pool.filter(pl.col("lonlat_status") == "ok")
         .with_columns((pl.col("sale_price") / pl.col("unit_area")).alias("ppsf"))
@@ -544,6 +574,7 @@ def assemble_condo_assessment_features(
             "own_n",
         )
         .join(knn, on="parcel_id", how="left")
+        .join(prior_sales, on="parcel_id", how="left")
         .rename(
             {
                 "unit_area": "char_unit_area",
@@ -556,6 +587,7 @@ def assemble_condo_assessment_features(
             era_expr(),
             pl.col("mkt_bldg_roll_n").fill_null(0),
             pl.col("mkt_knn_n").fill_null(0),
+            pl.col("mkt_parcel_n_prior_sales").fill_null(0),
             pl.lit((valuation_date.month - 1) // 3 + 1).alias("time_quarter"),
             pl.lit(valuation_date.month).alias("time_month"),
         )

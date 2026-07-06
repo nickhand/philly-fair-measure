@@ -156,9 +156,15 @@ CONDO_SPEC = FamilySpec(
         "mkt_knn_log_ppsf",
         "mkt_area_level_log_ppsf",
         "mkt_knn_mean_dist_m",
+        # repeat-sales carry-forward (see the residential spec) — for tower
+        # units the own prior sale is the strongest single datum
+        "mkt_parcel_prev_log_price_ref",
     ],
     ordinals=["char_exterior_condition", "char_interior_condition"],
-    missing=[("mkt_bldg_roll_mean_price", "bldg_roll_missing")],
+    missing=[
+        ("mkt_bldg_roll_mean_price", "bldg_roll_missing"),
+        ("mkt_parcel_prev_log_price_ref", "prev_price_missing"),
+    ],
     # no style dummies (condo units have no char_style); evidence terms only —
     # the district random effect still carries geography-conditional width
     sigma_terms=["bldg_roll_missing", "knn_dist"],
