@@ -49,6 +49,31 @@ def _num(value: object) -> float | None:
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
+def peer_predicate(
+    family: str,
+    parcel_id: object,
+    zip5: object,
+    building: object,
+) -> pl.Expr:
+    """The base "similar homes" filter, shared by the equity statistics and the
+    report histogram so the two views can never drift apart (they did once:
+    the histogram kept a condo tower as its own peer group after the stats
+    stopped doing that). Same family, same ZIP when known, never the subject
+    itself, and — for condos — never the subject's own building."""
+    expr = (
+        (pl.col("model_family") == family)
+        & (pl.col("parcel_id") != parcel_id)
+        & (pl.col("opa_market_value") > 0)
+        & (pl.col("model_median") > 0)
+        & pl.col("opa_vs_model_ratio").is_not_null()
+    )
+    if zip5 is not None:
+        expr &= pl.col("loc_zip5") == zip5
+    if family == "condo" and building is not None:
+        expr &= pl.col("building_id").is_null() | (pl.col("building_id") != building)
+    return expr
+
+
 def equity_context(
     screen_row: dict[str, object], data_dir: Path | None = None, *, min_peers: int = _MIN_PEERS
 ) -> EquityContext | None:
@@ -62,23 +87,12 @@ def equity_context(
     root = data_dir if data_dir is not None else config.data_dir()
     parcel_id = screen_row.get("parcel_id")
     zip5 = screen_row.get("loc_zip5")
-    # peers come from the subject's own family: houses vs houses, condos vs condos
+    # peers come from the subject's own family: houses vs houses, condos vs
+    # condos — and, for condos, only OTHER buildings (see peer_predicate)
     family = str(screen_row.get("model_family") or "residential")
     res = pl.scan_parquet(root / "marts" / "assessment_screen.parquet").filter(
-        (pl.col("model_family") == family)
-        & (pl.col("opa_market_value") > 0)
-        & (pl.col("model_median") > 0)
-        & (pl.col("opa_vs_model_ratio").is_not_null())
-        & (pl.col("parcel_id") != parcel_id)
+        peer_predicate(family, parcel_id, zip5, screen_row.get("building_id"))
     )
-    if zip5 is not None:
-        res = res.filter(pl.col("loc_zip5") == zip5)
-    # a condo's peers are OTHER buildings: a 335-unit tower would otherwise
-    # dominate its own benchmark and "equal treatment" would read as a
-    # comparison of the building with itself
-    building = screen_row.get("building_id")
-    if family == "condo" and building is not None:
-        res = res.filter(pl.col("building_id").is_null() | (pl.col("building_id") != building))
     lo, hi = model / _VALUE_BAND, model * _VALUE_BAND
 
     band = (

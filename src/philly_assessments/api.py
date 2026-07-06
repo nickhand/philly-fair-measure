@@ -18,6 +18,7 @@ history) to `web/`. Design notes:
 from __future__ import annotations
 
 import logging
+import math
 from pathlib import Path
 from typing import Any
 
@@ -272,26 +273,23 @@ def _core(s: dict[str, Any]) -> PropertyCore:
 
 
 def _peer_histogram(frame: pl.DataFrame, s: dict[str, Any]) -> list[HistBin]:
-    """Ratio distribution of same-ZIP, similar-value homes (equity peer rule).
-    Peers come from the subject's own family — houses vs houses, condos vs
-    condos — so condo-heavy ZIPs don't distort rowhome histograms."""
+    """Ratio distribution of the SAME peer set the equity statistics use
+    (equity_context.peer_predicate — family, ZIP, never the subject or, for
+    condos, its own building), so the chart and the sentence below it can
+    never describe different populations."""
+    from philly_assessments.equity_context import peer_predicate
+
     zip5, median = s.get("loc_zip5"), _f(s.get("model_median"))
     if not zip5 or not median:
         return []
-    family = s.get("model_family") or "residential"
-    frame = frame.filter(pl.col("model_family") == family)
+    family = str(s.get("model_family") or "residential")
+    frame = frame.filter(peer_predicate(family, s.get("parcel_id"), zip5, s.get("building_id")))
     peers = frame.filter(
-        (pl.col("loc_zip5") == zip5)
-        & (pl.col("opa_market_value") > _MIN_VALUE)
-        & (pl.col("model_median") > _MIN_VALUE)
-        & pl.col("opa_vs_model_ratio").is_between(_HIST_LO, _HIST_HI)
+        pl.col("opa_vs_model_ratio").is_between(_HIST_LO, _HIST_HI)
         & pl.col("model_median").is_between(median / _VALUE_BAND, median * _VALUE_BAND)
     )
     if peers.height < 10:
-        peers = frame.filter(
-            (pl.col("loc_zip5") == zip5)
-            & pl.col("opa_vs_model_ratio").is_between(_HIST_LO, _HIST_HI)
-        )
+        peers = frame.filter(pl.col("opa_vs_model_ratio").is_between(_HIST_LO, _HIST_HI))
     if not peers.height:
         return []
     ratios = peers["opa_vs_model_ratio"].to_numpy()
@@ -373,6 +371,50 @@ def _equity(frame: pl.DataFrame, root: Path, s: dict[str, Any]) -> Equity | None
         verdict=ctx.verdict,
         histogram=_peer_histogram(frame, s),
     )
+
+
+def _condo_building_comps(
+    root: Path, frame: pl.DataFrame, s: dict[str, Any], k: int = 8
+) -> list[CompRow]:
+    """Recent arms-length sales in the subject's own building — the condo
+    equivalent of comps (same location and building; the size column lets the
+    reader scale between units). distance_m=0 renders as "same building"."""
+    building = s.get("building_id")
+    mart = root / "marts" / "condo_sale_features.parquet"
+    if building is None or not mart.exists():
+        return []
+    sales = (
+        pl.scan_parquet(mart)
+        .filter((pl.col("building_id") == building) & (pl.col("parcel_id") != s.get("parcel_id")))
+        .select("parcel_id", "sale_date", "sale_price", "char_unit_area", "time_adj_log")
+        .sort("sale_date", descending=True)
+        .head(k)
+        .collect()
+    )
+    if not sales.height:
+        return []
+    addresses = dict(
+        frame.filter(pl.col("parcel_id").is_in(sales["parcel_id"].to_list()))
+        .select("parcel_id", "address")
+        .iter_rows()
+    )
+    return [
+        CompRow(
+            address=str(addresses.get(str(r["parcel_id"]), r["parcel_id"])),
+            sale_date=str(r["sale_date"])[:10],
+            sale_price=_f(r["sale_price"]),
+            # sale-date dollars moved to the index reference (~today), the
+            # same convention as the residential comps' price_adj_today
+            price_adj_today=(
+                float(r["sale_price"]) * math.exp(float(r["time_adj_log"] or 0.0))
+                if r["sale_price"] is not None
+                else None
+            ),
+            livable_area=_f(r["char_unit_area"]),
+            distance_m=0.0,
+        )
+        for r in sales.to_dicts()
+    ]
 
 
 def _histories(root: Path, parcel_id: str) -> tuple[list[YearValue], list[SaleRow]]:
@@ -589,7 +631,11 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
     def property_comps(parcel_id: str) -> list[CompRow]:
         from philly_assessments.models.comps import find_comps
 
-        _row(frame, parcel_id)  # 404 before the slow path
+        row = _row(frame, parcel_id)  # 404 before the slow path
+        if row.get("model_family") == "condo":
+            # the leaf-comp machinery is residential-only; a condo's natural
+            # comps are recent arms-length sales in its own building
+            return _condo_building_comps(root, frame, row)
         try:
             comps = find_comps(parcel_id, root, k=8).comps
         except Exception as err:  # noqa: BLE001 — comps need model artifacts

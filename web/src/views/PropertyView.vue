@@ -453,7 +453,9 @@ function printPage() {
                   <td class="money py-2 pr-3 text-right whitespace-nowrap">
                     {{ c.livable_area ? `${num(c.livable_area)} sq ft` : '—' }}
                   </td>
-                  <td class="money py-2 text-right whitespace-nowrap">{{ distMiles(c.distance_m) }}</td>
+                  <td class="money py-2 text-right whitespace-nowrap">
+                    {{ c.distance_m === 0 ? 'Same building' : distMiles(c.distance_m) }}
+                  </td>
                 </tr>
               </tbody>
             </table>
