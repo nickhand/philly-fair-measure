@@ -464,8 +464,10 @@ def _histories(root: Path, parcel_id: str) -> tuple[list[YearValue], list[SaleRo
 def create_app(data_dir: Path | None = None) -> FastAPI:
     import os
 
+    from fastapi import Request, Response
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.middleware.gzip import GZipMiddleware
+    from fastapi.responses import JSONResponse
 
     root = data_dir if data_dir is not None else config.data_dir()
     frame, screen_built = _load_frame(root)
@@ -473,6 +475,19 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
     # the citywide overview payload is ~51k GeoJSON points (~6 MB raw, ~10x
     # smaller gzipped); everything else compresses as a free bonus
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+    # Unhandled exceptions must become a response HERE, inside CORSMiddleware
+    # (added below, so it wraps this) — a 500 escaping to the outer stack
+    # carries no CORS headers, and the browser then reports an opaque
+    # "access control" failure instead of the real status.
+    @app.middleware("http")
+    async def json_500(request: Request, call_next: Any) -> Response:
+        try:
+            return await call_next(request)  # type: ignore[no-any-return]
+        except Exception:
+            logger.exception("unhandled error on %s", request.url.path)
+            return JSONResponse({"detail": "internal server error"}, status_code=500)
+
     # public read-only data service: the site is served from another origin
     # (Netlify / nickhand.dev) and calls the Fly API directly. GET-only, no
     # credentials, so a permissive default is appropriate; override with a

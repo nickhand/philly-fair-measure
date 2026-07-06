@@ -77,11 +77,16 @@ export-stats:
 bundle-data:
 	uv run python scripts/bundle_deploy_data.py
 
-# Boot the API against the deploy bundle and exercise every endpoint —
-# run this before deploying; it catches anything the bundle is missing
+# Boot the API against the deploy bundle and exercise every endpoint, in a
+# venv holding ONLY the serve deps (mirrors the Docker image) — catches both
+# missing bundle files and training-only imports leaking into the serve path
 [group: "deploy-api"]
 api-smoke:
-	uv run python scripts/smoke_api.py
+	rm -rf .venv-serve
+	uv venv .venv-serve
+	uv pip install --python .venv-serve/bin/python -r requirements.serve.txt httpx
+	uv pip install --python .venv-serve/bin/python --no-deps .
+	.venv-serve/bin/python scripts/smoke_api.py
 
 # Ship the API: bundle, smoke-test, then deploy to Fly.io
 [group: "deploy-api"]

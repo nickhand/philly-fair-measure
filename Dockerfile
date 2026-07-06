@@ -16,10 +16,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-# serve-time dependencies only (see src/philly_fair_measure/api.py imports)
-RUN uv pip install --system --no-cache \
-    "fastapi>=0.115" "uvicorn[standard]>=0.30" "polars>=1.0" \
-    "numpy>=2.0" "lightgbm>=4.0" "pydantic>=2.7"
+# serve-time dependencies only — the same pinned list `just api-smoke` tests
+# against, so the smoke gate proves the image's import surface
+COPY requirements.serve.txt ./
+RUN uv pip install --system --no-cache -r requirements.serve.txt
 
 COPY pyproject.toml README.md ./
 COPY src ./src

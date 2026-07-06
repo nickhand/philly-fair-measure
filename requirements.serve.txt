@@ -1,0 +1,11 @@
+# Serve-time dependencies — the ONLY third-party packages the API may import.
+# Shared by the Docker image (Dockerfile) and the isolated smoke venv
+# (`just api-smoke`), so a training-only import leaking into the serve path
+# fails the smoke gate instead of production. Training deps live in
+# pyproject.toml and stay out of here.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+polars>=1.0
+numpy>=2.0
+lightgbm>=4.0
+pydantic>=2.7

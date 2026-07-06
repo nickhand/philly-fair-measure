@@ -7,6 +7,8 @@
 __pycache__/
 *.py[cod]
 .venv/
+# serve-deps-only venv built by `just api-smoke`
+.venv-serve/
 .pytest_cache/
 .ruff_cache/
 dist/

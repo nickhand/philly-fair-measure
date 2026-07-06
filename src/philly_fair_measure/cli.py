@@ -113,7 +113,7 @@ def _cmd_train_condo(args: argparse.Namespace) -> int:
 
 
 def _cmd_train_baseline(args: argparse.Namespace) -> int:
-    from philly_fair_measure.models import train_baseline
+    from philly_fair_measure.models.baseline import train_baseline
 
     result = train_baseline(args.data_dir, test_fraction=args.test_fraction, market=args.market)
     print(f"run {result.run_id} -> {result.run_dir}\n")

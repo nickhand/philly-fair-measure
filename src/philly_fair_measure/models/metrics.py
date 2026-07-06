@@ -21,7 +21,6 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import Any
 
-import assesspy
 import numpy as np
 import numpy.typing as npt
 
@@ -85,6 +84,10 @@ def fit_metrics(estimate: npt.ArrayLike, sale_price: npt.ArrayLike) -> FitMetric
 
 
 def ratio_metrics(estimate: npt.ArrayLike, sale_price: npt.ArrayLike) -> RatioMetrics:
+    # deferred: assesspy is a training-only dependency, absent from the serve
+    # image (requirements.serve.txt) whose API imports this module transitively
+    import assesspy
+
     est, sale = _clean(estimate, sale_price)
     if len(est) < 3:
         return RatioMetrics(median_ratio=None, cod=None, prd=None, prb=None, mki=None)
