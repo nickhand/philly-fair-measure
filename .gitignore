@@ -1,11 +1,14 @@
 # Data is never committed; raw snapshots and derived tables live locally.
 # Root-anchored: web/src/data/ (the exported site stats the app imports) IS committed.
 /data/
-
-# Local working brief for coding agents; not part of the public repo.
-/AGENTS.md
 # The deploy bundle is derived from /data by `just bundle-data`
 /deploy/
+
+# Local working material, kept out of the public repo.
+# /AGENTS.md is the coding-agent working brief; /design/ is the design
+# handoff package (mockups, style references).
+/AGENTS.md
+/design/
 
 __pycache__/
 *.py[cod]
