@@ -204,6 +204,29 @@ def _cmd_screen_assessments(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_sync_docs(args: argparse.Namespace) -> int:
+    from philly_fair_measure.docs_sync import sync_docs
+
+    result = sync_docs(check=args.check)
+    for name in result.unknown:
+        print(f"WARNING: no builder registered for marker {name}")
+    if args.check:
+        if result.changed:
+            print("docs out of sync with web/src/data/siteStats.json:")
+            for name in result.changed:
+                print(f"  {name}")
+            print("run `fair-measure sync-docs` and commit the result")
+            return 1
+        print("docs in sync with siteStats.json")
+        return 0
+    if result.changed:
+        for name in result.changed:
+            print(f"rewrote {name}")
+    else:
+        print("docs already in sync")
+    return 0
+
+
 def _cmd_screen_audit(args: argparse.Namespace) -> int:
     from philly_fair_measure.validation.screen_audit import run_screen_audit
 
@@ -977,6 +1000,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     screen.add_argument("--data-dir", type=Path)
     screen.set_defaults(func=_cmd_screen_assessments)
+
+    sync = subparsers.add_parser(
+        "sync-docs",
+        help="rewrite the generated number blocks in README.md/docs/model.md "
+        "from the committed web/src/data/siteStats.json (--check: exit 1 on "
+        "drift instead of rewriting — run by `just gates` and CI)",
+    )
+    sync.add_argument("--check", action="store_true")
+    sync.set_defaults(func=_cmd_sync_docs)
 
     audit = subparsers.add_parser(
         "screen-audit",

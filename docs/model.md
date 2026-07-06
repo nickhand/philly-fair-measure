@@ -181,14 +181,16 @@ a cross-check, and the bake-off was residential-only).
 
 ## 6. Results
 
-Out-of-time test set, n≈19.5k, run `20260706T202658Z-baseline`. Identical test
+<!-- generated:model-results-table:begin -->
+Out-of-time test set, n≈19.5k, run `20260706T222312Z-baseline`. Identical test
 set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
-|---|---|---|---|---|---|---|---|
-| **LightGBM** | **0.333** | **26.4%** | 1.031 | **25.5** | **1.087** | **−0.073** | 0.905 |
-| Ridge | 0.427 | 37.4% | 1.045 | 35.5 | 1.061 | −0.080 | 0.981 |
-| **OPA (incumbent)** | 0.449 | 34.0% | 0.983 | 34.5 | 1.190 | −0.234 | 0.787 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **LightGBM** | **0.333** | **26.4%** | 1.031 | **25.5** | **1.087** | **-0.073** | 0.905 |
+| Ridge | 0.427 | 37.4% | 1.045 | 35.5 | 1.061 | -0.080 | 0.981 |
+| **OPA (incumbent)** | **0.449** | **34.0%** | 0.983 | **34.5** | **1.190** | **-0.234** | 0.787 |
+<!-- generated:model-results-table:end -->
 
 The model is **more accurate** (RMSE 0.337 vs 0.449), **more uniform**
 (COD 25.8 vs 34.5), and **markedly less regressive** (PRD 1.07 vs 1.19; PRB
@@ -263,12 +265,15 @@ Guards keep the flags honest where the record, not the value, is the problem:
   flagged, so the strong flags stay reserved for cases outside the model's
   stated uncertainty.
 
+<!-- generated:model-screen-counts:begin -->
 As of run `20260706T222312Z` (Tax Year 2027 roll): 496,975 properties
-screened — 1,643 over-assessed candidates, 6,253 under-assessed candidates,
-44,408 in the attention tier, 93 insufficient records. (The constant-quality
-index cut under-assessed candidates nearly in half: the retired mix index
-inflated estimates in gentrifying districts, manufacturing spurious
-under-flags.) A coherence gate
+screened — 1,643 over-assessed candidates, 6,253 under-assessed
+candidates, 44,408 in the attention tier, 93 insufficient
+records.
+<!-- generated:model-screen-counts:end -->
+(The constant-quality index of 2026-07-06 cut under-assessed candidates
+nearly in half: the retired mix index inflated estimates in gentrifying
+districts, manufacturing spurious under-flags.) A coherence gate
 refuses to screen against feature marts and model runs from different
 generations (`StaleRunError`) rather than silently mixing them, and every
 build must pass the structural invariants in `validation/screen_audit.py`

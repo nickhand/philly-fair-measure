@@ -11,14 +11,17 @@ comparisons — is published in a per-property report.
 **Live site:** [nickhand.dev/fair-measure](https://nickhand.dev/fair-measure/)
 · **Model documentation:** [docs/model.md](docs/model.md)
 
-As of the July 2026 run (Tax Year 2027 assessments), the screen covers
-**496,975** residential properties and condos: **1,643** flagged as likely
-over-assessed, **6,253** as likely under-assessed, and **44,408** inside the
-interval but near its edge ("worth a look"). A residential flag requires two
-independent uncertainty methods — the Bayesian posterior interval and a
-spatially weighted conformalized-quantile-regression band — to both place the
-city's value outside on the same side. 93 records with no recorded livable
+<!-- generated:readme-screen-counts:begin -->
+As of the latest run (Tax Year 2027 assessments), the screen covers
+**496,975** residential properties and condos: **1,643** flagged
+as likely over-assessed, **6,253** as likely under-assessed, and
+**44,408** inside the interval but near its edge ("worth a look").
+A residential flag requires two independent uncertainty methods — the
+Bayesian posterior interval and a spatially weighted
+conformalized-quantile-regression band — to both place the city's value
+outside on the same side. 93 records with no recorded livable
 area are reported as insufficient rather than valued.
+<!-- generated:readme-screen-counts:end -->
 
 ## What it does
 
@@ -41,23 +44,25 @@ area are reported as insufficient rather than valued.
 
 ## Results
 
+<!-- generated:readme-results-tables:begin -->
 Out-of-time test set (n = 19,484), run `20260706T222312Z-baseline`. The same
 homes, the same treatment; OPA's assessed values are the incumbent benchmark.
 
 On the IAAO ratio-study basis (financed, arm's-length sales — the standard
 assessment offices are evaluated on):
 
-| | Median ratio | COD | PRD | PRB | MAPE |
-|---|---|---|---|---|---|
+|  | Median ratio | COD | PRD | PRB | MAPE |
+| --- | --- | --- | --- | --- | --- |
 | This model | 1.001 | 19.3 | 1.024 | +0.010 | 19.3% |
-| OPA | 0.848 | 24.7 | 1.070 | −0.058 | 24.9% |
+| OPA | 0.893 | 23.2 | 1.065 | -0.058 | 22.9% |
 
 On the full untrimmed sample, including cash and distressed sales:
 
-| | Median ratio | COD | PRD | PRB | MAPE |
-|---|---|---|---|---|---|
-| This model | 1.031 | 25.5 | 1.087 | −0.073 | 26.4% |
-| OPA | 0.983 | 34.5 | 1.190 | −0.234 | 34.0% |
+|  | Median ratio | COD | PRD | PRB | MAPE |
+| --- | --- | --- | --- | --- | --- |
+| This model | 1.031 | 25.5 | 1.087 | -0.073 | 26.4% |
+| OPA | 0.983 | 34.5 | 1.190 | -0.234 | 34.0% |
+<!-- generated:readme-results-tables:end -->
 
 IAAO targets for reference: median ratio 0.90–1.10, COD ≤ 15 (single-family),
 PRD 0.98–1.03, |PRB| ≤ 0.05. The model meets the median-ratio and PRD/PRB

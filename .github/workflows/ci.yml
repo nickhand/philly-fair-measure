@@ -26,6 +26,8 @@ jobs:
         run: uv run mypy src
       - name: Tests (offline)
         run: uv run pytest
+      - name: Docs in sync with published stats
+        run: uv run fair-measure sync-docs --check
 
   web:
     runs-on: ubuntu-latest

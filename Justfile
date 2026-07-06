@@ -33,6 +33,7 @@ gates:
 	uv run ruff format --check src tests
 	uv run ruff check src tests
 	uv run mypy src
+	uv run fair-measure sync-docs --check
 	uv run pytest -q
 	cd web && npm run test:unit -- --run
 	cd web && npm run build
@@ -68,6 +69,7 @@ rescreen:
 [group: "pipeline"]
 export-stats:
 	uv run fair-measure export-web-stats
+	uv run fair-measure sync-docs
 
 # ---------------------------------------------------------------- deploy: api (Fly.io)
 

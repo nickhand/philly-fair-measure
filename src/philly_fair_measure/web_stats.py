@@ -164,6 +164,45 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
     )
     coverage_pct = round(float(bayes_overall["coverage_90"]) * 100)
 
+    # screen counts + the full 3-model results rows: the single committed
+    # source `fair-measure sync-docs` renders README/model.md numbers from,
+    # so the docs can be CI-checked against this file without the data lake
+    from philly_fair_measure.validation.screen_audit import audit_screen
+    from philly_fair_measure.vocab import AssessmentFlag
+
+    screen_df = pl.read_parquet(root / "marts" / "assessment_screen.parquet")
+    audit = audit_screen(screen_df)
+    flags = audit["flags"]
+
+    def _flag_total(flag: str) -> int:
+        return sum(count for key, count in flags.items() if key.endswith(f"/{flag}"))
+
+    screen = {
+        "properties": audit["rows"],
+        "over": _flag_total(str(AssessmentFlag.OVER)),
+        "under": _flag_total(str(AssessmentFlag.UNDER)),
+        "watch": audit["watch"],
+        "insufficient": _flag_total(str(AssessmentFlag.INSUFFICIENT)),
+        "by_family_flag": flags,
+    }
+
+    evaluation = pl.read_parquet(run_dir / "evaluation.parquet")
+    overall = evaluation.filter(
+        (pl.col("segment_type") == "overall") & (pl.col("convention") == "out_of_time")
+    )
+    results_table = {
+        str(r["model"]): {
+            "rmse_log": round(float(r["rmse_log"]), 3),
+            "mape_pct": round(float(r["mape"]) * 100, 1),
+            "median_ratio": round(float(r["median_ratio"]), 3),
+            "cod": round(float(r["cod"]), 1),
+            "prd": round(float(r["prd"]), 3),
+            "prb": round(float(r["prb"]), 3),
+            "mki": round(float(r["mki"]), 3),
+        }
+        for r in overall.to_dicts()
+    }
+
     stats: dict[str, Any] = {
         "meta": {
             "generated_at": datetime.now(UTC).strftime("%Y-%m-%d"),
@@ -182,6 +221,8 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
             "discount_pct": discount_pct,
         },
         "redistribution": redistribution,
+        "screen": screen,
+        "results_table": results_table,
     }
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
