@@ -156,6 +156,22 @@ weighted variants. Where **both** the Bayesian posterior and the conformal band
 put OPA's value outside their 90% interval, the flag is robust to either
 method's assumptions.
 
+### 5.7 Conformalized quantile regression — the bake-off (built, not adopted)
+`fair-measure cqr-check` trains LightGBM quantile heads (q05/q95) on the fit
+slice, conformalizes their miss on the validation slice (globally and with
+the same spatially weighted kNN correction as 5.6), and compares every
+interval system on the untouched out-of-time test slice. Measured 2026-07-06
+(nominal 90%): cqr-knn covers 88.9% at median log-width **0.91** vs the
+fixed-offset conformal-knn's 89.4% at 0.97 (≈6% narrower bands) and the
+Bayesian posterior's 91.1% at 1.31; in the expensive quintiles cqr is much
+sharper (q4/q5 width 0.65 vs 0.74/0.75 conformal) at 89–92% coverage, and its
+by-district coverage floor is the best of the four (0.864 vs 0.856 conformal,
+0.770 raw Bayesian). **No method fixes the cheap-tail undercoverage** (q1:
+cqr 0.850, conformal 0.858, Bayesian 0.790 — vs 90 nominal); q1 misses are
+genuine outliers, not a width-model failure. Adopting cqr-knn as the band
+around the LightGBM point (display + second gate machine) is a live option;
+the screen currently keeps the 5.6 fixed-offset variant.
+
 ## 6. Results
 
 Out-of-time test set, n≈19.5k, run `20260706T004017Z-baseline`. Identical test

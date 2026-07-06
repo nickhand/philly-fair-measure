@@ -295,6 +295,42 @@ def _cmd_conformal_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_cqr_check(args: argparse.Namespace) -> int:
+    import polars as pl
+
+    from philly_fair_measure.models.cqr import cqr_check
+
+    result = cqr_check(args.data_dir, alpha=args.alpha, k=args.k)
+    print(f"CQR bake-off on {result.run_dir.name} (nominal {1 - args.alpha:.0%})\n")
+    methods = ["bayesian", "conformal_knn", "cqr_global", "cqr_knn"]
+    header = f"{'segment':<16}{'n':>9}" + "".join(f"{m:>18}" for m in methods)
+    print(header)
+    print("-" * len(header))
+    segments = result.table.select("segment_type", "segment", "n").unique(maintain_order=True)
+    for seg in segments.to_dicts():
+        cells = []
+        for method in methods:
+            row = result.table.filter(
+                (pl.col("method") == method)
+                & (pl.col("segment_type") == seg["segment_type"])
+                & (pl.col("segment") == seg["segment"])
+            )
+            if row.height:
+                cells.append(f"{row['coverage'][0]:>10.3f}/{row['median_width_log'][0]:<7.2f}")
+            else:
+                cells.append(f"{'-':>18}")
+        print(f"{seg['segment']:<16}{seg['n']:>9,}" + "".join(cells))
+    print("\ncoverage across districts (min - max):")
+    for method in methods:
+        d = result.district_coverage.filter(pl.col("method") == method)
+        if d.height:
+            span = d.select(
+                pl.col("coverage").min().alias("lo"), pl.col("coverage").max().alias("hi")
+            ).to_dicts()[0]
+            print(f"  {method:<16} {span['lo']:.3f} - {span['hi']:.3f}")
+    return 0
+
+
 def _cmd_ensemble_check(args: argparse.Namespace) -> int:
     from philly_fair_measure.models.ensemble import ensemble_check
 
@@ -968,6 +1004,17 @@ def main(argv: list[str] | None = None) -> int:
     conformal.add_argument("--k", type=int, default=500, help="calibration neighbors (knn method)")
     conformal.add_argument("--data-dir", type=Path)
     conformal.set_defaults(func=_cmd_conformal_check)
+
+    cqr = subparsers.add_parser(
+        "cqr-check",
+        help="conformalized quantile regression bake-off: feature-adaptive "
+        "CQR bands (global + spatially weighted) vs the Bayesian posterior "
+        "and fixed-offset conformal, on the untouched out-of-time test slice",
+    )
+    cqr.add_argument("--alpha", type=float, default=0.10)
+    cqr.add_argument("--k", type=int, default=500, help="calibration neighbors (knn variant)")
+    cqr.add_argument("--data-dir", type=Path)
+    cqr.set_defaults(func=_cmd_cqr_check)
 
     ensemble = subparsers.add_parser(
         "ensemble-check",
