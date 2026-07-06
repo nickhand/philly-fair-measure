@@ -2,8 +2,9 @@
 
 OPA is legally barred from income/demographic/crime features
 (docs/research-notes.md), and this project keeps demographics
-diagnostics-only by design (AGENTS.md proxy caution; docs/equity-diagnostics.md
-showed the demographic-free model already collapses OPA's racial ratio gap).
+diagnostics-only by design — demographic variables are never valuation
+features, only after-the-fact checks (docs/equity-diagnostics.md showed the
+demographic-free model already collapses OPA's racial ratio gap).
 This module measures the constraint's price: one toggled retrain of the
 residential LightGBM with tract-level ACS aggregates joined as features,
 against the identical out-of-time split, params, and seed.
