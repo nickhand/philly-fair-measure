@@ -4,8 +4,8 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from philly_assessments import catalog
-from philly_assessments.ingest.manifests import (
+from philly_fair_measure import catalog
+from philly_fair_measure.ingest.manifests import (
     ColumnInfo,
     FileInfo,
     SnapshotManifest,

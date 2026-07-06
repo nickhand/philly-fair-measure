@@ -1,7 +1,7 @@
 import polars as pl
 
-from philly_assessments.staging.tables import stg_assessments, stg_deeds, stg_opa_properties
-from philly_assessments.staging.temporal import with_parsed_timestamp, with_parsed_year
+from philly_fair_measure.staging.tables import stg_assessments, stg_deeds, stg_opa_properties
+from philly_fair_measure.staging.temporal import with_parsed_timestamp, with_parsed_year
 
 
 def test_with_parsed_timestamp_statuses():

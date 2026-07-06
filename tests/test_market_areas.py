@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse.csgraph import connected_components
 from sklearn.neighbors import radius_neighbors_graph
 
-from philly_assessments.features.market_areas import (
+from philly_fair_measure.features.market_areas import (
     CONTIGUITY_RADIUS_M,
     MIN_SPLIT_PARCELS,
     _enforce_contiguity,

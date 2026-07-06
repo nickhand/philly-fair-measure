@@ -1,7 +1,7 @@
 import numpy as np
 from shapely.geometry import box
 
-from philly_assessments.diagnostics.aerial_change import (
+from philly_fair_measure.diagnostics.aerial_change import (
     TILE_PX,
     TilePair,
     _polygon_mask,

@@ -1,6 +1,6 @@
 import numpy as np
 
-from philly_assessments.diagnostics.historical_redistribution import _tier_redistribution
+from philly_fair_measure.diagnostics.historical_redistribution import _tier_redistribution
 
 
 def test_uniform_assessment_is_neutral():

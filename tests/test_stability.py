@@ -1,4 +1,4 @@
-from philly_assessments.diagnostics.stability import _summary
+from philly_fair_measure.diagnostics.stability import _summary
 
 
 def test_summary_stats():

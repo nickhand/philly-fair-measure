@@ -5,7 +5,7 @@ import pyarrow as pa
 import pytest
 import respx
 
-from philly_assessments.sources.carto import (
+from philly_fair_measure.sources.carto import (
     PHL_CARTO_URL,
     CartoClient,
     CartoColumn,

@@ -4,9 +4,9 @@ from datetime import datetime
 import polars as pl
 import pytest
 
-from philly_assessments.features.assessment_features import assemble_assessment_features
-from philly_assessments.features.sale_features import _CHAR_RENAMES, _LOC_RENAMES
-from philly_assessments.validation.opa import finalize_screen
+from philly_fair_measure.features.assessment_features import assemble_assessment_features
+from philly_fair_measure.features.sale_features import _CHAR_RENAMES, _LOC_RENAMES
+from philly_fair_measure.validation.opa import finalize_screen
 
 VALUATION_DATE = datetime(2026, 7, 1)
 
@@ -117,7 +117,7 @@ def test_event_windows_anchor_on_valuation_date():
 
 
 def test_twin_uniformity_strict_key():
-    from philly_assessments.validation.opa import twin_uniformity
+    from philly_fair_measure.validation.opa import twin_uniformity
 
     def _parcel(pid, value, area=1000.0, cond="4"):
         return {
@@ -259,8 +259,8 @@ def test_screen_refuses_stale_runs(tmp_path):
     # a run older than the mart it scores must refuse (relearned market areas
     # relabel geography under the model — measured 10x false-flag explosion),
     # unless the caller explicitly opts into staleness
-    from philly_assessments.ingest.manifests import DerivedManifest, write_derived_manifest
-    from philly_assessments.validation.opa import StaleRunError, _require_coherent
+    from philly_fair_measure.ingest.manifests import DerivedManifest, write_derived_manifest
+    from philly_fair_measure.validation.opa import StaleRunError, _require_coherent
 
     run_dir = tmp_path / "run_id=20260101T000000Z-bayesian"
     run_dir.mkdir()

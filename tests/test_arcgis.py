@@ -5,8 +5,8 @@ import polars as pl
 import pytest
 import respx
 
-from philly_assessments.ingest.snapshots import snapshot_arcgis_layer
-from philly_assessments.sources.arcgis import PHL_ARCGIS_BASE, ArcGISClient, ArcGISError
+from philly_fair_measure.ingest.snapshots import snapshot_arcgis_layer
+from philly_fair_measure.sources.arcgis import PHL_ARCGIS_BASE, ArcGISClient, ArcGISError
 
 LAYER_URL = f"{PHL_ARCGIS_BASE}/TEST_SVC/FeatureServer/0"
 

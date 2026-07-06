@@ -490,7 +490,7 @@ property-assessments/
   README.md
   pyproject.toml
   src/
-    philly_assessments/
+    philly_fair_measure/
       __init__.py
       config.py
       sources/
@@ -572,8 +572,8 @@ Build a downloader for CARTO/API-backed datasets.
 Deliverable:
 
 ```text
-src/philly_assessments/sources/carto.py
-src/philly_assessments/ingest/snapshots.py
+src/philly_fair_measure/sources/carto.py
+src/philly_fair_measure/ingest/snapshots.py
 ```
 
 Capabilities:
@@ -593,7 +593,7 @@ Create a local DuckDB database or query layer over Parquet snapshots.
 Deliverable:
 
 ```text
-src/philly_assessments/catalog.py
+src/philly_fair_measure/catalog.py
 ```
 
 Capabilities:
@@ -611,7 +611,7 @@ Build the first sale-cleaning pipeline.
 Deliverable:
 
 ```text
-src/philly_assessments/validation/sales.py
+src/philly_fair_measure/validation/sales.py
 ```
 
 Start with whatever fields are actually available. Do not overfit to Cook County assumptions.
@@ -668,8 +668,8 @@ Do not start by building the valuation model.
 Suggested first deliverables:
 
 1. `docs/source_inventory.md`
-2. `src/philly_assessments/sources/carto.py`
-3. `src/philly_assessments/ingest/snapshots.py`
+2. `src/philly_fair_measure/sources/carto.py`
+3. `src/philly_fair_measure/ingest/snapshots.py`
 4. `tests/test_carto_download.py`
 5. one successful raw snapshot saved as Parquet with a manifest
 

@@ -19,7 +19,7 @@ web/                    Vue 3 + TypeScript + Vite + Tailwind v4 (mobile-first)
   src/views/            Home (search), Property (report), Map, Methodology,
                         Admin (staff, unlinked), NotFound
 
-src/philly_assessments/api.py   FastAPI over the marts
+src/philly_fair_measure/api.py   FastAPI over the marts
   startup: assessment_screen + coordinates loaded once into memory (~500k rows)
   /api/search            address autocomplete (case-insensitive, prefix-ranked)
   /api/property/{id}     fast core: verdict, values, interval, signals

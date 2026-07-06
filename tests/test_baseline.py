@@ -5,14 +5,14 @@ import numpy as np
 import polars as pl
 import pytest
 
-from philly_assessments.ingest.derived import write_derived_table
-from philly_assessments.ingest.manifests import InputRef
-from philly_assessments.models.baseline import feature_lists, train_baseline
-from philly_assessments.models.metrics import fit_metrics, ratio_metrics
+from philly_fair_measure.ingest.derived import write_derived_table
+from philly_fair_measure.ingest.manifests import InputRef
+from philly_fair_measure.models.baseline import feature_lists, train_baseline
+from philly_fair_measure.models.metrics import fit_metrics, ratio_metrics
 
 
 def test_vertical_calibration_flattens_compression_gradient():
-    from philly_assessments.models.baseline import (
+    from philly_fair_measure.models.baseline import (
         apply_vertical_calibration,
         fit_vertical_calibration,
     )
@@ -165,7 +165,7 @@ def test_train_baseline_end_to_end(tmp_path):
     assert "style" in evaluation["segment_type"].unique().to_list()
 
     # scoring from the persisted run reproduces training-time predictions
-    from philly_assessments.models.scoring import score_lightgbm
+    from philly_fair_measure.models.scoring import score_lightgbm
 
     frame_scored = (
         _synthetic_mart()

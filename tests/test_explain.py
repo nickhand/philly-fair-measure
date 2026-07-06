@@ -2,7 +2,7 @@ import numpy as np
 
 
 def test_appeal_points_filters_correctable_and_flags_implausible():
-    from philly_assessments.models.explain import Driver, Explanation, appeal_points
+    from philly_fair_measure.models.explain import Driver, Explanation, appeal_points
 
     exp = Explanation(
         value=200_000.0,
@@ -33,11 +33,11 @@ def test_appeal_points_filters_correctable_and_flags_implausible():
 
 
 def test_explain_is_faithful_ranked_and_readable(tmp_path):
-    from philly_assessments.ingest.derived import write_derived_table
-    from philly_assessments.ingest.manifests import InputRef
-    from philly_assessments.models.baseline import train_baseline
-    from philly_assessments.models.explain import explain, plain_language
-    from philly_assessments.models.scoring import score_lightgbm
+    from philly_fair_measure.ingest.derived import write_derived_table
+    from philly_fair_measure.ingest.manifests import InputRef
+    from philly_fair_measure.models.baseline import train_baseline
+    from philly_fair_measure.models.explain import explain, plain_language
+    from philly_fair_measure.models.scoring import score_lightgbm
     from tests.test_baseline import _synthetic_mart
 
     frame = _synthetic_mart()
@@ -78,7 +78,7 @@ def test_explain_is_faithful_ranked_and_readable(tmp_path):
 
 
 def test_display_value_gates_and_formats_for_residents():
-    from philly_assessments.models.explain import display_value
+    from philly_fair_measure.models.explain import display_value
 
     # self-explanatory facts get human formatting with units
     assert display_value("char_livable_area", 1120.0) == "1,120 sq ft"
@@ -92,7 +92,7 @@ def test_display_value_gates_and_formats_for_residents():
 
 
 def test_decode_recorded_translates_published_city_codes():
-    from philly_assessments.models.explain import decode_recorded
+    from philly_fair_measure.models.explain import decode_recorded
 
     assert decode_recorded("char_interior_condition", "4") == "average (code 4)"
     assert decode_recorded("char_exterior_condition", 4.0) == "average (code 4)"

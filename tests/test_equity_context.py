@@ -1,9 +1,9 @@
 import polars as pl
 import pytest
 
-from philly_assessments.equity_context import equity_context
-from philly_assessments.ingest.derived import write_derived_table
-from philly_assessments.ingest.manifests import InputRef
+from philly_fair_measure.equity_context import equity_context
+from philly_fair_measure.ingest.derived import write_derived_table
+from philly_fair_measure.ingest.manifests import InputRef
 
 
 def _screen(tmp_path):

@@ -1,10 +1,10 @@
 import polars as pl
 import pytest
 
-from philly_assessments.ingest.derived import write_derived_table
-from philly_assessments.ingest.manifests import InputRef
-from philly_assessments.models.baseline import train_baseline
-from philly_assessments.models.comps import find_comps, resolve_parcel
+from philly_fair_measure.ingest.derived import write_derived_table
+from philly_fair_measure.ingest.manifests import InputRef
+from philly_fair_measure.models.baseline import train_baseline
+from philly_fair_measure.models.comps import find_comps, resolve_parcel
 from tests.test_baseline import _synthetic_mart
 
 _INPUTS = [InputRef(dataset="test", fetched_at="t")]

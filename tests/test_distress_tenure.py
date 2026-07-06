@@ -2,7 +2,7 @@ from datetime import datetime
 
 import polars as pl
 
-from philly_assessments.features.sale_features import (
+from philly_fair_measure.features.sale_features import (
     DISTRESS_TENURE_COLUMNS,
     distress_tenure_features,
 )
@@ -106,7 +106,7 @@ def test_rental_license_spans_at_sale_date():
 
 
 def test_financing_features_refi_hard_money_and_cash():
-    from philly_assessments.features.sale_features import financing_features
+    from philly_fair_measure.features.sale_features import financing_features
 
     mortgages = pl.LazyFrame(
         [

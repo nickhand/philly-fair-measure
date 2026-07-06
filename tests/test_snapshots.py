@@ -7,9 +7,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import respx
 
-from philly_assessments.ingest.manifests import read_manifest
-from philly_assessments.ingest.snapshots import snapshot_carto_table
-from philly_assessments.sources.carto import PHL_CARTO_URL
+from philly_fair_measure.ingest.manifests import read_manifest
+from philly_fair_measure.ingest.snapshots import snapshot_carto_table
+from philly_fair_measure.sources.carto import PHL_CARTO_URL
 
 FIELDS = {
     "cartodb_id": {"type": "number", "pgtype": "int8"},

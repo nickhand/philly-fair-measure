@@ -3,7 +3,7 @@ from datetime import datetime
 import polars as pl
 import pytest
 
-from philly_assessments.features.spatial import knn_ppsf_at_date, knn_ppsf_for_sales
+from philly_fair_measure.features.spatial import knn_ppsf_at_date, knn_ppsf_for_sales
 
 
 def _point(sale_id, parcel, x, y, date, value):

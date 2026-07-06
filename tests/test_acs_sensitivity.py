@@ -1,6 +1,6 @@
 import polars as pl
 
-from philly_assessments.diagnostics.acs_sensitivity import join_tracts
+from philly_fair_measure.diagnostics.acs_sensitivity import join_tracts
 
 
 def _square(lon0, lat0, size=0.01):

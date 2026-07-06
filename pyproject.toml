@@ -1,5 +1,5 @@
 [project]
-name = "philly-assessments"
+name = "philly-fair-measure"
 version = "0.1.0"
 description = "Philadelphia property assessment data package: verified public-data ingestion, snapshotting, and valuation modeling"
 readme = "README.md"
@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.scripts]
-philly = "philly_assessments.cli:main"
+philly = "philly_fair_measure.cli:main"
 
 [dependency-groups]
 dev = [

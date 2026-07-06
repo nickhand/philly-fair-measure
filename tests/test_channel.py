@@ -1,7 +1,7 @@
 import numpy as np
 import polars as pl
 
-from philly_assessments.diagnostics.channel import _design, _ols_coef
+from philly_fair_measure.diagnostics.channel import _design, _ols_coef
 
 
 def test_design_recovers_planted_channel_discount():

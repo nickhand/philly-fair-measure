@@ -2,7 +2,7 @@ from datetime import datetime
 
 import polars as pl
 
-from philly_assessments.validation.sales import classify_sales
+from philly_fair_measure.validation.sales import classify_sales
 
 
 def _deed(record_id, parcel, price, sale_date, **overrides):

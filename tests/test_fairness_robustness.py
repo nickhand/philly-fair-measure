@@ -2,7 +2,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from philly_assessments.diagnostics.fairness_robustness import _by_race
+from philly_fair_measure.diagnostics.fairness_robustness import _by_race
 
 
 def test_by_race_median_ratio_and_min_group():

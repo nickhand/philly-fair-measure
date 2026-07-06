@@ -965,7 +965,7 @@ wheels = [
 ]
 
 [[package]]
-name = "philly-assessments"
+name = "philly-fair-measure"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

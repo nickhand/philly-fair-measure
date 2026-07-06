@@ -9,7 +9,7 @@ uv run philly snapshot-all   # capture all core tables (continues past failures,
 uv run philly freshness      # heartbeat: exits 1 if any core dataset is missing or > 8 days old
 ```
 
-The core table set lives in `philly_assessments.config.CORE_CARTO_TABLES`.
+The core table set lives in `philly_fair_measure.config.CORE_CARTO_TABLES`.
 Parcel polygons (`philly snapshot arcgis PWD_PARCELS`, ~10 min) change rarely;
 refresh them occasionally rather than weekly, then re-run
 `philly stage --tables parcels`.
@@ -21,11 +21,11 @@ revisit with delta tables once change detection lands.
 
 ```bash
 mkdir -p data/logs
-cp scripts/com.philly-assessments.snapshot.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.philly-assessments.snapshot.plist
+cp scripts/com.philly-fair-measure.snapshot.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.philly-fair-measure.snapshot.plist
 
 # run once immediately to verify
-launchctl start com.philly-assessments.snapshot
+launchctl start com.philly-fair-measure.snapshot
 tail -f data/logs/snapshot.log
 ```
 
@@ -40,7 +40,7 @@ manually, or wire it into anything that runs regularly, e.g. a shell profile
 nag or a weekly reminder:
 
 ```bash
-cd /Users/nhand/DataProjects/philly-property-assessments && uv run philly freshness \
+cd /Users/nhand/DataProjects/philly-fair-measure && uv run philly freshness \
   || echo "⚠️  Philly snapshots are stale — check data/logs/snapshot.log"
 ```
 

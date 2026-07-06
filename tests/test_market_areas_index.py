@@ -4,14 +4,14 @@ import numpy as np
 import polars as pl
 import pytest
 
-from philly_assessments.features.market_areas import build_market_areas, sale_points
-from philly_assessments.features.price_index import (
+from philly_fair_measure.features.market_areas import build_market_areas, sale_points
+from philly_fair_measure.features.price_index import (
     CITYWIDE,
     build_price_index,
     with_time_adjustment,
 )
-from philly_assessments.ingest.derived import write_derived_table
-from philly_assessments.ingest.manifests import InputRef
+from philly_fair_measure.ingest.derived import write_derived_table
+from philly_fair_measure.ingest.manifests import InputRef
 
 _INPUTS = [InputRef(dataset="test", fetched_at="t")]
 

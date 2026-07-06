@@ -16,7 +16,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-# serve-time dependencies only (see src/philly_assessments/api.py imports)
+# serve-time dependencies only (see src/philly_fair_measure/api.py imports)
 RUN uv pip install --system --no-cache \
     "fastapi>=0.115" "uvicorn[standard]>=0.30" "polars>=1.0" \
     "numpy>=2.0" "lightgbm>=4.0" "pydantic>=2.7"
@@ -32,4 +32,4 @@ ENV PHILLY_DATA_DIR=/app/data \
     PORT=8080
 
 EXPOSE 8080
-CMD ["uvicorn", "--factory", "philly_assessments.api:create_app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "--factory", "philly_fair_measure.api:create_app", "--host", "0.0.0.0", "--port", "8080"]

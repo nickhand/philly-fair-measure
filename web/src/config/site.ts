@@ -3,9 +3,8 @@
 export const SITE = {
   creatorName: 'Nick Hand',
   creatorUrl: 'https://nickhand.dev',
-  // TODO: update once the repository is published under its public name.
-  githubUrl: 'https://github.com/nickhand/philly-assessments',
-  modelDocsUrl: 'https://github.com/nickhand/philly-assessments/blob/main/docs/model.md',
+  githubUrl: 'https://github.com/nickhand/philly-fair-measure',
+  modelDocsUrl: 'https://github.com/nickhand/philly-fair-measure/blob/main/docs/model.md',
   /** OPA's First Level Review — the form arrives by mail with each new
    * assessment notice, or owners can request one. */
   flrUrl:

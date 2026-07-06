@@ -1,7 +1,7 @@
 import numpy as np
 import polars as pl
 
-from philly_assessments.models.conformal import (
+from philly_fair_measure.models.conformal import (
     CalibrationSet,
     _split_quantiles,
     calibration_from_run,
@@ -81,9 +81,9 @@ def test_district_mondrian_with_fallback():
 
 
 def test_calibration_and_coverage_from_trained_run(tmp_path):
-    from philly_assessments.ingest.derived import write_derived_table
-    from philly_assessments.ingest.manifests import InputRef
-    from philly_assessments.models.baseline import train_baseline
+    from philly_fair_measure.ingest.derived import write_derived_table
+    from philly_fair_measure.ingest.manifests import InputRef
+    from philly_fair_measure.models.baseline import train_baseline
     from tests.test_baseline import _synthetic_mart
 
     frame = _synthetic_mart()
@@ -109,7 +109,7 @@ def test_calibration_and_coverage_from_trained_run(tmp_path):
     assert cal.residual.size == val_df.height
 
     test_resid = frame_residuals(result.run_dir, test_df)
-    from philly_assessments.models.conformal import xy_district
+    from philly_fair_measure.models.conformal import xy_district
 
     xy, district = xy_district(test_df)
     lo, hi = conformal_offsets(cal, xy, district, method="knn", k=50)

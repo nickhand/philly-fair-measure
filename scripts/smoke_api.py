@@ -26,7 +26,7 @@ def main() -> int:
 
     from fastapi.testclient import TestClient
 
-    from philly_assessments.api import create_app
+    from philly_fair_measure.api import create_app
 
     client = TestClient(create_app())
 

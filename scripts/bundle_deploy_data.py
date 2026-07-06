@@ -17,8 +17,8 @@ import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from philly_assessments import config  # noqa: E402
-from philly_assessments.models.scoring import latest_run_dir  # noqa: E402
+from philly_fair_measure import config  # noqa: E402
+from philly_fair_measure.models.scoring import latest_run_dir  # noqa: E402
 
 OUT = Path("deploy/data")
 

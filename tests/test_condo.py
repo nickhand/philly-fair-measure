@@ -3,7 +3,7 @@ from datetime import datetime
 import polars as pl
 import pytest
 
-from philly_assessments.features.condo_features import assemble_condo_features
+from philly_fair_measure.features.condo_features import assemble_condo_features
 
 
 def _unit(parcel, area=900.0, street="777", hn=200, lon=-75.16, lat=39.95):
@@ -94,7 +94,7 @@ def test_condo_features_building_roll_and_shares():
 def test_floor_expr_conventions():
     import polars as pl
 
-    from philly_assessments.features.condo_features import floor_expr
+    from philly_fair_measure.features.condo_features import floor_expr
 
     out = pl.DataFrame(
         {"unit": ["2204", "8L", "33K", "PH", "P209", "3", "9901", None, "CD"]}
@@ -103,7 +103,7 @@ def test_floor_expr_conventions():
 
 
 def test_condo_assessment_features_loo_at_date():
-    from philly_assessments.features.condo_features import assemble_condo_assessment_features
+    from philly_fair_measure.features.condo_features import assemble_condo_assessment_features
 
     units = [
         _unit("880000001", area=1000.0),

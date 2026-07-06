@@ -2,7 +2,7 @@ from datetime import datetime
 
 import polars as pl
 
-from philly_assessments.report import ReportData, render_html
+from philly_fair_measure.report import ReportData, render_html
 
 
 def _screen_row(**overrides):
@@ -124,7 +124,7 @@ def test_render_html_full_packet():
 
 
 def test_render_html_includes_driver_panel():
-    from philly_assessments.models.explain import Driver, Explanation
+    from philly_fair_measure.models.explain import Driver, Explanation
 
     exp = Explanation(
         value=520_000.0,
@@ -159,7 +159,7 @@ def test_render_html_includes_driver_panel():
 
 
 def test_render_html_includes_appeal_panel():
-    from philly_assessments.models.explain import Driver, Explanation
+    from philly_fair_measure.models.explain import Driver, Explanation
 
     exp = Explanation(
         value=200_000.0,
@@ -184,7 +184,7 @@ def test_render_html_includes_appeal_panel():
 
 
 def test_render_html_includes_equity_panel():
-    from philly_assessments.equity_context import EquityContext
+    from philly_fair_measure.equity_context import EquityContext
 
     ctx = EquityContext(
         ratio=1.18,
@@ -211,9 +211,9 @@ def test_render_html_includes_equity_panel():
 
 
 def test_leaderboards_rank_by_confidence_and_uniformity(tmp_path):
-    from philly_assessments.ingest.derived import write_derived_table
-    from philly_assessments.ingest.manifests import InputRef
-    from philly_assessments.report import leaderboards
+    from philly_fair_measure.ingest.derived import write_derived_table
+    from philly_fair_measure.ingest.manifests import InputRef
+    from philly_fair_measure.report import leaderboards
 
     def row(pid, addr, opa, model, ratio, z, pi_lo, pi_hi, flag, twin_n=6, twin_med=1.0):
         return {

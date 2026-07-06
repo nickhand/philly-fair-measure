@@ -1,6 +1,6 @@
 import numpy as np
 
-from philly_assessments.diagnostics.channel import (
+from philly_fair_measure.diagnostics.channel import (
     CHANNEL_DISCOUNT_BY_QUINTILE,
     cash_market_value,
 )

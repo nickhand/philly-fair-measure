@@ -1,9 +1,9 @@
 import polars as pl
 from fastapi.testclient import TestClient
 
-from philly_assessments.api import create_app
-from philly_assessments.ingest.derived import write_derived_table
-from philly_assessments.ingest.manifests import InputRef
+from philly_fair_measure.api import create_app
+from philly_fair_measure.ingest.derived import write_derived_table
+from philly_fair_measure.ingest.manifests import InputRef
 
 
 def _screen_rows() -> list[dict]:

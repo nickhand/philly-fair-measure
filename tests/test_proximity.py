@@ -1,7 +1,7 @@
 import numpy as np
 import polars as pl
 
-from philly_assessments.features.proximity import (
+from philly_fair_measure.features.proximity import (
     _nearest_distance,
     _project_geoms,
     _street_class,
@@ -9,7 +9,7 @@ from philly_assessments.features.proximity import (
 
 
 def test_project_and_nearest_distance():
-    from philly_assessments.features.market_areas import project_xy
+    from philly_fair_measure.features.market_areas import project_xy
 
     # a station point and a park polygon, both defined in lon/lat
     geojson = np.array(

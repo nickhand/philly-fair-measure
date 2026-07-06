@@ -2,9 +2,9 @@ import numpy as np
 import polars as pl
 import pytest
 
-from philly_assessments.ingest.derived import write_derived_table
-from philly_assessments.ingest.manifests import InputRef
-from philly_assessments.models.bayesian import (
+from philly_fair_measure.ingest.derived import write_derived_table
+from philly_fair_measure.ingest.manifests import InputRef
+from philly_fair_measure.models.bayesian import (
     CONDO_SPEC,
     CovariateEncoder,
     GeoIndex,
@@ -101,7 +101,7 @@ def test_condo_family_spec_encoder_and_sigma():
 
 
 def test_parcel_index_repeats_only_and_leakage_safe():
-    from philly_assessments.models.bayesian import ParcelIndex
+    from philly_fair_measure.models.bayesian import ParcelIndex
 
     train = pl.DataFrame(
         {"parcel_id": ["a", "a", "b", "b", "b", "c"]}  # a x2, b x3, c x1
@@ -170,7 +170,7 @@ def test_train_bayesian_end_to_end(tmp_path):
     assert (predictions["pi_high_90"] > predictions["pi_low_90"]).all()
 
     # scoring artifacts roundtrip: price a few rows through the scoring path
-    from philly_assessments.models.scoring import score_bayesian_intervals
+    from philly_fair_measure.models.scoring import score_bayesian_intervals
 
     subset = frame.head(5)
     median, lo, hi = score_bayesian_intervals(result.run_dir, subset, chunk_size=3, seed=1)

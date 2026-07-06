@@ -4,7 +4,7 @@ from datetime import datetime
 import polars as pl
 import pytest
 
-from philly_assessments.features.sale_features import assemble_sale_features
+from philly_fair_measure.features.sale_features import assemble_sale_features
 
 
 def _sale(sale_id, parcel, price, date, status="arms_length"):
@@ -190,7 +190,7 @@ def test_condo_accounts_excluded_from_scope_and_pools():
 
 
 def test_distress_features_severity_demo_delinquency():
-    from philly_assessments.features.sale_features import assemble_sale_features
+    from philly_fair_measure.features.sale_features import assemble_sale_features
 
     sales = [_sale("s", "p1", 80_000.0, datetime(2020, 6, 1))]
     violations = [

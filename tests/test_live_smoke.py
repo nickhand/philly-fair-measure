@@ -2,7 +2,7 @@
 
 import pytest
 
-from philly_assessments.sources.carto import CartoClient
+from philly_fair_measure.sources.carto import CartoClient
 
 pytestmark = pytest.mark.live
 

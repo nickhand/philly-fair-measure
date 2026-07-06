@@ -1,4 +1,4 @@
-# philly-assessments
+# philly-fair-measure
 
 A public-data-driven property assessment and valuation system for Philadelphia.
 The first deliverable is a reliable, reproducible, versioned data package built
@@ -51,7 +51,7 @@ row counts, timing, and file checksums. Raw data is never modified after write.
 ## Layout
 
 ```
-src/philly_assessments/
+src/philly_fair_measure/
   config.py            # data dir resolution + core snapshot table registry
   sources/carto.py     # CARTO SQL API client (schema, counts, keyset pagination)
   ingest/manifests.py  # snapshot + derived-table manifest schemas (pydantic)

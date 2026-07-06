@@ -1,4 +1,4 @@
-/** Mirrors the pydantic response models in src/philly_assessments/api.py. */
+/** Mirrors the pydantic response models in src/philly_fair_measure/api.py. */
 
 export type Flag =
   | 'over_assessed_candidate'

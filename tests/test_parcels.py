@@ -4,7 +4,7 @@ import math
 import polars as pl
 import pytest
 
-from philly_assessments.staging.parcels import parcel_shape_features, stg_parcels
+from philly_fair_measure.staging.parcels import parcel_shape_features, stg_parcels
 
 _LON0, _LAT0 = -75.16, 39.95
 _M_LON = 111_320.0 * math.cos(math.radians(_LAT0))
