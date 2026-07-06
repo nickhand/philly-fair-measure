@@ -74,6 +74,13 @@ from philly_fair_measure.models.metrics import evaluate_estimates
 
 logger = logging.getLogger(__name__)
 
+# Upper bound on log-sigma (smoothly enforced with softplus in training AND
+# scoring): the additive log-sigma design can stack term combinations never
+# observed jointly in training, and nothing in the city's realized residuals
+# supports sigma above ~1.0 in logs. Applied identically in _fit_posterior
+# and predict_price_draws so the two stay one model.
+_LOG_SIGMA_CAP = 0.0
+
 PI_LOW, PI_HIGH = 0.05, 0.95
 N_RBF_CENTERS = 64
 MIN_DISTRICT_SEGMENT_N = 200
@@ -128,7 +135,15 @@ RESIDENTIAL_SPEC = FamilySpec(
     ],
     sigma_terms=[
         "block_roll_missing",
-        "knn_dist",
+        # comp-distance enters as saturating bins, not a continuous slope: the
+        # log-linear form fit a power law (sigma ~ (1+d)^0.28) that kept
+        # growing forever and stacked into 100x+ predictive bands, while the
+        # empirical residual machine (conformal-knn) showed near-flat scale in
+        # distance (decomposition 2026-07-06: the dist term carried +1.6 of
+        # log-sigma on the worst rows, mu-spread only 0.11)
+        "knn_d300",
+        "knn_d600",
+        "knn_dfar",
         "style_twin",
         "style_detached",
         "style_other",
@@ -381,7 +396,11 @@ def _sigma_design(df: pl.DataFrame, family: str = "residential") -> np.ndarray:
     return np.column_stack(
         [
             missing,
-            np.log1p(dist) / 10.0,
+            # saturating distance bins (reference: comps within 100m) — see
+            # the sigma_terms note in RESIDENTIAL_SPEC for why not a slope
+            ((dist >= 100.0) & (dist < 300.0)).astype(np.float64),
+            ((dist >= 300.0) & (dist < 600.0)).astype(np.float64),
+            (dist >= 600.0).astype(np.float64),
             (style == "twin").astype(np.float64),
             (style == "detached").astype(np.float64),
             ((style == "other") | (style == "unknown")).astype(np.float64),
@@ -453,16 +472,28 @@ def _fit_posterior(
             w = pm.Normal("w_spatial", 0.0, 1.0, dims="basis")
             mu = mu + basis @ (tau_gp * w)
 
+        # sigma covariates are all bounded [0, 1] after the bin/grading design,
+        # so 0.35 caps any single term's multiplicative reach at ~e^0.7 per
+        # 2sd — the priors bind now that no covariate has an unbounded tail
         g0 = pm.Normal("g0", -1.0, 1.0)
-        g = pm.Normal("g", 0.0, 0.5, dims="sigma_term")
+        g = pm.Normal("g", 0.0, 0.35, dims="sigma_term")
         tau_sigma_district = pm.HalfNormal("tau_sigma_district", 0.3)
         z_sigma_district = pm.Normal("z_sigma_district", 0.0, 1.0, dims="district")
         u_sigma_district = pm.Deterministic(
             "u_sigma_district", tau_sigma_district * z_sigma_district, dims="district"
         )
+        # smooth cap on log-sigma: the additive form multiplies term
+        # combinations never observed jointly in training (measured
+        # 2026-07-06: d600-bin + block-missing + district stacked to
+        # sigma=2.8 -> a 171,822x band on roll-only stock). No Philadelphia
+        # housing segment's realized residuals support sigma > ~1; softplus
+        # keeps the gradient alive as the cap engages.
+        raw_log_sigma = g0 + z_sigma @ g + u_sigma_district[district_idx]
         sigma = pm.Deterministic(
             "sigma_obs",
-            pm.math.exp(g0 + z_sigma @ g + u_sigma_district[district_idx]),
+            pm.math.exp(
+                _LOG_SIGMA_CAP - pm.math.softplus(_LOG_SIGMA_CAP - raw_log_sigma)
+            ),
         )
 
         # learned nu couples every observation through one global parameter and
@@ -595,6 +626,8 @@ def predict_price_draws(
                 (n_draws, int(unknown.sum()))
             )
         log_sigma = log_sigma + u
+    # same smooth cap as _fit_posterior — scoring must be the trained model
+    log_sigma = _LOG_SIGMA_CAP - np.logaddexp(0.0, _LOG_SIGMA_CAP - log_sigma)
     t_noise = rng.standard_t(np.maximum(draws["nu"], 2.1)[:, None], size=mu.shape)
     log_pred = mu + np.exp(log_sigma) * t_noise
     if time_adj_log is not None:
