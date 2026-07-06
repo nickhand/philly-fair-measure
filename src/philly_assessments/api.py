@@ -481,6 +481,9 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                 "geometry": {"type": "Point", "coordinates": [r["loc_lon"], r["loc_lat"]]},
                 "properties": {
                     "id": r["parcel_id"],
+                    # address rides along so stacked dots (condo towers share
+                    # one coordinate) can offer a pick-a-home list on click
+                    "address": r["address"],
                     "flag": r["assessment_flag"],
                     "attention": r["attention"],
                     "opa": r["opa_market_value"],
@@ -490,6 +493,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
             }
             for r in sub.select(
                 "parcel_id",
+                "address",
                 "loc_lon",
                 "loc_lat",
                 "assessment_flag",
@@ -532,8 +536,10 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                         },
                         "properties": {
                             "id": r["parcel_id"],
+                            "address": r["address"],
                             "flag": r["assessment_flag"],
                             "attention": r["attention"],
+                            "opa": r["opa_market_value"],
                             # condo flags come from the condo-unit model and
                             # cluster in towers; the map lets users separate them
                             "family": r["model_family"],
@@ -541,10 +547,12 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                     }
                     for r in sub.select(
                         "parcel_id",
+                        "address",
                         "loc_lon",
                         "loc_lat",
                         "assessment_flag",
                         "attention",
+                        "opa_market_value",
                         "model_family",
                     ).to_dicts()
                 ],

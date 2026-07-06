@@ -15,8 +15,10 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { api } from '@/api/client'
 import { track } from '@/lib/analytics'
-import type { PropertyCore, SearchHit } from '@/api/types'
+import type { Attention, Flag, PropertyCore, SearchHit } from '@/api/types'
 import { applyFairMeasurePaint, dotLayers, flagColor, legend } from '@/map/fairMeasureMapStyle'
+import { verdictFor } from '@/utils/verdict'
+import { money } from '@/utils/format'
 import AddressSearch from '@/components/search/AddressSearch.vue'
 import PropertySheet from '@/components/map/PropertySheet.vue'
 
@@ -25,8 +27,12 @@ const PHILLY_CENTER: [number, number] = [-75.16, 39.985]
 
 const router = useRouter()
 const container = ref<HTMLDivElement | null>(null)
-/** Which legend groups are visible; chips toggle these on/off. */
-const enabledLabels = ref<Set<string>>(new Set(legend.map((l) => l.label)))
+/** Which legend groups are visible; chips toggle these on/off. The gray
+ * within-range majority starts hidden — the map's job is the pattern, and
+ * 460k quiet dots drown it; the chip turns them on for anyone who asks. */
+const enabledLabels = ref<Set<string>>(
+  new Set(legend.filter((l) => l.tier !== 'base').map((l) => l.label)),
+)
 /** Condo flags come from the condo-unit model and cluster in Center City
  * towers — a separate toggle (applied at every zoom) keeps them from being
  * read as the rowhome pattern. */
@@ -73,6 +79,22 @@ const map = shallowRef<maplibregl.Map | null>(null)
 const selected = ref<PropertyCore | null>(null)
 const zoomedOut = ref(true)
 const loadError = ref(false)
+
+/** Stacked dots: condo towers put many homes on one coordinate, so a click
+ * can hit dozens of units. When it does, the sheet shows this pick-a-home
+ * list instead of silently cycling; closing a picked home returns to it. */
+interface StackedHome {
+  id: string
+  address: string
+  flag: Flag
+  attention: Attention
+  opa: number | null
+}
+const choices = ref<StackedHome[] | null>(null)
+
+function closeChoices() {
+  choices.value = null
+}
 
 let controller: AbortController | undefined
 let painted = false
@@ -176,11 +198,47 @@ function ensureParcelLayer(m: maplibregl.Map) {
       },
     })
     applyDotFilter()
-    for (const layerId of ['fm-dots-base', 'fm-dots-flagged', 'fm-dots-far', 'fm-dots-far-watch']) {
-      m.on('click', layerId, (e) => {
-        const id = e.features?.[0]?.properties?.id as string | undefined
-        if (id) openParcel(id)
-      })
+    const dotLayerIds = ['fm-dots-base', 'fm-dots-flagged', 'fm-dots-far', 'fm-dots-far-watch']
+    // one map-level click handler across every dot layer: collect ALL homes
+    // under the tap (padded a few px for fat fingers), dedupe by parcel —
+    // one home opens directly, a stack opens the pick-a-home list
+    m.on('click', (e) => {
+      const present = dotLayerIds.filter((id) => m.getLayer(id))
+      if (!present.length) return
+      const pad = 5
+      const feats = m.queryRenderedFeatures(
+        [
+          [e.point.x - pad, e.point.y - pad],
+          [e.point.x + pad, e.point.y + pad],
+        ],
+        { layers: present },
+      )
+      const seen = new Map<string, StackedHome>()
+      for (const f of feats) {
+        const p = f.properties as Record<string, unknown>
+        const id = p.id as string | undefined
+        if (!id || seen.has(id)) continue
+        seen.set(id, {
+          id,
+          address: (p.address as string) || id,
+          flag: (p.flag as Flag) ?? 'no_assessment',
+          attention: (p.attention as Attention) ?? null,
+          opa: typeof p.opa === 'number' ? p.opa : null,
+        })
+      }
+      if (seen.size === 0) return
+      if (seen.size === 1) {
+        choices.value = null
+        openParcel([...seen.keys()][0]!)
+        return
+      }
+      selected.value = null
+      choices.value = [...seen.values()].sort((a, b) =>
+        a.address.localeCompare(b.address, undefined, { numeric: true }),
+      )
+      track('map_stack_opened', { n: seen.size })
+    })
+    for (const layerId of dotLayerIds) {
       m.on('mouseenter', layerId, () => (m.getCanvas().style.cursor = 'pointer'))
       m.on('mouseleave', layerId, () => (m.getCanvas().style.cursor = ''))
     }
@@ -305,6 +363,44 @@ onBeforeUnmount(() => {
     <!-- bottom sheet -->
     <div v-if="selected" class="absolute inset-x-0 bottom-0 z-20 mx-auto max-w-[560px]">
       <PropertySheet :property="selected" @close="closeSheet" />
+    </div>
+
+    <!-- stacked homes chooser (many units share one dot — condo towers) -->
+    <div v-else-if="choices" class="absolute inset-x-0 bottom-0 z-20 mx-auto max-w-[560px]">
+      <div class="m-3 overflow-hidden rounded-xl border border-line-soft bg-white shadow-popover">
+        <div class="flex items-center justify-between border-b border-line-faint py-1.5 pl-4 pr-2">
+          <p class="text-body-sm font-bold text-ink">
+            {{ choices.length }} homes share this spot — pick one
+          </p>
+          <button
+            type="button"
+            class="flex min-h-9 min-w-9 items-center justify-center rounded-md text-muted hover:bg-paper"
+            aria-label="Close this list"
+            @click="closeChoices"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></svg>
+          </button>
+        </div>
+        <ul class="max-h-64 overflow-auto" role="list">
+          <li v-for="c in choices" :key="c.id">
+            <button
+              type="button"
+              class="flex w-full items-center gap-2.5 border-t border-line-faint px-4 py-2.5 text-left first:border-t-0 hover:bg-brand-50"
+              @click="openParcel(c.id)"
+            >
+              <span
+                class="h-2.5 w-2.5 shrink-0 rounded-full"
+                :style="{ background: verdictFor(c.flag, c.attention).hex }"
+                aria-hidden="true"
+              ></span>
+              <span class="min-w-0 flex-1 truncate text-body-sm font-medium text-ink">
+                {{ c.address }}
+              </span>
+              <span class="shrink-0 text-caption tabular-nums text-muted">{{ money(c.opa) }}</span>
+            </button>
+          </li>
+        </ul>
+      </div>
     </div>
   </div>
 </template>
