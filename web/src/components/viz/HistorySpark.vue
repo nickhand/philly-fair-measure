@@ -99,6 +99,9 @@ interface PlacedLabel {
   fill: string
   weight: number
   size: number
+  /** Draw a white plate behind this label — the "today" callout is the same
+   * blue as the assessment line and can sit right on it. */
+  bg?: boolean
 }
 
 const CHAR_W = 6.9
@@ -181,6 +184,7 @@ const labels = computed<PlacedLabel[]>(() => {
         fill: '#0f4d90',
         weight: 700,
         size: 12.5,
+        bg: true,
       },
       lx,
       ly,
@@ -210,6 +214,17 @@ const labels = computed<PlacedLabel[]>(() => {
   }
   return placed
 })
+
+/** White plates behind flagged labels (see PlacedLabel.bg), padded a hair
+ * around the estimated text box. */
+const labelPlates = computed(() =>
+  labels.value
+    .filter((l) => l.bg)
+    .map((l) => {
+      const r = labelRect(l)
+      return { key: l.key, x: r.x0 - 3, y: r.y0 - 1, width: r.x1 - r.x0 + 6, height: r.y1 - r.y0 + 2 }
+    }),
+)
 
 const ariaLabel = computed(() => {
   const first = props.assessments[0]
@@ -268,7 +283,19 @@ function onMove(e: PointerEvent) {
         :transform="`rotate(45 ${x(s.year)} ${y(s.price as number)})`"
       />
       <!-- labels last so they paint above markers; positions come from the
-           collision solver -->
+           collision solver. White plates sit under flagged labels so a label
+           that lands on the same-colored assessment line stays readable. -->
+      <rect
+        v-for="p in labelPlates"
+        :key="`plate-${p.key}`"
+        :x="p.x"
+        :y="p.y"
+        :width="p.width"
+        :height="p.height"
+        rx="3"
+        fill="#ffffff"
+        opacity="0.9"
+      />
       <text
         v-for="l in labels"
         :key="l.key"
