@@ -1,31 +1,34 @@
-# Fly.io config for the Fair Measure API (see Justfile: `just fly-deploy`).
-# The ~500k-row screen frame loads into memory at startup, so the machine
-# needs headroom beyond the default 512 MB.
+# fly.toml app configuration file generated for fair-measure-api on 2026-07-05T23:16:28-04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+# The ~500k-row screen frame loads into memory at startup, so the [[vm]] block
+# needs headroom beyond the default 512 MB (see Justfile: `just fly-deploy`).
 
-app = "fair-measure-api"
-primary_region = "iad"
+app = 'fair-measure-api'
+primary_region = 'iad'
 
 [build]
-dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-PORT = "8080"
-PHILLY_ENV = "prod"
+  PHILLY_ENV = 'prod'
+  PORT = '8080'
 
 [http_service]
-internal_port = 8080
-force_https = true
-auto_stop_machines = "stop"
-auto_start_machines = true
-min_machines_running = 0
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
 
-[[http_service.checks]]
-grace_period = "30s"
-interval = "15s"
-method = "GET"
-path = "/health"
-timeout = "5s"
+  [[http_service.checks]]
+    interval = '15s'
+    timeout = '5s'
+    grace_period = '30s'
+    method = 'GET'
+    path = '/health'
 
 [[vm]]
-size = "shared-cpu-2x"
-memory = "2gb"
+  size = 'shared-cpu-2x'
+  memory = '2gb'
