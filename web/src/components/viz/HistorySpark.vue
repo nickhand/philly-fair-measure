@@ -60,11 +60,12 @@ const path = computed(() =>
 const last = computed(() => props.assessments[props.assessments.length - 1])
 
 /** Assessment-line height at an arbitrary year (linear interpolation) — used
- * to keep sale labels off the line. */
+ * to keep sale labels off the line. Null outside the drawn span: a label next
+ * to a pre-history sale must not dodge a line that isn't there. */
 function lineYAt(year: number): number | null {
   const pts = props.assessments
   if (!pts.length) return null
-  if (year <= pts[0]!.year) return y.value(pts[0]!.value)
+  if (year < pts[0]!.year || year > pts[pts.length - 1]!.year) return null
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1]!
     const b = pts[i]!
@@ -109,30 +110,33 @@ function labelRect(l: { x: number; y: number; anchor: string; text: string }) {
 const labels = computed<PlacedLabel[]>(() => {
   type Rect = { x0: number; x1: number; y0: number; y1: number }
   const placed: PlacedLabel[] = []
-  const obstacles: Rect[] = []
+  const markers: { mx: number; my: number }[] = []
   if (last.value) {
-    const lx = x.value(last.value.year)
-    const ly = y.value(last.value.value)
-    obstacles.push({ x0: lx - 7, x1: lx + 7, y0: ly - 7, y1: ly + 7 })
+    markers.push({ mx: x.value(last.value.year), my: y.value(last.value.value) })
   }
   for (const s of pricedSales.value) {
-    const sx = x.value(s.year)
-    const sy = y.value(s.price as number)
-    obstacles.push({ x0: sx - 9, x1: sx + 9, y0: sy - 9, y1: sy + 9 })
+    markers.push({ mx: x.value(s.year), my: y.value(s.price as number) })
+  }
+  // A label may sit snugly above/beside ITS OWN marker (the visual
+  // convention) but must clear other markers by a wide berth — so the own
+  // marker shrinks to a tight core instead of the full exclusion zone.
+  const markerRect = (m: { mx: number; my: number }, own: boolean): Rect => {
+    const r = own ? 4 : 9
+    return { x0: m.mx - r, x1: m.mx + r, y0: m.my - r, y1: m.my + r }
   }
   // 2px clearance margin: touching rects read as overlapping at dot scale
   const overlaps = (a: Rect, b: Rect) =>
     a.x0 < b.x1 + 2 && b.x0 < a.x1 + 2 && a.y0 < b.y1 + 2 && b.y0 < a.y1 + 2
-  const conflicts = (cand: PlacedLabel): number => {
+  const conflicts = (cand: PlacedLabel, ownIdx: number): number => {
     const r = labelRect(cand)
     let n = placed.filter((p) => overlaps(r, labelRect(p))).length
-    n += obstacles.filter((o) => overlaps(r, o)).length
+    n += markers.filter((m, i) => overlaps(r, markerRect(m, i === ownIdx))).length
     // the assessment line, sampled at the label's center
     const ly = lineYAt(x.value.invert((r.x0 + r.x1) / 2))
     if (ly != null && r.y0 < ly + 4 && ly - 4 < r.y1) n += 1
     return n
   }
-  const place = (cand: PlacedLabel, markerX: number, markerY: number) => {
+  const place = (cand: PlacedLabel, markerX: number, markerY: number, ownIdx: number) => {
     // candidates: natural spot, then beside the marker (dense chart tops
     // often leave no vertical slot), each swept over clamped y offsets; if
     // nothing is fully clear, take the least-conflicted spot
@@ -147,7 +151,7 @@ const labels = computed<PlacedLabel[]>(() => {
     for (const base of bases) {
       for (const dy of [0, 15, -15, 30, -30, 45, -45, 60, -60]) {
         const attempt = { ...base, y: Math.min(BASE - 2, Math.max(11, base.y + dy)) }
-        const score = conflicts(attempt)
+        const score = conflicts(attempt, ownIdx)
         if (score === 0) {
           placed.push(attempt)
           return
@@ -160,6 +164,7 @@ const labels = computed<PlacedLabel[]>(() => {
     }
     placed.push(best ?? cand)
   }
+  let markerIdx = 0
   if (last.value) {
     const lx = x.value(last.value.year)
     const ly = y.value(last.value.value)
@@ -176,9 +181,11 @@ const labels = computed<PlacedLabel[]>(() => {
       },
       lx,
       ly,
+      markerIdx,
     )
+    markerIdx += 1
   }
-  for (const s of [...pricedSales.value].sort((a, b) => a.year - b.year)) {
+  for (const s of pricedSales.value) {
     const sx = x.value(s.year)
     const sy = y.value(s.price as number)
     place(
@@ -194,7 +201,9 @@ const labels = computed<PlacedLabel[]>(() => {
       },
       sx,
       sy,
+      markerIdx,
     )
+    markerIdx += 1
   }
   return placed
 })

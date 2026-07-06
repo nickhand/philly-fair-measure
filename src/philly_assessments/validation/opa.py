@@ -27,10 +27,10 @@ Two model families share the mart, distinguished by `model_family` +
                  (interval_method="bayesian_posterior")
     condo        88-prefix residential condo units (250-12,000 sqft); point
                  estimate from the latest condo LightGBM run, interval from
-                 the condo Bayesian run's posterior predictive when one
-                 exists (interval_method="bayesian_posterior"), else from
-                 spatially weighted conformal offsets around the LightGBM
-                 prediction (interval_method="conformal_knn")
+                 spatially weighted conformal offsets around that prediction
+                 (interval_method="conformal_knn") — the self-consistent
+                 pairing; the condo Bayesian arm is a research artifact
+                 (hot median, stiff to unit-level evidence)
 
 `screen_z` expresses the disagreement in predictive-uncertainty units
 (log(OPA/median) scaled by the interval's log-width / 3.29, i.e. ~standard
@@ -472,11 +472,15 @@ def _condo_screen_frame(
 ) -> tuple[pl.DataFrame, list[Path]] | None:
     """Condo rows for the screen, or None when the condo model isn't built.
 
-    Point estimate from the latest condo LightGBM run. The 90% interval comes
-    from the condo Bayesian run when one exists — the same dual-model gate the
-    residential screen uses — falling back to spatially weighted conformal
-    offsets calibrated on the LightGBM run's validation slice
-    (models/conformal.py)."""
+    Point estimate AND interval from the self-consistent LightGBM + conformal
+    pairing: the isotonic-calibrated condo LightGBM (measured 2026-07-06:
+    repeat-segment median 1.035 with the prior-sale carry-forward) anchors the
+    flags, with spatially weighted conformal offsets calibrated on its own
+    validation slice (models/conformal.py). The condo Bayesian arm stays a
+    research artifact: its median runs ~25% hot out-of-time (the district
+    price index over-adjusts condos) and, being linear, it barely reacts to a
+    unit's own prior sale — 3600 Conshohocken #1001 (sold $140k in 2024)
+    priced $84k Bayesian vs $118k LightGBM against OPA's $120k."""
     from philly_assessments.features.condo_features import assemble_condo_assessment_features
 
     try:
@@ -484,11 +488,6 @@ def _condo_screen_frame(
     except FileNotFoundError:
         logger.info("no condo run found; screening residential only")
         return None
-    try:
-        bayes_run: Path | None = latest_run_dir("bayesian-condo", data_dir)
-    except FileNotFoundError:
-        bayes_run = None
-        logger.info("no bayesian-condo run found; condo intervals fall back to conformal")
     condo_mart = root / "marts" / "condo_sale_features.parquet"
     if not condo_mart.exists():
         logger.info("condo mart missing; screening residential only")
@@ -497,8 +496,7 @@ def _condo_screen_frame(
         ("condo_sale_features", read_derived_manifest(condo_mart).built_at),
         ("sale_features", residential_mart_built),
     )
-    for run_dir in (condo_run, *([bayes_run] if bayes_run is not None else [])):
-        _require_coherent(run_dir, marts, allow_stale=allow_stale)
+    _require_coherent(condo_run, marts, allow_stale=allow_stale)
 
     proximity_path = root / "marts" / "proximity.parquet"
     features = assemble_condo_assessment_features(
@@ -527,24 +525,20 @@ def _condo_screen_frame(
         pred = pred * np.exp(-features["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy())
     condo_calibration = lightgbm_median_ratio(condo_run, model="condo_lightgbm")
 
-    if bayes_run is not None:
-        median, pi_low, pi_high = score_bayesian_intervals(bayes_run, features)
-        interval_method = IntervalMethod.BAYESIAN
-    else:
-        from philly_assessments.models.conformal import (
-            calibration_from_run,
-            conformal_offsets,
-            xy_district,
-        )
+    from philly_assessments.models.conformal import (
+        calibration_from_run,
+        conformal_offsets,
+        xy_district,
+    )
 
-        cal = calibration_from_run(condo_run, data_dir)
-        xy, district = xy_district(features)
-        lo_off, hi_off = conformal_offsets(cal, xy, district, method="knn")
-        # the conformal residuals are measured around the isotonic-calibrated
-        # prediction, so that prediction anchors the interval and the flags
-        median = pred
-        pi_low, pi_high = pred * np.exp(lo_off), pred * np.exp(hi_off)
-        interval_method = IntervalMethod.CONFORMAL
+    cal = calibration_from_run(condo_run, data_dir)
+    xy, district = xy_district(features)
+    lo_off, hi_off = conformal_offsets(cal, xy, district, method="knn")
+    # the conformal residuals are measured around the isotonic-calibrated
+    # prediction, so that prediction anchors the interval and the flags
+    median = pred
+    pi_low, pi_high = pred * np.exp(lo_off), pred * np.exp(hi_off)
+    interval_method = IntervalMethod.CONFORMAL
 
     frame = features.select(
         "parcel_id",
@@ -573,4 +567,4 @@ def _condo_screen_frame(
         pl.lit(interval_method).alias("interval_method"),
         pl.lit(valuation_date).alias("valuation_date"),
     )
-    return frame, [condo_run, *([bayes_run] if bayes_run is not None else [])]
+    return frame, [condo_run]

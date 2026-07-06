@@ -62,7 +62,12 @@ const estAnchor = computed<'start' | 'middle' | 'end'>(() => {
   if (frac < 0.15) return 'start'
   if (frac > 0.85) return 'end'
   if (Math.abs(medX.value - opaX.value) < 95) {
-    return medX.value <= opaX.value ? 'end' : 'start'
+    // far side of the city drop line — unless that side runs into the
+    // low/high bound labels at the strip's edges, then take the near side
+    const farSide = medX.value <= opaX.value ? 'end' : 'start'
+    if (farSide === 'end' && frac < 0.28) return 'start'
+    if (farSide === 'start' && frac > 0.72) return 'end'
+    return farSide
   }
   return 'middle'
 })

@@ -121,14 +121,15 @@ isotonic-calibrated) with condo features: unit characteristics,
 `unit_area_share` (the public-data stand-in for declared % ownership), and
 building-level leave-one-out rolling means. `building_id` itself is not a
 feature (~9k mostly-singleton levels would overfit); the rolling mean carries
-the building signal. The condo family also has a Bayesian arm — the §5.4
-hierarchy retrained on the condo mart with condo covariates (unit area,
-building rolls, floor, `unit_area_share`, building size) and an evidence-only
-σ design (condo units have no style; the district effect carries
-geography-conditional width). Measured on the out-of-time condo test slice
-(n=1,868): 90% interval coverage 0.887, COD 23.8, R²(log) 0.78. The screen
-uses this posterior for condo intervals when a `bayesian-condo` run exists,
-falling back to conformal offsets (§5.6) otherwise.
+the building signal, and the unit's own prior sale enters as the same
+repeat-sales carry-forward the residential model uses (measured 2026-07-06:
+repeat-segment COD 23.9 → 21.6, median ratio 1.063 → 1.035). The screen pairs
+this LightGBM point estimate with conformal offsets (§5.6) — a
+self-consistent anchor. The condo family also has a Bayesian arm (the §5.4
+hierarchy on condo covariates with an evidence-only σ design), kept as a
+research artifact rather than the screen's anchor: its median runs ~25% hot
+out-of-time (the district price index over-adjusts condos) and, being
+linear, it barely reacts to a unit's own prior sale.
 
 ### 5.5b New construction
 A sale-comparison model prices a brand-new build against the older stock it
