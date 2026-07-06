@@ -78,6 +78,7 @@ def assemble_assessment_features(
     valuation_date: datetime,
     market_areas: pl.LazyFrame | None = None,
     price_index: pl.DataFrame | None = None,
+    area_drift: pl.DataFrame | None = None,
     parcels: pl.LazyFrame | None = None,
     demolitions: pl.LazyFrame | None = None,
     delinquencies: pl.LazyFrame | None = None,
@@ -134,6 +135,7 @@ def assemble_assessment_features(
         "parcel_id",
         "loc_block_id",
         "loc_district",
+        "loc_market_area",
         pl.col("total_livable_area").alias("livable_area"),
         pl.col("year_built_parsed").alias("year_built"),
         "lon",
@@ -142,10 +144,11 @@ def assemble_assessment_features(
     ).unique(subset=["parcel_id"])
     pool = pool.join(sale_context, on="parcel_id", how="left")
     if price_index is not None:
-        pool = with_time_adjustment(pool, price_index)
+        pool = with_time_adjustment(pool, price_index, area_drift=area_drift)
         base_adj = with_time_adjustment(
             base.with_columns(pl.lit(valuation_date).alias("_val_date")),
             price_index,
+            area_drift=area_drift,
             date_col="_val_date",
         ).drop("_val_date")
     else:

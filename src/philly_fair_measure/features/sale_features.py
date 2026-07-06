@@ -123,6 +123,15 @@ DIST_COLUMNS = [
 ]
 
 
+def _load_area_drift(root: Path) -> pl.DataFrame | None:
+    """Optional companion to the price index (v2 repeat-sales build)."""
+    path = root / "marts" / "area_drift.parquet"
+    if not path.exists():
+        return None
+    drift = pl.read_parquet(path)
+    return drift if drift.height else None
+
+
 def join_delinquencies(frame: pl.DataFrame, delinquencies: pl.LazyFrame | None) -> pl.DataFrame:
     """CURRENT-ONLY distress join (dist_ prefix): the delinquency table shows
     today's delinquents, so these features are honest for recent sales and the
@@ -668,6 +677,7 @@ def assemble_sale_features(
     assessments: pl.LazyFrame,
     market_areas: pl.LazyFrame | None = None,
     price_index: pl.DataFrame | None = None,
+    area_drift: pl.DataFrame | None = None,
     parcels: pl.LazyFrame | None = None,
     demolitions: pl.LazyFrame | None = None,
     delinquencies: pl.LazyFrame | None = None,
@@ -753,7 +763,7 @@ def assemble_sale_features(
         .rename({"market_area": "loc_market_area", "district": "loc_district"})
     )
     if price_index is not None:
-        pool = with_time_adjustment(pool, price_index)
+        pool = with_time_adjustment(pool, price_index, area_drift=area_drift)
     else:
         pool = pool.with_columns(pl.lit(0.0).alias("time_adj_log"))
 
@@ -1040,6 +1050,7 @@ def build_sale_features(
         pl.scan_parquet(paths["assessments"]),
         pl.scan_parquet(paths["market_areas"]),
         pl.read_parquet(paths["price_index"]),
+        _load_area_drift(root),
         optional["parcels"],
         optional["demolitions"],
         optional["delinquencies"],

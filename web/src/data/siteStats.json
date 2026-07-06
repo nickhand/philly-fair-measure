@@ -1,8 +1,8 @@
 {
   "meta": {
     "generated_at": "2026-07-06",
-    "model_run_id": "20260706T202658Z-baseline",
-    "interval_run_id": "20260706T200133Z-bayesian",
+    "model_run_id": "20260706T222312Z-baseline",
+    "interval_run_id": "20260706T224625Z-bayesian",
     "n_test": 19484,
     "interval_nominal_pct": 90,
     "interval_coverage_pct": 91
@@ -16,37 +16,37 @@
       "mape_pct": 34.0
     },
     "model": {
-      "median_ratio": 1.035,
-      "cod": 25.9,
-      "prd": 1.072,
-      "prb": -0.061,
-      "mape_pct": 27.0
+      "median_ratio": 1.031,
+      "cod": 25.5,
+      "prd": 1.087,
+      "prb": -0.073,
+      "mape_pct": 26.4
     }
   },
   "iaao_card": {
     "opa": {
-      "median_ratio": 0.848,
-      "cod": 24.7,
-      "prd": 1.07,
+      "median_ratio": 0.893,
+      "cod": 23.2,
+      "prd": 1.065,
       "prb": -0.058,
-      "mape_pct": 24.9
+      "mape_pct": 22.9
     },
     "model": {
-      "median_ratio": 1.0,
-      "cod": 20.0,
-      "prd": 1.013,
-      "prb": 0.023,
-      "mape_pct": 20.0
+      "median_ratio": 1.001,
+      "cod": 19.3,
+      "prd": 1.024,
+      "prb": 0.01,
+      "mape_pct": 19.3
     }
   },
   "tiers_financed": {
     "q1": {
       "opa_pct": 124,
-      "model_pct": 109
+      "model_pct": 110
     },
     "q5": {
       "opa_pct": 88,
-      "model_pct": 100
+      "model_pct": 98
     }
   },
   "cash": {

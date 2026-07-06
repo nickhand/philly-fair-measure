@@ -12,8 +12,8 @@ comparisons — is published in a per-property report.
 · **Model documentation:** [docs/model.md](docs/model.md)
 
 As of the July 2026 run (Tax Year 2027 assessments), the screen covers
-**496,975** residential properties and condos: **1,716** flagged as likely
-over-assessed, **11,420** as likely under-assessed, and **53,564** inside the
+**496,975** residential properties and condos: **1,643** flagged as likely
+over-assessed, **6,253** as likely under-assessed, and **44,408** inside the
 interval but near its edge ("worth a look"). A residential flag requires two
 independent uncertainty methods — the Bayesian posterior interval and a
 spatially weighted conformalized-quantile-regression band — to both place the
@@ -41,7 +41,7 @@ area are reported as insufficient rather than valued.
 
 ## Results
 
-Out-of-time test set (n = 19,484), run `20260706T202658Z-baseline`. The same
+Out-of-time test set (n = 19,484), run `20260706T222312Z-baseline`. The same
 homes, the same treatment; OPA's assessed values are the incumbent benchmark.
 
 On the IAAO ratio-study basis (financed, arm's-length sales — the standard
@@ -49,14 +49,14 @@ assessment offices are evaluated on):
 
 | | Median ratio | COD | PRD | PRB | MAPE |
 |---|---|---|---|---|---|
-| This model | 1.000 | 20.0 | 1.013 | +0.023 | 20.0% |
+| This model | 1.001 | 19.3 | 1.024 | +0.010 | 19.3% |
 | OPA | 0.848 | 24.7 | 1.070 | −0.058 | 24.9% |
 
 On the full untrimmed sample, including cash and distressed sales:
 
 | | Median ratio | COD | PRD | PRB | MAPE |
 |---|---|---|---|---|---|
-| This model | 1.035 | 25.9 | 1.072 | −0.061 | 27.0% |
+| This model | 1.031 | 25.5 | 1.087 | −0.073 | 26.4% |
 | OPA | 0.983 | 34.5 | 1.190 | −0.234 | 34.0% |
 
 IAAO targets for reference: median ratio 0.90–1.10, COD ≤ 15 (single-family),
@@ -197,7 +197,9 @@ policies, are in [CONTRIBUTING.md](CONTRIBUTING.md).
   full-sample COD reflects that.
 - Predictive intervals undercover in the cheapest quintile (~76–79% realized
   vs. 90% nominal); the site reports interval-based results with that caveat.
-- Condo accuracy roughly ties OPA rather than beating it.
+- Condo accuracy: the model beats OPA on error (rmse 0.252 vs 0.278) and
+  sits within half a COD point of OPA's uniformity (19.3 vs 18.8) — condos
+  remain OPA's best segment.
 - OPA's interior-condition fields are stale and cannot be independently
   verified; the model routes around them with distress and permit signals.
 - Single metro; no cross-city validation.

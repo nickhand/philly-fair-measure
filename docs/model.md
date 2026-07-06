@@ -58,7 +58,7 @@ the persisted split fractions.
 |---|---|
 | Hedonic (`char_`) | area, beds/baths, year built, style, era, construction |
 | Learned market areas (`loc_`) | k-means sale-price geography replacing OPA's hand-drawn zones |
-| District price index (`time_adj_log`) | compound monthly log-$/sqft level, shrunk to citywide where thin |
+| Constant-quality price index (`time_adj_log`) | BMN repeat-sales curves per district (ridge-shrunk to citywide) + shrunken per-market-area drift — a mix index overstated gentrifying-district appreciation by up to ±28% vs repeat-sale truth |
 | As-of kNN surface (`mkt_knn_`) | distance-weighted mean of the *k* nearest **strictly earlier** sales — the between-block gradient trees can't interpolate; quarter-blocked against look-ahead |
 | Rolling means (`mkt_*_roll_`) | block/building leave-one-out $/sqft level (the CCAO workhorse) |
 | Parcel geometry (`shp_`) | area, perimeter, vertex/angle SDs, min-rotated-rect ratios from PWD polygons |
@@ -186,8 +186,8 @@ set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
 |---|---|---|---|---|---|---|---|
-| **LightGBM** | **0.338** | **27.1%** | 1.035 | **26.0** | **1.072** | **−0.061** | 0.932 |
-| Ridge | 0.436 | 37.7% | 1.022 | 36.9 | 1.038 | −0.054 | 1.022 |
+| **LightGBM** | **0.333** | **26.4%** | 1.031 | **25.5** | **1.087** | **−0.073** | 0.905 |
+| Ridge | 0.427 | 37.4% | 1.045 | 35.5 | 1.061 | −0.080 | 0.981 |
 | **OPA (incumbent)** | 0.449 | 34.0% | 0.983 | 34.5 | 1.190 | −0.234 | 0.787 |
 
 The model is **more accurate** (RMSE 0.337 vs 0.449), **more uniform**
@@ -263,9 +263,12 @@ Guards keep the flags honest where the record, not the value, is the problem:
   flagged, so the strong flags stay reserved for cases outside the model's
   stated uncertainty.
 
-As of run `20260706T202658Z` (Tax Year 2027 roll): 496,975 properties
-screened — 1,716 over-assessed candidates, 11,420 under-assessed candidates,
-53,564 in the attention tier, 93 insufficient records. A coherence gate
+As of run `20260706T222312Z` (Tax Year 2027 roll): 496,975 properties
+screened — 1,643 over-assessed candidates, 6,253 under-assessed candidates,
+44,408 in the attention tier, 93 insufficient records. (The constant-quality
+index cut under-assessed candidates nearly in half: the retired mix index
+inflated estimates in gentrifying districts, manufacturing spurious
+under-flags.) A coherence gate
 refuses to screen against feature marts and model runs from different
 generations (`StaleRunError`) rather than silently mixing them, and every
 build must pass the structural invariants in `validation/screen_audit.py`
@@ -293,7 +296,8 @@ pipeline · a full model-vs-OPA benchmark on every run.
 
 ## 9. Known limitations
 
-Cash-market dispersion is partly irreducible; condo parity with OPA; interval
+Cash-market dispersion is partly irreducible; condos remain OPA's best
+segment (we beat their rmse, trail their COD by ~0.5); interval
 undercoverage in q1; OPA's interior-condition fields are stale and unavailable
 to verify (the model routes around them via distress/permit signals); single
 metro, no cross-city validation.

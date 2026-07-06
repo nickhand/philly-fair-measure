@@ -392,6 +392,8 @@ def build_assessment_screen(
         optional[name] = pl.scan_parquet(path) if path.exists() else None
     proximity_path = root / "marts" / "proximity.parquet"
     optional["proximity"] = pl.scan_parquet(proximity_path) if proximity_path.exists() else None
+    from philly_fair_measure.features.sale_features import _load_area_drift
+
     features = assemble_assessment_features(
         pl.scan_parquet(paths["opa"]),
         pl.scan_parquet(paths["sales"]),
@@ -400,6 +402,7 @@ def build_assessment_screen(
         valuation_date,
         pl.scan_parquet(paths["market_areas"]),
         pl.read_parquet(paths["price_index"]),
+        _load_area_drift(root),
         optional["parcels"],
         optional["demolitions"],
         optional["delinquencies"],
@@ -624,12 +627,15 @@ def _condo_screen_frame(
     _require_coherent(condo_run, marts, allow_stale=allow_stale)
 
     proximity_path = root / "marts" / "proximity.parquet"
+    from philly_fair_measure.features.sale_features import _load_area_drift
+
     features = assemble_condo_assessment_features(
         pl.scan_parquet(paths["opa"]),
         pl.scan_parquet(paths["sales"]),
         valuation_date,
         pl.scan_parquet(paths["market_areas"]),
         pl.read_parquet(paths["price_index"]),
+        _load_area_drift(root),
         pl.scan_parquet(proximity_path) if proximity_path.exists() else None,
     )
     # pin row order for reproducible interval draws (see the residential arm)
