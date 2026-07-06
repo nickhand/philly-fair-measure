@@ -4,7 +4,7 @@
  * aria-activedescendant tracking, results announced via aria-live.
  * SCRIPT IS TESTED — the design pass (handoff) ports classes/markup only;
  * behavior, ids, and ARIA structure are unchanged. */
-import { computed, ref, useId } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useId } from 'vue'
 import { useSearch } from '@/composables/useSearch'
 import { track } from '@/lib/analytics'
 import { money } from '@/utils/format'
@@ -96,6 +96,21 @@ function prefixLen(address: string): number {
 }
 
 const showList = computed(() => open.value && text.value.trim().length >= 2)
+
+/** The full placeholder with the "like 1234 Maple St" hint gets cut off in a
+ * phone-width field; drop the hint below 640px. */
+const narrow = ref(false)
+function syncNarrow() {
+  narrow.value = typeof window !== 'undefined' && window.innerWidth < 640
+}
+onMounted(() => {
+  syncNarrow()
+  window.addEventListener('resize', syncNarrow)
+})
+onBeforeUnmount(() => window.removeEventListener('resize', syncNarrow))
+const placeholder = computed(() =>
+  narrow.value ? 'Enter your street address' : 'Enter your street address, like 1234 Maple St',
+)
 </script>
 
 <template>
@@ -121,7 +136,7 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
           spellcheck="false"
           enterkeyhint="search"
           type="text"
-          placeholder="Enter your street address, like 1234 Maple St"
+          :placeholder="placeholder"
           class="w-full bg-transparent text-base text-ink outline-none placeholder:text-faint"
           @input="onInput"
           @keydown="onKeydown"
