@@ -18,6 +18,34 @@ from = "/fair-measure/assets/*"
 to = "/assets/:splat"
 status = 200
 
+# Public files (Vite rebases their URLs to the subpath, but they live at the
+# publish root) — without these they'd fall through to the SPA fallback and
+# serve index.html instead of the font/icon/image
+[[redirects]]
+from = "/fair-measure/fonts/*"
+to = "/fonts/:splat"
+status = 200
+
+[[redirects]]
+from = "/fair-measure/favicon.svg"
+to = "/favicon.svg"
+status = 200
+
+[[redirects]]
+from = "/fair-measure/favicon-32.png"
+to = "/favicon-32.png"
+status = 200
+
+[[redirects]]
+from = "/fair-measure/social-card.png"
+to = "/social-card.png"
+status = 200
+
+[[redirects]]
+from = "/fair-measure/robots.txt"
+to = "/robots.txt"
+status = 200
+
 # SPA fallback for history-mode routes under the subpath
 [[redirects]]
 from = "/fair-measure/*"

@@ -4,20 +4,99 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
-      name="description"
-      content="A free, independent check of your Philadelphia property assessment. Enter your address and see if the city's value for your home looks fair."
+      name="robots"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
     />
     <meta name="theme-color" content="#0f4d90" />
+
+    <!-- Primary meta (per-route title/description/canonical are updated by the
+         router; these are the crawl-time defaults) -->
+    <title>Fair Measure — Check Your Philadelphia Property Assessment</title>
+    <meta name="title" content="Fair Measure — Check Your Philadelphia Property Assessment" />
+    <meta
+      name="description"
+      content="A free, independent check of Philadelphia property assessments. Enter your address, see if the city's value looks fair, and get the evidence to appeal."
+    />
+    <meta
+      name="keywords"
+      content="Philadelphia property assessment, property assessment check, Philly property tax, OPA assessment, property tax appeal Philadelphia, First Level Review, is my assessment fair, Philadelphia home value, assessment appeal, Tax Year 2027 assessments"
+    />
+    <meta name="author" content="Nick Hand" />
+    <link rel="canonical" href="https://nickhand.dev/fair-measure/" />
+
+    <!-- Open Graph / Facebook (absolute URLs — scrapers do not run JS) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://nickhand.dev/fair-measure/" />
     <meta property="og:title" content="Fair Measure — is your home's assessment fair?" />
     <meta
       property="og:description"
-      content="A free, independent check of your Philadelphia property assessment, built from the city's own open data."
+      content="A free, independent check of your Philadelphia property assessment, built from the city's own open data — with the evidence to appeal."
     />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="/social-card.png" />
+    <meta property="og:image" content="https://philly-fair-measure.netlify.app/social-card.png" />
+    <meta property="og:site_name" content="Nick Hand" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://nickhand.dev/fair-measure/" />
+    <meta name="twitter:title" content="Fair Measure — is your home's assessment fair?" />
+    <meta
+      name="twitter:description"
+      content="A free, independent check of your Philadelphia property assessment, built from the city's own open data — with the evidence to appeal."
+    />
+    <meta name="twitter:image" content="https://philly-fair-measure.netlify.app/social-card.png" />
+
+    <!-- Geo -->
+    <meta name="geo.region" content="US-PA" />
+    <meta name="geo.placename" content="Philadelphia" />
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>Fair Measure</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+
+    <!-- JSON-LD: WebApplication -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Fair Measure",
+        "alternateName": "Fair Measure Philadelphia",
+        "description": "A free, independent check of Philadelphia property assessments. Enter an address to see the city's value next to an open-data model's estimate, compare with similar homes, and get the evidence to request a review or appeal.",
+        "url": "https://nickhand.dev/fair-measure/",
+        "applicationCategory": "DataVisualization",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript",
+        "isAccessibleForFree": true,
+        "author": {
+          "@type": "Person",
+          "name": "Nick Hand",
+          "url": "https://nickhand.dev"
+        },
+        "publisher": {
+          "@type": "Person",
+          "name": "Nick Hand"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "image": "https://philly-fair-measure.netlify.app/social-card.png",
+        "about": {
+          "@type": "Thing",
+          "name": "Philadelphia property assessments",
+          "description": "Whether the City of Philadelphia's Tax Year 2027 property assessments reflect what homes actually sell for, checked home by home with an open-data valuation model."
+        },
+        "spatial": {
+          "@type": "Place",
+          "name": "Philadelphia, Pennsylvania",
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 39.9526,
+            "longitude": -75.1652
+          }
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

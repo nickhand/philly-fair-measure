@@ -51,6 +51,8 @@ async function load(id: string) {
         : 'Something went wrong loading this property. Please try again.'
     return
   }
+  // Router set a generic title on navigation; replace it with the address.
+  document.title = `${core.value.address} — Fair Measure`
   track('report_viewed', { flag: core.value.flag, family: core.value.model_family })
   reportLoading.value = true
   try {
