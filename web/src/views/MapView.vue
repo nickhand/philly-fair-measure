@@ -123,6 +123,8 @@ async function refreshParcels() {
   }
 }
 
+const searchRef = ref<InstanceType<typeof AddressSearch> | null>(null)
+
 async function openParcel(parcelId: string) {
   track('map_parcel_opened')
   try {
@@ -136,16 +138,27 @@ async function openParcel(parcelId: string) {
 function closeSheet() {
   selected.value = null
   map.value?.setFilter('fm-dot-selected', ['==', ['get', 'id'], ''])
+  // a cleared selection leaves a stale address in the bar otherwise
+  searchRef.value?.clear()
+}
+
+/** Open a parcel and bring the camera to it (search picks + ?parcel= links).
+ * Deep links jump instead of flying: the just-mounted map gets resized by
+ * settling layout, and maplibre cancels in-flight animations on resize. */
+async function focusParcel(parcelId: string, animate = true) {
+  await openParcel(parcelId)
+  const p = selected.value
+  if (p?.lon != null && p.lat != null) {
+    const camera = { center: [p.lon, p.lat] as [number, number], zoom: 17 }
+    if (animate) map.value?.flyTo(camera)
+    else map.value?.jumpTo(camera)
+  } else {
+    router.push({ name: 'property', params: { parcelId } })
+  }
 }
 
 async function onSearchSelect(hit: SearchHit) {
-  await openParcel(hit.parcel_id)
-  const p = selected.value
-  if (p?.lon != null && p.lat != null) {
-    map.value?.flyTo({ center: [p.lon, p.lat], zoom: 17 })
-  } else {
-    router.push({ name: 'property', params: { parcelId: hit.parcel_id } })
-  }
+  await focusParcel(hit.parcel_id)
 }
 
 /** Add paint overrides + the parcel source/layers as soon as the style can
@@ -227,6 +240,7 @@ function ensureParcelLayer(m: maplibregl.Map) {
         })
       }
       if (seen.size === 0) return
+      searchRef.value?.clear() // the bar can't describe a dot-click selection
       if (seen.size === 1) {
         choices.value = null
         openParcel([...seen.keys()][0]!)
@@ -264,6 +278,9 @@ onMounted(() => {
   m.on('styledata', () => ensureParcelLayer(m))
   m.on('moveend', refreshParcels) // independent of style readiness
   map.value = m
+  // deep link from the report page: /map?parcel=<id> opens + centers the home
+  const initial = router.currentRoute.value.query.parcel
+  if (typeof initial === 'string' && initial) void focusParcel(initial, false)
   if (import.meta.env.DEV) {
     // debugging handle for browser devtools; stripped from production builds
     ;(window as unknown as { __map?: maplibregl.Map }).__map = m
@@ -293,7 +310,7 @@ onBeforeUnmount(() => {
 
     <!-- floating search -->
     <div class="absolute inset-x-3 top-3 z-10 mx-auto max-w-[560px]">
-      <AddressSearch compact @select="onSearchSelect" />
+      <AddressSearch ref="searchRef" compact @select="onSearchSelect" />
     </div>
 
     <!-- legend chips double as show/hide toggles; a vertical column ordered

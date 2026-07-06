@@ -73,6 +73,12 @@ def equity_context(
     )
     if zip5 is not None:
         res = res.filter(pl.col("loc_zip5") == zip5)
+    # a condo's peers are OTHER buildings: a 335-unit tower would otherwise
+    # dominate its own benchmark and "equal treatment" would read as a
+    # comparison of the building with itself
+    building = screen_row.get("building_id")
+    if family == "condo" and building is not None:
+        res = res.filter(pl.col("building_id").is_null() | (pl.col("building_id") != building))
     lo, hi = model / _VALUE_BAND, model * _VALUE_BAND
 
     band = (
@@ -96,6 +102,6 @@ def equity_context(
     else:
         verdict = "in line"
 
-    kind = "condos in " if family == "condo" else ""
+    kind = "condos in other buildings, " if family == "condo" else ""
     where = f"{kind}ZIP {zip5}, {scope}" if zip5 is not None else scope
     return EquityContext(ratio, peer_median, peers.height, percentile, where, verdict)

@@ -559,6 +559,9 @@ def _condo_screen_frame(
         "loc_ward",
         "mkt_bldg_roll_n",
         "bldg_n_units",
+        # the equity peer group excludes the subject's own building — a
+        # 335-unit tower must not be its own "equal treatment" benchmark
+        "building_id",
         "opa_market_value",
     ).with_columns(
         pl.Series("pred_lightgbm", pred),

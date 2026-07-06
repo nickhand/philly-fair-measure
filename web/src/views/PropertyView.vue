@@ -168,11 +168,26 @@ function printPage() {
     <template v-else>
       <!-- header + verdict -->
       <div class="mt-4">
-        <h1 class="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">{{ core.address }}</h1>
+        <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <h1 class="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
+            {{ core.address }}
+          </h1>
+          <span
+            v-if="core.model_family === 'condo'"
+            class="rounded-full bg-brand-50 px-2.5 py-0.5 text-caption font-bold text-brand-700"
+            >Condo unit</span
+          >
+        </div>
         <p class="mt-1 text-body-sm text-muted">
           Philadelphia · OPA #{{ core.parcel_id }} ·
           <a :href="cityLink" rel="noopener" class="font-semibold text-brand-600 underline"
             >city record</a
+          >
+          ·
+          <RouterLink
+            :to="{ name: 'map', query: { parcel: core.parcel_id } }"
+            class="font-semibold text-brand-600 underline"
+            >see on the map</RouterLink
           >
         </p>
       </div>

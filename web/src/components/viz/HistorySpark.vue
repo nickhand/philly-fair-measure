@@ -82,21 +82,90 @@ function saleAnchor(sx: number): 'start' | 'middle' | 'end' {
   return 'middle'
 }
 
-/** Place each sale label above its diamond unless that spot is (a) off the top
- * of the plot, (b) within a band of the assessment line, or (c) colliding with
- * the "today" label — then drop it below the diamond. */
-function saleLabelY(sx: number, sy: number, year: number): number {
-  const above = sy - 12
-  let collide = above < 11 // clipped at the top edge
-  const ly = lineYAt(year)
-  if (ly != null && Math.abs(above - ly) < 11) collide = true
+/** Generic label placement: every label (the "today" callout and each sale)
+ * starts above its point and shifts vertically in steps until it clears the
+ * labels already placed, the markers, and the assessment line — instead of
+ * the previous pairwise special cases, which still let dense charts collide. */
+interface PlacedLabel {
+  key: string
+  text: string
+  x: number
+  y: number
+  anchor: 'start' | 'middle' | 'end'
+  fill: string
+  weight: number
+  size: number
+}
+
+const CHAR_W = 6.9
+const LABEL_H = 13
+
+function labelRect(l: { x: number; y: number; anchor: string; text: string }) {
+  const w = l.text.length * CHAR_W
+  const x0 = l.anchor === 'start' ? l.x : l.anchor === 'end' ? l.x - w : l.x - w / 2
+  return { x0, x1: x0 + w, y0: l.y - LABEL_H + 2, y1: l.y + 2 }
+}
+
+const labels = computed<PlacedLabel[]>(() => {
+  type Rect = { x0: number; x1: number; y0: number; y1: number }
+  const placed: PlacedLabel[] = []
+  const obstacles: Rect[] = []
   if (last.value) {
     const lx = x.value(last.value.year)
-    const ty = y.value(last.value.value) - 8
-    if (Math.abs(sx - lx) < 110 && Math.abs(above - ty) < 14) collide = true
+    const ly = y.value(last.value.value)
+    obstacles.push({ x0: lx - 6, x1: lx + 6, y0: ly - 6, y1: ly + 6 })
   }
-  return collide ? Math.min(BASE - 2, sy + 22) : above
-}
+  for (const s of pricedSales.value) {
+    const sx = x.value(s.year)
+    const sy = y.value(s.price as number)
+    obstacles.push({ x0: sx - 7, x1: sx + 7, y0: sy - 7, y1: sy + 7 })
+  }
+  const overlaps = (a: Rect, b: Rect) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1
+  const collides = (cand: PlacedLabel): boolean => {
+    const r = labelRect(cand)
+    if (placed.some((p) => overlaps(r, labelRect(p)))) return true
+    if (obstacles.some((o) => overlaps(r, o))) return true
+    // the assessment line, sampled at the label's center
+    const ly = lineYAt(x.value.invert((r.x0 + r.x1) / 2))
+    return ly != null && r.y0 < ly + 4 && ly - 4 < r.y1
+  }
+  const place = (cand: PlacedLabel) => {
+    for (const dy of [0, 15, -15, 30, -30, 45, -45]) {
+      const attempt = { ...cand, y: Math.min(BASE - 2, Math.max(11, cand.y + dy)) }
+      if (!collides(attempt)) {
+        placed.push(attempt)
+        return
+      }
+    }
+    placed.push(cand) // dense beyond saving — keep the natural spot
+  }
+  if (last.value) {
+    place({
+      key: 'today',
+      text: `${moneyCompact(last.value.value)} today`,
+      x: x.value(last.value.year),
+      y: Math.max(11, y.value(last.value.value) - 8),
+      anchor: 'end',
+      fill: '#0f4d90',
+      weight: 700,
+      size: 12.5,
+    })
+  }
+  for (const s of [...pricedSales.value].sort((a, b) => a.year - b.year)) {
+    const sx = x.value(s.year)
+    place({
+      key: `sale-${s.date}`,
+      text: `Sold ${moneyCompact(s.price as number)}`,
+      x: sx,
+      y: y.value(s.price as number) - 12,
+      anchor: saleAnchor(sx),
+      fill: '#8a6100',
+      weight: 600,
+      size: 12,
+    })
+  }
+  return placed
+})
 
 const ariaLabel = computed(() => {
   const first = props.assessments[0]
@@ -146,30 +215,29 @@ function onMove(e: PointerEvent) {
         <line :x1="hover.sx" :y1="TOP" :x2="hover.sx" :y2="BASE" stroke="#c6d0dc" stroke-width="1" aria-hidden="true" />
         <circle :cx="hover.sx" :cy="hover.sy" r="3.5" fill="#ffffff" stroke="#0f4d90" stroke-width="2" aria-hidden="true" />
       </template>
-      <template v-if="last">
-        <circle :cx="x(last.year)" :cy="y(last.value)" r="4" fill="#0f4d90" />
-        <text :x="x(last.year)" :y="Math.max(11, y(last.value) - 8)" text-anchor="end" font-size="12.5" font-weight="700" fill="#0f4d90" style="font-variant-numeric: tabular-nums">
-          {{ moneyCompact(last.value) }} today
-        </text>
-      </template>
-      <g v-for="s in pricedSales" :key="s.date">
-        <rect
-          :x="x(s.year) - 4.5" :y="y(s.price as number) - 4.5" width="9" height="9"
-          fill="#ffffff" stroke="#8a6100" stroke-width="2"
-          :transform="`rotate(45 ${x(s.year)} ${y(s.price as number)})`"
-        />
-        <text
-          :x="x(s.year)"
-          :y="saleLabelY(x(s.year), y(s.price as number), s.year)"
-          :text-anchor="saleAnchor(x(s.year))"
-          font-size="12"
-          font-weight="600"
-          fill="#8a6100"
-          style="font-variant-numeric: tabular-nums"
-        >
-          Sold {{ moneyCompact(s.price as number) }}
-        </text>
-      </g>
+      <circle v-if="last" :cx="x(last.year)" :cy="y(last.value)" r="4" fill="#0f4d90" />
+      <rect
+        v-for="s in pricedSales"
+        :key="s.date"
+        :x="x(s.year) - 4.5" :y="y(s.price as number) - 4.5" width="9" height="9"
+        fill="#ffffff" stroke="#8a6100" stroke-width="2"
+        :transform="`rotate(45 ${x(s.year)} ${y(s.price as number)})`"
+      />
+      <!-- labels last so they paint above markers; positions come from the
+           collision solver -->
+      <text
+        v-for="l in labels"
+        :key="l.key"
+        :x="l.x"
+        :y="l.y"
+        :text-anchor="l.anchor"
+        :font-size="l.size"
+        :font-weight="l.weight"
+        :fill="l.fill"
+        style="font-variant-numeric: tabular-nums"
+      >
+        {{ l.text }}
+      </text>
       <text :x="PAD" :y="BASE + 15" text-anchor="start" font-size="11.5" fill="#8593a4">{{ years[0] }}</text>
       <text :x="width - PAD" :y="BASE + 15" text-anchor="end" font-size="11.5" fill="#8593a4">{{ years[1] }}</text>
     </svg>

@@ -74,6 +74,21 @@ function onCheck() {
   else inputEl.value?.focus()
 }
 
+/** Clear the field (X button, or the parent when a selection goes away). */
+function clear() {
+  text.value = ''
+  reset()
+  open.value = false
+  active.value = -1
+}
+
+function onClear() {
+  clear()
+  inputEl.value?.focus()
+}
+
+defineExpose({ clear })
+
 /** Bold the matched prefix in each option ("108 ELF|reths aly"). */
 function prefixLen(address: string): number {
   const needle = text.value.trim().toUpperCase()
@@ -113,6 +128,16 @@ const showList = computed(() => open.value && text.value.trim().length >= 2)
           @focus="open = true"
           @blur="onBlur"
         />
+        <button
+          v-if="text"
+          type="button"
+          aria-label="Clear the search"
+          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted hover:bg-paper"
+          @mousedown.prevent
+          @click="onClear"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></svg>
+        </button>
       </div>
       <button
         v-if="!props.compact"
