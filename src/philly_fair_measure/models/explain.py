@@ -88,6 +88,8 @@ FEATURE_LABELS: dict[str, tuple[str, str]] = {
     "mkt_knn_log_ppsf": ("nearby recent sale prices", _SALES),
     "mkt_knn_n": ("number of nearby recent sales", _SALES),
     "mkt_knn_mean_dist_m": ("distance to comparable sales", _SALES),
+    "mkt_knn_price_anchor_log": ("nearby prices scaled to this home's size", _SALES),
+    "mkt_newbuild_price_anchor_log": ("new-construction prices at this home's size", _SALES),
     "char_new_build": ("newly built home", _HOME),
     "mkt_newbuild_knn_log_ppsf": ("nearby sales of newly built homes", _SALES),
     "mkt_newbuild_knn_n": ("number of nearby new-construction sales", _SALES),

@@ -47,6 +47,7 @@ from philly_fair_measure.features.sale_features import (
     join_delinquencies,
     join_parcel_shapes,
     join_proximity,
+    price_anchor_exprs,
     style_expr,
 )
 from philly_fair_measure.features.spatial import (
@@ -463,6 +464,7 @@ def assemble_assessment_features(
                 pl.col("char_new_build")
                 * (pl.col("mkt_newbuild_knn_log_ppsf") - pl.col("mkt_knn_log_ppsf")).fill_null(0.0)
             ).alias("mkt_newbuild_premium"),
+            *price_anchor_exprs(),
         )
         .drop("house_number_parsed", strict=False)
     )

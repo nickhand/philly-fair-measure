@@ -78,6 +78,12 @@ NUMERIC_FEATURES: Final = (
     "mkt_knn_log_ppsf",
     "mkt_knn_n",
     "mkt_knn_mean_dist_m",
+    # log-price anchors: surface $/sqft x this home's size, on the target's
+    # own scale — trees can't form the product themselves, and without it
+    # large homes regress toward neighborhood dollar levels (measured: sold
+    # new builds >2,500 sqft under-predicted 18.5% median, n=78)
+    "mkt_knn_price_anchor_log",
+    "mkt_newbuild_price_anchor_log",
     # new-construction comp surface: what then-new homes sold for nearby —
     # the pool a brand-new build actually belongs to (features/spatial.py)
     "char_new_build",

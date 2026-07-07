@@ -294,3 +294,30 @@ def test_assessment_join_and_population_window():
 
     assert row["asmt_market_value_sale_year"] == 180_000.0
     assert row["asmt_value_yoy_change"] == pytest.approx(0.2)
+
+
+def test_price_anchor_exprs_scale_surfaces_to_home_size():
+    from philly_fair_measure.features.sale_features import price_anchor_exprs
+
+    df = pl.DataFrame(
+        {
+            "char_livable_area": [1000.0, 2000.0, 0.0, None],
+            "mkt_knn_log_ppsf": [math.log(200.0)] * 4,
+            "mkt_newbuild_knn_log_ppsf": [math.log(300.0), None, math.log(300.0), math.log(300.0)],
+        }
+    ).with_columns(price_anchor_exprs())
+    # exp(anchor) = surface $/sqft x sqft: an implied price on the target's scale
+    assert math.exp(df["mkt_knn_price_anchor_log"][0]) == pytest.approx(200_000.0)
+    assert math.exp(df["mkt_newbuild_price_anchor_log"][0]) == pytest.approx(300_000.0)
+    assert math.exp(df["mkt_knn_price_anchor_log"][1]) == pytest.approx(400_000.0)
+    # null-honest: a missing surface or unusable recorded area never
+    # fabricates an anchor (the model reads density from the *_n columns)
+    assert df["mkt_newbuild_price_anchor_log"][1] is None
+    assert df["mkt_knn_price_anchor_log"][2] is None
+    assert df["mkt_knn_price_anchor_log"][3] is None
+
+
+def test_assembled_frames_carry_the_price_anchors():
+    by_id = _assemble([_sale("s1", "p1", 260_000.0, datetime(2019, 6, 1))], [_opa("p1")])
+    assert "mkt_knn_price_anchor_log" in next(iter(by_id.values()))
+    assert "mkt_newbuild_price_anchor_log" in next(iter(by_id.values()))

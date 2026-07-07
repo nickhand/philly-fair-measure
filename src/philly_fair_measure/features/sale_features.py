@@ -621,6 +621,28 @@ def _parcel_prior_sale_features(pool: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def price_anchor_exprs() -> list[pl.Expr]:
+    """Log-price anchors: what the kNN $/sqft surfaces imply for THIS home's
+    size (surface log $/sqft + log sqft = log dollars, the target's own
+    scale). Trees cannot multiply two features, so without the explicit
+    product the model regresses large homes toward neighborhood dollar
+    levels — measured 2026-07-07 on the out-of-time test set: sold new builds
+    over 2,500 sqft under-predicted 18.5% at the median (n=78), the
+    206 Kalos St failure ($289/sqft of surface evidence, $205/sqft
+    predicted). Null-honest: null when either ingredient is missing, so the
+    model keeps reading evidence density from the *_n / *_mean_dist_m
+    columns. Shared by both feature frames — the definitions must match."""
+    area_log = (
+        pl.when(pl.col("char_livable_area") > 0)
+        .then(pl.col("char_livable_area").log())
+        .otherwise(None)
+    )
+    return [
+        (pl.col("mkt_knn_log_ppsf") + area_log).alias("mkt_knn_price_anchor_log"),
+        (pl.col("mkt_newbuild_knn_log_ppsf") + area_log).alias("mkt_newbuild_price_anchor_log"),
+    ]
+
+
 def _knn_surface(pool: pl.DataFrame) -> pl.DataFrame:
     """As-of kNN $/sqft surfaces for every pooled sale (see features/spatial.py):
     the general surface over all arms-length sales, plus a new-construction
@@ -981,6 +1003,7 @@ def assemble_sale_features(
                 pl.col("char_new_build")
                 * (pl.col("mkt_newbuild_knn_log_ppsf") - pl.col("mkt_knn_log_ppsf")).fill_null(0.0)
             ).alias("mkt_newbuild_premium"),
+            *price_anchor_exprs(),
         )
         .drop("asmt_year", "house_number_parsed", "livable_area", "year_built", strict=False)
     )

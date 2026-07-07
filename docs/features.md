@@ -51,6 +51,22 @@ external (listings — access/terms-constrained; imagery — later-stage) or
 accepting the limit and letting the Bayesian intervals carry the tail
 uncertainty, which they do.
 
+**New-construction evidence (`mkt_newbuild_*`, `char_new_build`; anchors
+added 2026-07-07):** a second kNN surface whose evidence pool is restricted
+to sales of then-new homes (built within `NEW_BUILD_LAG_YEARS`=1 of their own
+sale; ~4% of the pool, so k=10 and the mean neighbor distance doubles as the
+evidence-density signal), plus `char_new_build` and `mkt_newbuild_premium`
+(new-build surface minus general surface, applied to new builds only).
+`mkt_knn_price_anchor_log` / `mkt_newbuild_price_anchor_log` (2026-07-07) are
+the surfaces scaled to the home's own size — surface log $/sqft + log sqft,
+i.e. an implied log price on the target's scale. Trees cannot form that
+product themselves, and the measured cost was concentrated exactly where a
+factored form is needed: sold new builds over 2,500 sqft under-predicted
+**18.5%** at the median (n=78) while the 409-sale new-build slice overall sat
+at −2% — the "large new build among old rowhomes" case (206 Kalos St:
+$289/sqft of surface evidence, $205/sqft predicted). Null-honest: anchors are
+null wherever a surface or the recorded area is missing.
+
 **L&I distress round two + tenure (`evt_`/`ten_`, 2026-07-03):** four newly
 ingested tables (complaints 1.04M, case_investigations 2.08M, rental
 business_licenses 288k, appeals 43k — all ~99% OPA-linked, live-profiled
