@@ -60,7 +60,8 @@ def readme_screen_counts(stats: dict[str, Any]) -> str:
         f"As of the latest run (Tax Year 2027 assessments), the screen covers\n"
         f"**{s['properties']:,}** residential properties and condos: **{s['over']:,}** flagged\n"
         f"as likely over-assessed, **{s['under']:,}** as likely under-assessed, and\n"
-        f'**{s["watch"]:,}** inside the interval but near its edge ("worth a look").\n'
+        f"**{s['watch']:,}** unflagged but at or beyond the edge of the published\n"
+        f'range ("worth a look").\n'
         f"A residential flag requires two independent uncertainty methods — the\n"
         f"Bayesian posterior interval and a spatially weighted\n"
         f"conformalized-quantile-regression band — to both place the city's value\n"

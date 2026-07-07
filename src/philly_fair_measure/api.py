@@ -92,8 +92,8 @@ class PropertyCore(BaseModel):
     ratio: float | None
     screen_z: float | None
     flag: str
-    # within-range but in the outer part of the interval ("high"/"low") —
-    # weaker evidence than a flag, shown as "worth a closer look"
+    # within-range but at/beyond the outer fifth of the DISPLAYED band
+    # ("high"/"low") — weaker evidence than a flag, "worth a closer look"
     attention: str | None = None
     # built within ~a year of the valuation date: comp evidence runs low on
     # new construction, so the report shows a caveat
@@ -189,8 +189,8 @@ class Stats(BaseModel):
     within: int
     over: int
     under: int
-    # within-range homes near the interval edge (attention tier) — the
-    # "worth a closer look" count, weaker evidence than over/under
+    # within-range homes at/beyond the displayed band's edge (attention
+    # tier) — the "worth a closer look" count, weaker evidence than over/under
     watch: int
     median_ratio: float | None
     screen_built: str | None

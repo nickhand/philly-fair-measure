@@ -1,8 +1,8 @@
 {
   "meta": {
-    "generated_at": "2026-07-06",
-    "model_run_id": "20260706T222312Z-baseline",
-    "interval_run_id": "20260706T224625Z-bayesian",
+    "generated_at": "2026-07-07",
+    "model_run_id": "20260707T002634Z-baseline",
+    "interval_run_id": "20260707T004911Z-bayesian",
     "n_test": 19484,
     "interval_nominal_pct": 90,
     "interval_coverage_pct": 91
@@ -16,11 +16,11 @@
       "mape_pct": 34.0
     },
     "model": {
-      "median_ratio": 1.031,
-      "cod": 25.5,
+      "median_ratio": 1.032,
+      "cod": 25.6,
       "prd": 1.087,
-      "prb": -0.073,
-      "mape_pct": 26.4
+      "prb": -0.072,
+      "mape_pct": 26.6
     }
   },
   "iaao_card": {
@@ -32,11 +32,11 @@
       "mape_pct": 22.9
     },
     "model": {
-      "median_ratio": 1.001,
-      "cod": 19.3,
+      "median_ratio": 0.999,
+      "cod": 19.5,
       "prd": 1.024,
       "prb": 0.01,
-      "mape_pct": 19.3
+      "mape_pct": 19.4
     }
   },
   "tiers_financed": {
@@ -46,7 +46,7 @@
     },
     "q5": {
       "opa_pct": 88,
-      "model_pct": 98
+      "model_pct": 99
     }
   },
   "cash": {
@@ -119,28 +119,28 @@
   },
   "screen": {
     "properties": 496975,
-    "over": 1643,
-    "under": 6253,
-    "watch": 44408,
+    "over": 1694,
+    "under": 6175,
+    "watch": 87620,
     "insufficient": 93,
     "by_family_flag": {
-      "condo/over_assessed_candidate": 1355,
-      "condo/under_assessed_candidate": 2923,
-      "condo/within_range": 27875,
+      "condo/over_assessed_candidate": 1395,
+      "condo/under_assessed_candidate": 2834,
+      "condo/within_range": 27924,
       "residential/insufficient_record": 93,
-      "residential/over_assessed_candidate": 288,
-      "residential/under_assessed_candidate": 3330,
-      "residential/within_range": 461111
+      "residential/over_assessed_candidate": 299,
+      "residential/under_assessed_candidate": 3341,
+      "residential/within_range": 461089
     }
   },
   "results_table": {
     "lightgbm": {
-      "rmse_log": 0.333,
-      "mape_pct": 26.4,
-      "median_ratio": 1.031,
-      "cod": 25.5,
+      "rmse_log": 0.335,
+      "mape_pct": 26.6,
+      "median_ratio": 1.032,
+      "cod": 25.6,
       "prd": 1.087,
-      "prb": -0.073,
+      "prb": -0.072,
       "mki": 0.905
     },
     "ridge": {
