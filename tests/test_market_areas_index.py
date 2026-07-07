@@ -7,6 +7,7 @@ import pytest
 from philly_fair_measure.features.market_areas import build_market_areas, sale_points
 from philly_fair_measure.features.price_index import (
     CITYWIDE,
+    REFERENCE_TRAILING_MONTHS,
     build_price_index,
     with_time_adjustment,
 )
@@ -146,9 +147,14 @@ def test_price_index_recovers_drift_and_adjusts(tmp_path):
     dupes = index.group_by("district", "month").len().filter(pl.col("len") > 1)
     assert dupes.height == 0
 
-    # latest month is the reference: log_index ~ 0
-    latest = index.sort("month").group_by("district").agg(pl.col("log_index").last())
-    assert all(abs(v) < 1e-9 for v in latest["log_index"].to_list())
+    # the reference is the trailing-year mean level, so that window averages
+    # to 0 (a rising series leaves the single latest month slightly positive)
+    ref = (
+        index.sort("month")
+        .group_by("district")
+        .agg(pl.col("log_index").tail(REFERENCE_TRAILING_MONTHS).mean().alias("m"))
+    )
+    assert all(abs(v) < 1e-9 for v in ref["m"].to_list())
 
     # drifting district: first-month adjustment is large and positive;
     # shrinkage pulls it below the raw 2%/mo drift but well above half of it
@@ -168,4 +174,6 @@ def test_price_index_recovers_drift_and_adjusts(tmp_path):
     assert total_drift * 0.55 < adj[0] < total_drift * 1.05
     assert abs(adj[1]) < 0.12  # flat district: small adjustment
     assert adj[2] == pytest.approx((adj[0] + adj[1]) / 2, abs=0.15)  # citywide fallback between
-    assert abs(adj[3]) < 1e-9  # future date clamps to reference month
+    # future date clamps to the latest month; its adjustment is small but not
+    # exactly 0 — the latest month sits just above the trailing-year reference
+    assert abs(adj[3]) < 0.12

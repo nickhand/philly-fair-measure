@@ -247,7 +247,6 @@ def assemble_condo_features(
     opa: pl.LazyFrame,
     market_areas: pl.LazyFrame | None = None,
     price_index: pl.DataFrame | None = None,
-    area_drift: pl.DataFrame | None = None,
     assessments: pl.LazyFrame | None = None,
     proximity: pl.LazyFrame | None = None,
     *,
@@ -289,7 +288,7 @@ def assemble_condo_features(
             pl.lit(None, dtype=pl.Float64).alias("ma_med_adj_log_ppsf"),
         )
     if price_index is not None:
-        pool = with_time_adjustment(pool, price_index, area_drift=area_drift)
+        pool = with_time_adjustment(pool, price_index)
     else:
         pool = pool.with_columns(pl.lit(0.0).alias("time_adj_log"))
 
@@ -386,7 +385,6 @@ def assemble_condo_assessment_features(
     valuation_date: datetime,
     market_areas: pl.LazyFrame | None = None,
     price_index: pl.DataFrame | None = None,
-    area_drift: pl.DataFrame | None = None,
     proximity: pl.LazyFrame | None = None,
 ) -> pl.DataFrame:
     """Feature table for EVERY residential condo unit at a valuation date.
@@ -445,11 +443,10 @@ def assemble_condo_assessment_features(
         )
     )
     if price_index is not None:
-        pool = with_time_adjustment(pool, price_index, area_drift=area_drift)
+        pool = with_time_adjustment(pool, price_index)
         units = with_time_adjustment(
             units.with_columns(pl.lit(valuation_date).alias("_val_date")),
             price_index,
-            area_drift=area_drift,
             date_col="_val_date",
         ).drop("_val_date")
     else:
@@ -629,14 +626,12 @@ def build_condo_features(
         proximity = pl.scan_parquet(proximity_path)
     else:
         logger.warning("marts/proximity.parquet missing; prox_ features will be null")
-    from philly_fair_measure.features.sale_features import _load_area_drift
 
     frame = assemble_condo_features(
         pl.scan_parquet(paths["sale_validity"]),
         pl.scan_parquet(paths["opa_properties"]),
         pl.scan_parquet(paths["market_areas"]),
         pl.read_parquet(paths["price_index"]),
-        _load_area_drift(root),
         pl.scan_parquet(paths["assessments"]),
         proximity,
         min_sale_year=min_sale_year,

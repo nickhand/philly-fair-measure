@@ -1,9 +1,10 @@
-"""Repeat-sales index machinery: BMN curve recovery, area drift, adjustment math.
+"""Repeat-sales index machinery: BMN curve recovery, geo fallback, adjustment math.
 
-Synthetic ground truth — a known citywide appreciation path and a known
-area-level drift — must be recovered by the estimators, and
-`with_time_adjustment` must apply the drift with the documented sign
-(a faster-appreciating area needs MORE adjustment for older sales).
+Synthetic ground truth — a known appreciation path per geography — must be
+recovered by the estimators, and `with_time_adjustment` must pick the most
+specific curve a row carries (market area → district → citywide), so a
+sub-area that lagged its district carries its older sales forward by LESS
+(the 2314 Wallace St fix).
 """
 
 from datetime import date
@@ -66,35 +67,39 @@ def test_repeat_pairs_hygiene():
     assert pairs["held_yrs"][0] == pytest.approx(5.0, abs=0.05)
 
 
-def test_with_time_adjustment_applies_area_drift():
+def test_with_time_adjustment_prefers_area_then_district_then_city():
     months = [date(2020, 1, 1), date(2025, 1, 1)]
+    # d_0 climbed +0.30 over the window; ma_lag (a sub-area) only +0.10 — it
+    # plateaued, the Wallace case. ma_hot has no curve of its own; the last
+    # row has neither district nor area and must reach the citywide fallback.
     index = pl.DataFrame(
         {
-            "district": ["d_0", "d_0", CITYWIDE, CITYWIDE],
-            "month": months * 2,
-            "log_index": [-0.30, 0.0, -0.30, 0.0],
-            "n_sales": [5, 5, 5, 5],
-            "ref_month": [months[1]] * 4,
+            "district": ["d_0", "d_0", "ma_lag", "ma_lag", CITYWIDE, CITYWIDE],
+            "month": months * 3,
+            "log_index": [-0.30, 0.0, -0.10, 0.0, -0.25, 0.0],
+            "n_sales": [5] * 6,
+            "ref_month": [months[1]] * 6,
         }
     )
-    drift = pl.DataFrame({"market_area": ["ma_hot"], "drift_per_yr": [0.04], "n_pairs": [50]})
     frame = pl.DataFrame(
         {
-            "loc_district": ["d_0", "d_0"],
-            "loc_market_area": ["ma_hot", "ma_cold"],
-            "sale_date": [date(2020, 1, 1), date(2020, 1, 1)],
+            "loc_district": ["d_0", "d_0", None],
+            "loc_market_area": ["ma_lag", "ma_hot", None],
+            "sale_date": [date(2020, 1, 1)] * 3,
         }
     )
-    out = with_time_adjustment(frame, index, area_drift=drift)
-    # base adjustment 0.30; the hot area adds ~5 years x 0.04
-    hot, cold = out["time_adj_log"].to_list()
-    assert cold == pytest.approx(0.30)
-    assert hot == pytest.approx(0.30 + 5.0 * 0.04, abs=0.01)
-    # sales at the reference month get no drift regardless of area
-    at_ref = with_time_adjustment(
-        frame.with_columns(pl.lit(months[1]).alias("sale_date")), index, area_drift=drift
-    )
-    assert at_ref["time_adj_log"].to_list() == pytest.approx([0.0, 0.0])
+    lag, hot, orphan = with_time_adjustment(frame, index)["time_adj_log"].to_list()
+    # ma_lag has its own curve — only +0.10 to reach reference-month dollars,
+    # NOT the district's +0.30 (the over-adjustment the area level removes)
+    assert lag == pytest.approx(0.10)
+    assert hot == pytest.approx(0.30)  # no area curve -> district
+    assert orphan == pytest.approx(0.25)  # no district -> citywide
+    # a frame without the area column at all falls back to the district cleanly
+    no_area = with_time_adjustment(frame.drop("loc_market_area"), index)
+    assert no_area["time_adj_log"].to_list() == pytest.approx([0.30, 0.30, 0.25])
+    # sales at the reference month need no adjustment in any geography
+    at_ref = with_time_adjustment(frame.with_columns(pl.lit(months[1]).alias("sale_date")), index)
+    assert at_ref["time_adj_log"].to_list() == pytest.approx([0.0, 0.0, 0.0])
 
 
 def test_quarter_ix():

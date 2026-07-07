@@ -1,4 +1,4 @@
-"""Constant-quality price index (repeat sales) + market-area drift.
+"""Constant-quality price index: a three-level BMN repeat-sales hierarchy.
 
 OPA calibrates every sale to the valuation date with a compound monthly index
 and then drops time from its models; our v1 models carried time features and
@@ -12,29 +12,32 @@ appreciation ran −26% to +28%, and it flipped sign WITHIN a district (d_10
 repeat-sale carry-forward feature by ~$100k+ on specific homes (2314 Wallace
 St) and every comp's "adjusted today" price with it.
 
-v2 (this module) is constant-quality by construction:
+v2 (this module) is constant-quality by construction — a three-level BMN
+repeat-sales hierarchy, each level ridge-shrunk toward its parent:
 
-- **District curves — BMN repeat-sales regression** (Bailey–Muth–Nourse):
-  quarterly dummies fit to Δlog(price) of same-parcel arms-length pairs,
-  ridge-shrunk toward the citywide curve where districts are thin, then
-  interpolated to months, 3-month smoothed, normalized so the latest month
-  is 0. Pair hygiene: held ≥ ~6 months, |annualized Δlog| ≤ 0.35 (drops
-  flips/gut renovations — those pairs are quality CHANGES, not appreciation).
-- **Market-area drift** (`marts/area_drift.parquet`): per-area residual
-  appreciation rate vs its district curve, δ_a = Σ(r·h)/(Σh² + K) over the
-  area's pairs (r = pair residual, h = years held) — a shrunken
-  constant-drift correction at the geography where the mix problem actually
-  lives. Unknown areas get 0.
+- **BMN repeat-sales regression** (Bailey–Muth–Nourse): quarterly dummies fit
+  to Δlog(price) of same-parcel arms-length pairs, then interpolated to
+  months, smoothed, normalized so the trailing-year mean level is 0. Pair
+  hygiene: held ≥ ~6 months, |annualized Δlog| ≤ 0.35 (drops flips/gut
+  renovations — those pairs are quality CHANGES, not appreciation).
+- **Three geographies** in one table, keyed by the ``district`` column (the
+  namespaces ``__city__`` / ``d_NN`` / ``ma_NNN`` never collide): a citywide
+  curve (no prior), per-district curves shrunk toward citywide, and — for
+  market areas with ≥ ``MIN_PAIRS_FOR_AREA`` pairs — per-market-area curves
+  shrunk toward their district. The area level replaced a constant per-area
+  *drift* rate (v2.0): the drift couldn't express a sub-area that tracked its
+  district then diverged, so ma_146 (2314 Wallace St), which outran d_10 pre-
+  2010 and lagged it −0.17 after 2022, averaged to a ~0 drift and inherited
+  the district's full climb. A quarterly curve carries the sign flip.
 
-The special district ``__city__`` carries the citywide curve and is the
-fallback for parcels without a district. Fixtures with too few repeat pairs
-fall back to the v1 median-ppsf construction automatically (drift empty).
+Fixtures with too few repeat pairs fall back to the v1 median-ppsf
+construction automatically (district/citywide only, no area curves).
 
-`with_time_adjustment` attaches ``time_adj_log`` = −log_index(district,
-month) + δ_area·years_before_ref: adding it to log(price) expresses the sale
-in reference-month dollars; models trained on adjusted prices predict at
-reference level, and predictions are moved back to any date by subtracting
-the adjustment.
+`with_time_adjustment` attaches ``time_adj_log`` = −log_index(geo, month) for
+the most specific geography available (market area → district → citywide):
+adding it to log(price) expresses the sale in reference-month dollars; models
+trained on adjusted prices predict at reference level, and predictions are
+moved back to any date by subtracting the adjustment.
 """
 
 from __future__ import annotations
@@ -55,24 +58,35 @@ from philly_fair_measure.ingest.manifests import DerivedManifest, InputRef, read
 logger = logging.getLogger(__name__)
 
 SHRINKAGE_LAMBDA = 15.0
-SMOOTH_MONTHS = 3
+SMOOTH_MONTHS = 5
+# The reference ("today, index 0") is the trailing-year average level, not the
+# single latest month: at the market-area level the most recent month is thin
+# (ma_146 ~1 pair/month) and its noise anchored the WHOLE area index, hiding
+# the real divergence — a 12-month average is a stable "current level" that
+# recovers ma_146's measured −0.17 lag vs its district (the 2314 Wallace fix).
+REFERENCE_TRAILING_MONTHS = 12
 CITYWIDE = "__city__"
 
 # repeat-sales machinery (v2 constant-quality index)
 MIN_PAIRS_FOR_BMN = 500  # below this (unit fixtures), fall back to median-ppsf
+MIN_PAIRS_FOR_AREA = 200  # market areas thinner than this inherit the district curve
 PAIR_MIN_HELD_YEARS = 0.49
 PAIR_MAX_ANNUAL_LOG = 0.35  # flips/gut renos are quality changes, not appreciation
 PAIR_FLOOR_PRICE = 10_000.0
 BMN_START = "1997-01-01"  # RTT records begin; earlier dates are parse garbage
-RIDGE_TAU = 25.0  # pull district quarter effects toward the citywide curve
-DRIFT_SHRINK_K = 200.0  # yr²; ~8 five-year pairs reach half-weight
+RIDGE_TAU = 25.0  # districts pull firmly toward the citywide curve
+# Market areas pull only gently toward their district: at RIDGE_TAU the
+# district's climb swamped a real sub-area divergence (ma_146's systematic
+# −0.11..−0.29 recent underperformance vs d_10 shrank to ~0). Measured on
+# ma_146's 842 pairs, τ=6 keeps ~70% of the unshrunk divergence while the
+# 200-pair floor keeps thin areas from chasing quarter-level noise.
+AREA_RIDGE_TAU = 6.0
 
 
 @dataclass(frozen=True)
 class BuildResult:
     path: Path
     manifest: DerivedManifest
-    drift_path: Path | None = None
 
 
 def _repeat_pairs(sales: pl.LazyFrame) -> pl.DataFrame:
@@ -116,11 +130,20 @@ def _quarter_ix(dates: np.ndarray, q0_year: int) -> np.ndarray:
 
 
 def _bmn_curve(
-    q1: np.ndarray, q2: np.ndarray, dlog: np.ndarray, n_quarters: int, prior: np.ndarray | None
+    q1: np.ndarray,
+    q2: np.ndarray,
+    dlog: np.ndarray,
+    n_quarters: int,
+    prior: np.ndarray | None,
+    *,
+    ridge_tau: float = RIDGE_TAU,
 ) -> np.ndarray:
     """Quarterly log-level curve from pair data: least squares on ±1 quarter
     dummies (quarter 0 pinned to 0), optionally ridge-pulled toward a prior
-    curve (the citywide one) so thin districts stay sane."""
+    curve (its parent geography) so thin cells stay sane. ``ridge_tau`` sets
+    how hard: districts pull firmly toward citywide (RIDGE_TAU), market areas
+    pull gently toward their district (AREA_RIDGE_TAU) so a well-supported
+    area's real divergence survives."""
     rows = np.arange(len(dlog))
     a = np.zeros((len(dlog), n_quarters - 1))
     for q, sign in ((q2, 1.0), (q1, -1.0)):
@@ -128,7 +151,7 @@ def _bmn_curve(
         a[rows[mask], q[mask] - 1] += sign
     y = dlog.copy()
     if prior is not None:
-        tau = np.sqrt(RIDGE_TAU)
+        tau = np.sqrt(ridge_tau)
         a = np.vstack([a, tau * np.eye(n_quarters - 1)])
         y = np.concatenate([y, tau * prior[1:]])
     beta, *_ = np.linalg.lstsq(a, y, rcond=None)
@@ -214,7 +237,7 @@ def build_price_index(data_dir: Path | None = None) -> BuildResult:
         .alias("level")
     )
     reference = smoothed.group_by("district").agg(
-        pl.col("level").sort_by("month").last().alias("ref_level"),
+        pl.col("level").sort_by("month").tail(REFERENCE_TRAILING_MONTHS).mean().alias("ref_level"),
         pl.col("month").max().alias("ref_month"),
     )
     index = (
@@ -240,23 +263,9 @@ def build_price_index(data_dir: Path | None = None) -> BuildResult:
         "price_index",
         inputs,
         notes=f"median-ppsf fallback; lambda={SHRINKAGE_LAMBDA} smooth={SMOOTH_MONTHS}mo; "
-        f"log_index normalized to 0 at the latest month; {CITYWIDE} = fallback",
+        f"log_index 0 at the trailing-year mean; {CITYWIDE} = fallback",
     )
-    drift_path, _ = write_derived_table(
-        _empty_drift(),
-        root,
-        "marts",
-        "area_drift",
-        inputs,
-        notes="empty (median-ppsf fallback index carries no area drift)",
-    )
-    return BuildResult(path=path, manifest=manifest, drift_path=drift_path)
-
-
-def _empty_drift() -> pl.DataFrame:
-    return pl.DataFrame(
-        schema={"market_area": pl.String, "drift_per_yr": pl.Float64, "n_pairs": pl.Int64}
-    )
+    return BuildResult(path=path, manifest=manifest)
 
 
 def _build_repeat_sales(
@@ -295,6 +304,7 @@ def _build_repeat_sales(
     dlog = pairs["dlog"].to_numpy().astype(np.float64)
     district_arr = pairs["district"].to_numpy()
 
+    # level 1: citywide (no prior). level 2: districts shrunk toward citywide.
     city_curve = _bmn_curve(q1, q2, dlog, n_quarters, prior=None)
     district_names = [d for d in points["district"].unique().to_list() if d != CITYWIDE]
     curves: dict[str, np.ndarray] = {CITYWIDE: city_curve}
@@ -304,32 +314,42 @@ def _build_repeat_sales(
             curves[name] = city_curve
             continue
         curves[name] = _bmn_curve(q1[mask], q2[mask], dlog[mask], n_quarters, prior=city_curve)
-        logger.info("BMN %s: %d pairs", name, int(mask.sum()))
+        logger.info("BMN district %s: %d pairs", name, int(mask.sum()))
 
-    # pair residuals vs the district curve -> shrunken per-area drift rate
-    lvl2 = np.array([curves[d][q] for d, q in zip(district_arr, q2, strict=True)])
-    lvl1 = np.array([curves[d][q] for d, q in zip(district_arr, q1, strict=True)])
-    resid = dlog - (lvl2 - lvl1)
-    drift = (
-        pairs.with_columns(pl.Series("resid", resid))
-        .filter(pl.col("market_area").is_not_null())
-        .group_by("market_area")
-        .agg(
-            (
-                (pl.col("resid") * pl.col("held_yrs")).sum()
-                / ((pl.col("held_yrs") ** 2).sum() + DRIFT_SHRINK_K)
-            ).alias("drift_per_yr"),
-            pl.len().alias("n_pairs"),
+    # level 3: market-area curves for well-supported areas, shrunk toward their
+    # OWN district curve. This is what a constant per-area drift could not do —
+    # express an area that tracked its district then diverged (ma_146 outran
+    # d_10 pre-2010, lagged it recently; the two-sided residual averaged to 0).
+    area_arr = pairs["market_area"].to_numpy()
+    area_to_district = dict(
+        pairs.select("market_area", "district").drop_nulls("market_area").unique().iter_rows()
+    )
+    area_counts = pairs.drop_nulls("market_area").group_by("market_area").len().sort("market_area")
+    eligible = area_counts.filter(pl.col("len") >= MIN_PAIRS_FOR_AREA)["market_area"].to_list()
+    for area in eligible:
+        mask = area_arr == area
+        prior = curves.get(area_to_district.get(area, CITYWIDE), city_curve)
+        curves[area] = _bmn_curve(
+            q1[mask], q2[mask], dlog[mask], n_quarters, prior=prior, ridge_tau=AREA_RIDGE_TAU
         )
-        .sort("market_area")
-    )
+    logger.info("BMN market-area curves: %d of %d areas", len(eligible), area_counts.height)
 
-    # quarterly curves -> the monthly index table (same schema as v1)
-    n_sales = (
-        points.group_by("district", "month").agg(pl.len().alias("n_sales"))
-        if "district" in points.columns
-        else pl.DataFrame(schema={"district": pl.String, "month": pl.Date, "n_sales": pl.UInt32})
+    # quarterly curves -> the monthly index table. n_sales is per-geo metadata:
+    # count sales under each district key AND each area key (same namespaces the
+    # curves use), so every emitted row carries its own support.
+    pts_geo = points.join(
+        pl.read_parquet(paths["market_areas"]).select("parcel_id", "market_area"),
+        on="parcel_id",
+        how="left",
     )
+    n_sales = pl.concat(
+        [
+            pts_geo.drop_nulls(key)
+            .group_by(pl.col(key).alias("geo"), "month")
+            .agg(pl.len().alias("n_sales"))
+            for key in ("district", "market_area")
+        ]
+    ).rename({"geo": "district"})
     frames = []
     for name, curve in curves.items():
         levels = curve[month_q]
@@ -347,7 +367,7 @@ def _build_repeat_sales(
         )
     )
     reference = smoothed.group_by("district").agg(
-        pl.col("level").sort_by("month").last().alias("ref_level"),
+        pl.col("level").sort_by("month").tail(REFERENCE_TRAILING_MONTHS).mean().alias("ref_level"),
         pl.col("month").max().alias("ref_month"),
     )
     index = (
@@ -374,26 +394,17 @@ def _build_repeat_sales(
         "marts",
         "price_index",
         inputs,
-        notes=f"BMN repeat-sales, {pairs.height} pairs, tau={RIDGE_TAU}, "
-        f"smooth={SMOOTH_MONTHS}mo; log_index normalized to 0 at the latest month; "
-        f"{CITYWIDE} = fallback",
-    )
-    drift_path, _ = write_derived_table(
-        drift,
-        root,
-        "marts",
-        "area_drift",
-        inputs,
-        notes=f"per-market-area residual appreciation vs district BMN curve; "
-        f"shrinkage K={DRIFT_SHRINK_K} yr^2",
+        notes=f"BMN repeat-sales (city/district/market-area), {pairs.height} pairs, "
+        f"tau={RIDGE_TAU}, area threshold={MIN_PAIRS_FOR_AREA} pairs, smooth={SMOOTH_MONTHS}mo; "
+        f"log_index 0 at the trailing-year mean; {CITYWIDE} = fallback",
     )
     logger.info(
-        "repeat-sales index: %d pairs, %d districts; drift for %d areas",
+        "repeat-sales index: %d pairs, %d districts, %d market-area curves",
         pairs.height,
-        len(curves) - 1,
-        drift.height,
+        len(district_names),
+        len(eligible),
     )
-    return BuildResult(path=path, manifest=manifest, drift_path=drift_path)
+    return BuildResult(path=path, manifest=manifest)
 
 
 @overload
@@ -401,7 +412,6 @@ def with_time_adjustment(
     lf: pl.DataFrame,
     index: pl.DataFrame,
     *,
-    area_drift: pl.DataFrame | None = ...,
     district_col: str = ...,
     area_col: str = ...,
     date_col: str = ...,
@@ -414,7 +424,6 @@ def with_time_adjustment(
     lf: pl.LazyFrame,
     index: pl.DataFrame,
     *,
-    area_drift: pl.DataFrame | None = ...,
     district_col: str = ...,
     area_col: str = ...,
     date_col: str = ...,
@@ -426,24 +435,29 @@ def with_time_adjustment(
     lf: pl.LazyFrame | pl.DataFrame,
     index: pl.DataFrame,
     *,
-    area_drift: pl.DataFrame | None = None,
     district_col: str = "loc_district",
     area_col: str = "loc_market_area",
     date_col: str = "sale_date",
     out_col: str = "time_adj_log",
 ) -> pl.LazyFrame | pl.DataFrame:
-    """Attach ``out_col`` = −log_index(district, month(date)) +
-    δ_area·years_before_ref, clamped to the index's month range; falls back to
-    the citywide index for unknown districts and δ=0 for unknown areas (or
-    when no drift table is passed). A DataFrame in gives a DataFrame back; a
-    LazyFrame stays lazy."""
+    """Attach ``out_col`` = −log_index(geo, month(date)) for the most specific
+    geography the row carries — market area, then district, then citywide —
+    clamped to the index's month range. The index keys all three in one
+    ``district`` column (``ma_NNN`` / ``d_NN`` / ``__city__`` never collide),
+    so unknown areas fall through to the district curve and unknown districts
+    to citywide. A DataFrame in gives a DataFrame back; a LazyFrame stays
+    lazy."""
     bounds = index.select(pl.col("month").min().alias("lo"), pl.col("month").max().alias("hi"))
     lo, hi = bounds.row(0)
     city = index.filter(pl.col("district") == CITYWIDE).select(
         "month", pl.col("log_index").alias("_city_index")
     )
     district_index = index.select("district", "month", pl.col("log_index").alias("_d_index"))
+    area_index = index.select(
+        pl.col("district").alias("_area_key"), "month", pl.col("log_index").alias("_area_index")
+    )
 
+    schema = lf.collect_schema().names() if isinstance(lf, pl.LazyFrame) else lf.columns
     out = (
         lf.lazy()
         .with_columns(
@@ -456,33 +470,20 @@ def with_time_adjustment(
             right_on=["district", "month"],
             how="left",
         )
-        .join(
-            city.lazy(),
-            left_on="_adj_month",
-            right_on="month",
+        .join(city.lazy(), left_on="_adj_month", right_on="month", how="left")
+    )
+    sources = ["_d_index", "_city_index"]
+    drop = ["_adj_month", "_adj_district", "_d_index", "_city_index"]
+    if area_col in schema:
+        # only ``ma_NNN`` values ever match a loc_market_area, so the whole
+        # index can be offered — district/city keys simply never join here.
+        out = out.join(
+            area_index.lazy(),
+            left_on=[area_col, "_adj_month"],
+            right_on=["_area_key", "month"],
             how="left",
         )
-        .with_columns((-pl.coalesce("_d_index", "_city_index").fill_null(0.0)).alias(out_col))
-    )
-    schema = lf.collect_schema().names() if isinstance(lf, pl.LazyFrame) else lf.columns
-    if area_drift is not None and area_drift.height and area_col in schema:
-        # δ_area is a RATE (per year of distance from the reference month):
-        # the area's constant-quality appreciation ran δ above its district's
-        # curve, so a sale y years back needs δ·y MORE adjustment to reach
-        # reference-month dollars.
-        drift = area_drift.select(
-            pl.col("market_area").alias("_drift_area"), pl.col("drift_per_yr").alias("_drift")
-        )
-        out = (
-            out.join(drift.lazy(), left_on=area_col, right_on="_drift_area", how="left")
-            .with_columns(
-                (
-                    pl.col(out_col)
-                    + pl.col("_drift").fill_null(0.0)
-                    * ((pl.lit(hi) - pl.col("_adj_month")).dt.total_days() / 365.25)
-                ).alias(out_col)
-            )
-            .drop("_drift")
-        )
-    out = out.drop("_adj_month", "_adj_district", "_d_index", "_city_index")
+        sources = ["_area_index", *sources]
+        drop = ["_area_index", *drop]
+    out = out.with_columns((-pl.coalesce(*sources).fill_null(0.0)).alias(out_col)).drop(drop)
     return out.collect() if isinstance(lf, pl.DataFrame) else out
