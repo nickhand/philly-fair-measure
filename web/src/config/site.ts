@@ -9,10 +9,12 @@ export const SITE = {
    * assessment notice, or owners can request one. */
   flrUrl:
     'https://www.phila.gov/departments/office-of-property-assessment/property-assessments/#first-level-review-flr',
+  /** The Board of Revision of Taxes formal-appeal forms and documents. */
+  appealFormsUrl: 'https://www.phila.gov/documents/property-assessment-appeal-documents-and-forms/',
   /** The assessment cycle currently shown. Update on each reassessment. */
   assessmentTaxYear: 2027,
-  flrDeadlineText: 'September 1',
-  appealDeadlineText: 'the first Monday of October 2026',
+  flrDeadlineText: 'September 1, 2026',
+  appealDeadlineText: 'October 5, 2026',
 } as const
 
 /** The city's public record for a property — where an owner reviews the facts

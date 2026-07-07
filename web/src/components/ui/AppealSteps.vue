@@ -42,8 +42,11 @@ const inquiryLink = computed(() => opaInquiryUrl(props.parcelId))
       </li>
       <li>
         Still disagree after the review? File a formal appeal with the
-        <strong>Board of Revision of Taxes (BRT)</strong>. The deadline is the first Monday of
-        October each year.
+        <strong>Board of Revision of Taxes (BRT)</strong>, due by {{ SITE.appealDeadlineText }}. Get
+        the
+        <a :href="SITE.appealFormsUrl" rel="noopener" class="font-bold text-brand-600 underline"
+          >BRT appeal forms and documents</a
+        >.
       </li>
       <li>Bring your report from this site, photos, and any repair estimates as evidence.</li>
     </ol>
