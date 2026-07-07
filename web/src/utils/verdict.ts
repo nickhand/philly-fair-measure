@@ -37,7 +37,7 @@ export const VERDICTS: Record<Flag, Verdict> = {
     flag: 'within_range',
     headline: 'Your assessment is inside our range',
     detail:
-      "The city's value sits comfortably inside the range of prices this home could realistically sell for. Our range is wide on purpose — no model can pin down a home's exact value — so this means we see no sign of a problem, not that the number is perfect.",
+      "The city's value sits comfortably inside the range of prices this home could sell for. Our range is wide on purpose, because no model can pin down a home's exact price. So this is a good sign. It does not mean the number is perfect.",
     nextStep:
       'No action needed. If the facts the city has about your home are wrong, you can still ask them to fix the records.',
     textClass: 'text-fair',
@@ -50,7 +50,7 @@ export const VERDICTS: Record<Flag, Verdict> = {
     detail:
       "The city's value is above the highest value our model finds likely for this home. That can mean a higher tax bill than the home's real value supports.",
     nextStep:
-      'Check the facts below. If they support a lower value, you can appeal for free — see the steps at the end of this page.',
+      'Check the facts below. If they support a lower value, you can appeal for free. See the steps at the end of this page.',
     textClass: 'text-over',
     badgeClass: 'bg-over-soft text-over',
     hex: '#c2410c',
@@ -78,7 +78,7 @@ export const VERDICTS: Record<Flag, Verdict> = {
     flag: 'insufficient_record',
     headline: 'The city’s record here is incomplete',
     detail:
-      'The city has not recorded basic facts for this home — like its living area — so no model can fairly check its value. This usually means brand-new construction the city is still writing up.',
+      'The city has not recorded basic facts for this home, like its living area. Without them, no model can fairly check its value. This usually means brand-new construction the city is still writing up.',
     nextStep:
       'Check what the city has on file for this address. Once the record is complete, we can check it.',
     textClass: 'text-fair',
@@ -97,7 +97,7 @@ export const WATCH_VERDICTS: Record<'high' | 'low', Verdict> = {
     flag: 'within_range',
     headline: 'Your assessment sits near the top of our range',
     detail:
-      "The city's value is still inside the range of prices this home could sell for, but close to its upper edge. That is not proof of a problem — it is a reason to look closer.",
+      "The city's value is still inside the range of prices this home could sell for, but it is close to the top. That is not proof of a problem. It is a reason to take a closer look.",
     nextStep:
       'Check the facts the city has on file below, and see how your assessment compares with similar homes. If a recorded fact is wrong, the fix is free.',
     textClass: 'text-over',
@@ -128,13 +128,13 @@ export const WATCH_BEYOND_VERDICTS: Record<'high' | 'low', Verdict> = {
     ...WATCH_VERDICTS.high,
     headline: 'Your assessment is above our range',
     detail:
-      "The city's value is higher than the top of the range shown here. We don't flag it, because our two ways of checking this home do not agree about it. That is not proof of a problem — it is a reason to look closer.",
+      "The city's value is higher than the top of the range shown here. We don't flag it, because our two ways of checking this home don't agree. That is not proof of a problem. It is a reason to take a closer look.",
   },
   low: {
     ...WATCH_VERDICTS.low,
     headline: 'Your assessment is below our range',
     detail:
-      "The city's value is lower than the bottom of the range shown here. We don't flag it, because our two ways of checking this home do not agree about it. A lower assessment usually means a lower tax bill.",
+      "The city's value is lower than the bottom of the range shown here. We don't flag it, because our two ways of checking this home don't agree. A lower assessment usually means a lower tax bill.",
   },
 }
 

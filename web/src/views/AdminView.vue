@@ -137,7 +137,7 @@ onMounted(() => {
                 {{ r.screen_z?.toFixed(1) }}
               </td>
               <td v-if="kind === 'nonuniform'" class="px-3 py-2">
-                {{ r.twin_ratio ? pct(r.twin_ratio - 1, 1) : '—' }} ({{ r.twin_n }} twins)
+                {{ r.twin_ratio ? pct(r.twin_ratio - 1, 1) : 'N/A' }} ({{ r.twin_n }} twins)
               </td>
               <td class="px-3 py-2">
                 <RouterLink

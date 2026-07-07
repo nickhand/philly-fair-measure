@@ -49,7 +49,7 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
       <p class="mt-1.5 text-body-sm leading-relaxed text-body">
         Every year, Philadelphia’s Office of Property Assessment (OPA) estimates what your home is
         worth. Your property tax is about <strong>1.4%</strong> of that number. If the number is
-        too high, you pay too much tax. If your neighbor’s is too low, they pay too little — and
+        too high, you pay too much tax. If your neighbor’s is too low, they pay too little, and
         everyone else covers the difference.
       </p>
     </section>
@@ -59,15 +59,15 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
       <h2 class="text-title font-bold text-ink">Where our numbers come from</h2>
       <ul class="mt-1.5 list-disc space-y-1.5 pl-5 text-body-sm leading-relaxed text-body">
         <li><strong>More than 200,000 real home sales</strong> from city deed records (2016 to today).</li>
-        <li><strong>City property records</strong> — size, age, style, condition on file.</li>
-        <li><strong>City licenses and inspections</strong> — permits, complaints, violations, vacancy.</li>
-        <li><strong>Public maps</strong> — parcel shapes, transit, parks.</li>
+        <li><strong>City property records</strong>: size, age, style, and condition on file.</li>
+        <li><strong>City licenses and inspections</strong>: permits, complaints, violations, and vacancy.</li>
+        <li><strong>Public maps</strong>: parcel shapes, transit, and parks.</li>
       </ul>
       <p class="mt-2.5 text-body-sm leading-relaxed text-body">
-        A computer model learns from those sales — what did homes like this one actually sell for?
-        — and estimates today’s value for every home in the city.
+        A computer model learns from those sales. It asks what homes like this one actually sold
+        for, then estimates today’s value for every home in the city.
         <strong>What we never use:</strong> race, income, or anything about the people who live in
-        a home. People-data is never part of the price; we use it only afterward, to check the
+        a home. People-data is never part of the price. We use it only afterward, to check the
         model for neighborhood bias.
       </p>
     </section>
@@ -76,7 +76,7 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
     <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
       <h2 class="text-title font-bold text-ink">What does “90% sure” mean?</h2>
       <p class="mt-1 text-body-sm leading-relaxed text-muted">
-        Each dot is a home like yours that sold. Pick a confidence level — the range grows or
+        Each dot is a home like yours that sold. Pick a confidence level. The range grows or
         shrinks so that many dots land inside it.
       </p>
       <div class="mt-3.5 flex gap-1.5" role="group" aria-label="Confidence level">
@@ -106,12 +106,12 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
         ></span>
       </div>
       <p class="mt-3 text-center text-caption leading-normal text-body">
-        <strong class="text-brand-600">{{ filled }} of {{ TOTAL }}</strong> sold inside the range —
-        <span class="text-muted">open dots are sales that landed outside the range.</span>
+        <strong class="text-brand-600">{{ filled }} of {{ TOTAL }}</strong> sold inside the range.
+        <span class="text-muted">Open dots are sales that landed outside the range.</span>
       </p>
       <p class="mt-2 text-center text-caption text-muted">
         We only flag an assessment when the city’s value falls <strong>outside</strong> the 90%
-        range — and two different statistical methods have to agree first.
+        range, and two different statistical methods have to agree first.
       </p>
     </section>
 
@@ -145,17 +145,16 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
           <tr>
             <th scope="row" class="py-2 pr-2 font-normal leading-snug">Cheaper homes treated same as pricier ones</th>
             <td class="py-2 pr-2 font-bold text-ink">
-              {{ modelEven ? 'Close — passes the official test' : 'Uneven — fails it' }}
+              {{ modelEven ? 'Close: passes the official test' : 'Uneven: fails it' }}
             </td>
-            <td class="py-2">{{ opaEven ? 'Close — passes the official test' : 'Uneven — fails it' }}</td>
+            <td class="py-2">{{ opaEven ? 'Close: passes the official test' : 'Uneven: fails it' }}</td>
           </tr>
         </tbody>
       </table>
       <p class="mt-2.5 text-caption text-muted">
         <RouterLink to="/trust" class="font-semibold text-brand-600 underline"
           >See the full head-to-head proof</RouterLink
-        >
-        — the official test, scored line by line.
+        >. It runs the official test, scored line by line.
       </p>
     </section>
 
@@ -168,7 +167,7 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
           <p class="mt-1.5 text-body-sm leading-relaxed text-[#4d4633]">
             Public records don’t show a renovated kitchen, a leaking roof, or anything else inside
             your walls. If the inside of your home differs a lot from its records, our estimate can
-            be wrong — in either direction. That is why every report shows a range, and why the
+            be wrong in either direction. That is why every report shows a range, and why the
             facts table matters more than any single number.
           </p>
         </div>
@@ -182,8 +181,7 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
         This is an independent, open project by
         <a :href="SITE.creatorUrl" rel="noopener" class="font-semibold text-brand-600 underline"
           >{{ SITE.creatorName }}</a
-        >
-        — not a city service. The full
+        >. It is not a city service. The full
         <a :href="SITE.githubUrl" rel="noopener" class="font-semibold text-brand-600 underline"
           >code and data pipeline</a
         >
@@ -197,7 +195,7 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
     </section>
 
     <p class="mt-4 text-caption leading-normal text-faint">
-      Data updated 2026-07-04 · Model code and validation are public · Independent — not a City of
+      Data updated 2026-07-04 · Model code and validation are public · Independent, not a City of
       Philadelphia site
     </p>
   </div>

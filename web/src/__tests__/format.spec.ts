@@ -5,9 +5,9 @@ describe('money', () => {
   it('formats whole dollars', () => {
     expect(money(441_900)).toBe('$441,900')
   })
-  it('renders a dash for missing values', () => {
-    expect(money(null)).toBe('—')
-    expect(money(undefined)).toBe('—')
+  it('renders N/A for missing values', () => {
+    expect(money(null)).toBe('N/A')
+    expect(money(undefined)).toBe('N/A')
   })
 })
 
@@ -30,6 +30,6 @@ describe('pct', () => {
   it('formats ratios as percentages', () => {
     expect(pct(0.85)).toBe('85%')
     expect(pct(1.181, 1)).toBe('118.1%')
-    expect(pct(null)).toBe('—')
+    expect(pct(null)).toBe('N/A')
   })
 })

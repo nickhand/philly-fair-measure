@@ -411,7 +411,7 @@ onBeforeUnmount(() => {
       class="pointer-events-none absolute bottom-8 left-1/2 z-10 w-max max-w-[min(92vw,560px)] -translate-x-1/2 rounded-xl bg-[rgba(22,36,58,0.85)] px-3.5 py-1.5 text-center text-caption font-semibold text-white"
       role="status"
     >
-      Showing flagged homes and ones worth a look — zoom in to see every home
+      Showing flagged homes and ones worth a look. Zoom in to see every home.
     </div>
     <div
       v-else-if="fetching"
@@ -449,7 +449,7 @@ onBeforeUnmount(() => {
       <div class="m-3 overflow-hidden rounded-xl border border-line-soft bg-white shadow-popover">
         <div class="flex items-center justify-between border-b border-line-faint py-1.5 pl-4 pr-2">
           <p class="text-body-sm font-bold text-ink">
-            {{ choices.length }} homes share this spot — pick one
+            {{ choices.length }} homes share this spot. Pick one.
           </p>
           <button
             type="button"

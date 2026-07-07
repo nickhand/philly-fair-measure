@@ -4,32 +4,34 @@ const usd = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 })
 
-/** $441,900 — the everyday money format. */
+const NO_DATA = 'N/A'
+
+/** $441,900. The everyday money format. */
 export function money(value: number | null | undefined): string {
-  return value == null ? '—' : usd.format(value)
+  return value == null ? NO_DATA : usd.format(value)
 }
 
-/** $442k / $1.2M — compact for axes and small screens. */
+/** $442k / $1.2M, compact for axes and small screens. */
 export function moneyCompact(value: number | null | undefined): string {
-  if (value == null) return '—'
+  if (value == null) return NO_DATA
   const abs = Math.abs(value)
   if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
   if (abs >= 1_000) return `$${Math.round(value / 1_000)}k`
   return usd.format(value)
 }
 
-/** +$78,000 / −$40,000 — signed money for driver effects. */
+/** +$78,000 / −$40,000, signed money for driver effects. */
 export function moneySigned(value: number | null | undefined): string {
-  if (value == null) return '—'
+  if (value == null) return NO_DATA
   const sign = value >= 0 ? '+' : '−'
   return `${sign}${usd.format(Math.abs(value))}`
 }
 
 /** 0.85 → "85%" */
 export function pct(value: number | null | undefined, digits = 0): string {
-  return value == null ? '—' : `${(value * 100).toFixed(digits)}%`
+  return value == null ? NO_DATA : `${(value * 100).toFixed(digits)}%`
 }
 
 export function num(value: number | null | undefined): string {
-  return value == null ? '—' : new Intl.NumberFormat('en-US').format(value)
+  return value == null ? NO_DATA : new Intl.NumberFormat('en-US').format(value)
 }

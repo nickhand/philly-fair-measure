@@ -45,7 +45,7 @@ describe('verdictFor', () => {
     const above = verdictFor('within_range', 'high', { cityValue: 1_290_200, ...band })
     expect(above).toBe(WATCH_BEYOND_VERDICTS.high)
     expect(above.headline).toMatch(/above our range/)
-    expect(above.detail).toMatch(/do not agree/)
+    expect(above.detail).toMatch(/don't agree/)
     const below = verdictFor('within_range', 'low', { cityValue: 150_000, ...band })
     expect(below).toBe(WATCH_BEYOND_VERDICTS.low)
     expect(below.headline).toMatch(/below our range/)
@@ -60,7 +60,7 @@ describe('verdictFor', () => {
   })
 
   it('explains new-build above-range rows without the disagreement claim', () => {
-    // for new builds both methods can read the value as high — the flag is
+    // for new builds both methods can read the value as high; the flag is
     // withheld by rule, so "our checks disagree" would be false
     const v = verdictFor('within_range', 'high', {
       cityValue: 1_290_200,
@@ -70,7 +70,7 @@ describe('verdictFor', () => {
     })
     expect(v.headline).toMatch(/above our range/)
     expect(v.detail).toMatch(/newly built/)
-    expect(v.detail).not.toMatch(/do not agree/)
+    expect(v.detail).not.toMatch(/don't agree/)
   })
 
   it('uses the colorblind-safe blue/orange pair', () => {

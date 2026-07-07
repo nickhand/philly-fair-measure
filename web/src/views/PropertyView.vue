@@ -54,7 +54,7 @@ async function load(id: string) {
     return
   }
   // Router set a generic title on navigation; replace it with the address.
-  document.title = `${core.value.address} — Fair Measure`
+  document.title = `${core.value.address} · Fair Measure`
   track('report_viewed', { flag: core.value.flag, family: core.value.model_family })
   reportLoading.value = true
   try {
@@ -148,7 +148,7 @@ async function loadComps() {
 }
 
 function distMiles(m: number | null): string {
-  if (m == null) return '—'
+  if (m == null) return 'N/A'
   const ft = m * 3.28084
   return ft < 900 ? `${Math.round(ft / 10) * 10} ft` : `${(m / 1609.34).toFixed(1)} mi`
 }
@@ -276,7 +276,7 @@ function printPage() {
               <InfoTip label="Why a range and not one number?">
                 No one knows a home’s exact value until it sells. Our model studies thousands of nearby
                 sales and gives its best estimate, plus the range where its two independent ways of
-                measuring uncertainty agree — like a weather forecast for your home’s value.
+                measuring uncertainty agree. It’s like a weather forecast for your home’s value.
                 <RouterLink to="/methodology" class="font-semibold text-brand-600 underline"
                   >Learn how this works</RouterLink
                 >.
@@ -294,7 +294,7 @@ function printPage() {
             <p class="text-body-sm leading-normal text-body">
               <strong class="text-ink">Newly built home.</strong> City records say this home is
               brand new. New construction is the hardest case for a sale-comparison model like
-              ours — until the home itself sells, nearby sales mostly reflect older homes, so our
+              ours. Until the home itself sells, nearby sales mostly reflect older homes, so our
               estimate and range can run low. The city’s value may rest on information we can’t
               see, like the builder’s own numbers.
             </p>
@@ -320,7 +320,7 @@ function printPage() {
             <div class="no-print">
               <InfoTip>
                 Each bar shows roughly how many dollars one fact adds to or takes away from this
-                home’s estimate. The effects stack like percentages, not simple addition — so the
+                home’s estimate. The effects stack like percentages, not simple addition, so the
                 bars alone won’t add up to the gap from a typical Philadelphia
                 {{ core.model_family === 'condo' ? 'condo' : 'home' }} (about
                 {{ money(report.drivers.base_value) }} in today’s market). They explain the
@@ -355,7 +355,7 @@ function printPage() {
             <div class="no-print">
               <InfoTip>
                 100% means the city’s value equals our estimate. Being above your neighbors does not
-                prove the assessment is unfair — but a big gap is a reason to look closer.
+                prove the assessment is unfair, but a big gap is a reason to look closer.
               </InfoTip>
             </div>
           </template>
@@ -380,7 +380,7 @@ function printPage() {
               <summary class="cursor-pointer font-medium text-brand-600">Recorded sales</summary>
               <ul class="mt-2 space-y-1 text-body">
                 <li v-for="s in report.sale_history" :key="s.date + (s.price ?? 0)">
-                  {{ s.date }} — {{ money(s.price) }}
+                  {{ s.date }}: {{ money(s.price) }}
                   <span v-if="s.validity && s.validity !== 'arms_length'" class="text-muted">
                     (not a regular market sale)
                   </span>
@@ -433,7 +433,7 @@ function printPage() {
       <SectionCard
         class="mt-6"
         title="Comparable sales nearby"
-        subtitle="Recent arms-length sales of homes the model considers most similar — the market evidence behind the estimate."
+        subtitle="Recent arms-length sales of homes the model considers most similar. This is the market evidence behind the estimate."
       >
         <div v-if="comps === null && !compsLoading" class="no-print">
           <button
@@ -477,13 +477,13 @@ function printPage() {
                     {{ money(c.price_adj_today) }}
                   </td>
                   <td class="money py-2 pr-3 text-right whitespace-nowrap">
-                    {{ c.livable_area ? `${num(c.livable_area)} sq ft` : '—' }}
+                    {{ c.livable_area ? `${num(c.livable_area)} sq ft` : 'N/A' }}
                   </td>
                   <td class="money py-2 pr-3 text-right whitespace-nowrap">
                     {{ c.distance_m === 0 ? 'Same building' : distMiles(c.distance_m) }}
                   </td>
                   <td v-if="hasSimilarity" class="money py-2 text-right whitespace-nowrap">
-                    {{ c.similarity != null ? `${Math.round(c.similarity * 100)}%` : '—' }}
+                    {{ c.similarity != null ? `${Math.round(c.similarity * 100)}%` : 'N/A' }}
                   </td>
                 </tr>
               </tbody>
@@ -492,7 +492,7 @@ function printPage() {
           <p class="mt-2 text-caption text-faint">
             “In today’s market” adjusts each sale to current prices using our district price index.
             “Similarity” is how often our model sorts the comp with this home when it prices
-            properties — higher means the model treats them as closer matches.
+            properties. Higher means the model treats them as closer matches.
             These are the model’s comparables, not an appraiser’s. You can bring your own comparables
             to an appeal.
           </p>
@@ -530,7 +530,7 @@ function printPage() {
                   <svg
                     v-if="f.implausible"
                     width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
-                    role="img" aria-label="Looks unusual — double-check this one"
+                    role="img" aria-label="Looks unusual, double-check this one"
                     class="-mt-0.5 ml-0.5 inline-block"
                   ><path d="M12 3.5 21.5 20h-19Z" /><line x1="12" y1="10" x2="12" y2="14" /><circle cx="12" cy="17" r="0.5" fill="#c2410c" /></svg>
                 </th>
@@ -548,12 +548,12 @@ function printPage() {
             class="mt-2 text-caption text-faint"
           >
             “Not on file” means the city has no value recorded, so our model used a typical value
-            instead — that stand-in is what the dollar effect reflects. Getting a missing fact
+            instead. That stand-in is what the dollar effect reflects. Getting a missing fact
             onto the record can change the estimate.
           </p>
           <p class="mt-2 text-caption text-faint">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="-mt-0.5 inline-block"><path d="M12 3.5 21.5 20h-19Z" /><line x1="12" y1="10" x2="12" y2="14" /><circle cx="12" cy="17" r="0.5" fill="#c2410c" /></svg>
-            = this recorded value looks unusual for Philadelphia homes — double-check it.
+            = this recorded value looks unusual for Philadelphia homes, so double-check it.
           </p>
         </template>
         <p v-else class="text-body-sm text-muted">
@@ -585,13 +585,12 @@ function printPage() {
               Disagree with the value itself? Ask OPA for a
               <a :href="SITE.flrUrl" rel="noopener" class="font-bold text-brand-600 underline"
                 >First Level Review (FLR)</a
-              >
-              — the form comes in the mail with your new assessment notice, or you can request one
+              >. The form comes in the mail with your new assessment notice, or you can request one
               from OPA.
             </li>
             <li>
               Still disagree after the review? File a formal appeal with the
-              <strong>Board of Revision of Taxes (BRT)</strong> — the deadline is the first Monday
+              <strong>Board of Revision of Taxes (BRT)</strong>. The deadline is the first Monday
               of October each year.
             </li>
             <li>Bring this page, photos, and any repair estimates as evidence.</li>
@@ -610,7 +609,7 @@ function printPage() {
         <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p class="text-caption leading-relaxed text-faint">
             This report is public information, not legal or appraisal advice. Estimates come from a
-            statistical model and can be wrong for any single home — that’s why we show the range and
+            statistical model and can be wrong for any single home. That’s why we show the range and
             the facts, not just a number.
             <span v-if="report?.screen_built">Data updated {{ report.screen_built }}.</span>
           </p>

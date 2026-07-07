@@ -25,36 +25,33 @@ function goToProperty(hit: SearchHit) {
   router.push({ name: 'property', params: { parcelId: hit.parcel_id } })
 }
 
-/** Always renders — em-dash placeholders until /api/stats responds, so the
- * layout never collapses when the API is slow or down. */
-const counters = computed(() => [
-  { value: stats.value ? num(stats.value.properties) : '—', label: 'homes checked citywide' },
-  {
-    value: stats.value ? num(stats.value.over + stats.value.under) : '—',
-    label: 'flagged outside our range',
-  },
-  {
-    value: stats.value ? num(stats.value.watch) : '—',
-    label: 'more worth a closer look',
-  },
-  { value: '$0', label: 'to check or appeal' },
-])
+/** Always renders — a null value shows a spinner until /api/stats responds,
+ * so the layout never collapses when the API is slow or down. */
+const counters = computed<{ value: string | null; label: string }[]>(() => {
+  const s = stats.value
+  return [
+    { value: s ? num(s.properties) : null, label: 'homes checked citywide' },
+    { value: s ? num(s.over + s.under) : null, label: 'flagged outside our range' },
+    { value: s ? num(s.watch) : null, label: 'more worth a closer look' },
+    { value: '$0', label: 'to check or appeal' },
+  ]
+})
 
 const promises = [
   {
     icon: 'scale',
     title: 'A clear answer',
-    body: 'Fair, may be too high, or lower than our estimate — with the evidence behind it.',
+    body: 'A plain answer: fair, too high, or too low, with the evidence behind it.',
   },
   {
     icon: 'interval',
     title: 'The full picture',
-    body: 'Our estimate range, how neighbors are assessed, and ten years of history.',
+    body: 'You see our estimate range, how nearby homes are assessed, and ten years of history.',
   },
   {
     icon: 'document',
     title: 'What to do next',
-    body: 'If something looks off, the free steps to fix the record or appeal — no lawyer needed.',
+    body: 'If something looks off, we show the free steps to fix your record or appeal. You do not need a lawyer.',
   },
 ]
 </script>
@@ -67,7 +64,7 @@ const promises = [
         Is your home’s assessment fair?
       </h1>
       <p class="mx-auto mt-2.5 max-w-[520px] text-base leading-relaxed text-body sm:mt-3.5 sm:text-base">
-        Type your address. See how the city’s value compares with an independent estimate — free, no sign-up.
+        Type your address. See how the city’s value compares with an independent estimate. It’s free, with no sign-up.
       </p>
       <div class="mx-auto mt-4 max-w-[560px] text-left sm:mt-5">
         <AddressSearch @select="goToProperty" />
@@ -80,7 +77,15 @@ const promises = [
         class="grid grid-cols-2 gap-4 rounded-lg border border-line-soft bg-white px-4 py-5 text-center sm:grid-cols-4 sm:px-6"
       >
         <div v-for="c in counters" :key="c.label">
-          <dd class="money text-3xl font-extrabold tracking-tight text-brand-600">{{ c.value }}</dd>
+          <dd class="money text-3xl font-extrabold tracking-tight text-brand-600">
+            <span v-if="c.value === null" role="status" aria-label="Loading" class="inline-flex h-8 items-center justify-center">
+              <svg class="h-6 w-6 animate-spin text-brand-300" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" stroke-opacity="0.3" />
+                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+              </svg>
+            </span>
+            <template v-else>{{ c.value }}</template>
+          </dd>
           <dt class="mt-1 text-body-sm text-muted">{{ c.label }}</dt>
         </div>
       </dl>
@@ -115,8 +120,8 @@ const promises = [
       <div class="flex items-center gap-2.5 rounded-lg border border-[#d8e4f2] bg-[#eef4fb] px-4 py-3.5">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f4d90" stroke-width="2" stroke-linecap="round" aria-hidden="true" class="shrink-0"><circle cx="12" cy="12" r="9.5" /><line x1="12" y1="11" x2="12" y2="16.5" /><circle cx="12" cy="7.5" r="0.6" fill="#0f4d90" /></svg>
         <p class="text-caption leading-relaxed text-body">
-          We are independent — not run by the City of Philadelphia. Everything here is built from the
-          city’s own open data, and we show our work.
+          We are independent. We are not run by the City of Philadelphia. Everything here is built
+          from the city’s own open data, and we show our work.
           <RouterLink to="/methodology" class="font-semibold text-brand-600 underline">Read exactly how this works</RouterLink>
           or see
           <RouterLink to="/trust" class="font-semibold text-brand-600 underline">why you can trust these numbers</RouterLink>.

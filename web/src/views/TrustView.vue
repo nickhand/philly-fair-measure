@@ -29,7 +29,7 @@ const officialCard = [
   {
     q: 'Is the overall level right?',
     stat: 'Median ratio',
-    target: '0.90 – 1.10',
+    target: '0.90 to 1.10',
     city: fmt(iaao.opa.median_ratio, 2),
     cityPass: iaao.opa.median_ratio >= 0.9 && iaao.opa.median_ratio <= 1.1,
     ours: fmt(iaao.model.median_ratio, 2),
@@ -45,7 +45,7 @@ const officialCard = [
     oursPass: iaao.model.cod <= 15,
     oursNote:
       iaao.model.cod > 15 && iaao.model.cod <= 20
-        ? 'above the strict target — within IAAO tolerance for old rowhome stock'
+        ? 'above the strict target, but within IAAO tolerance for old rowhome stock'
         : undefined,
   },
   {
@@ -70,11 +70,11 @@ const officialCard = [
 
 /** Full-sample basis (every arms-length sale, no trim). */
 const fullCard = [
-  { stat: 'Median ratio', target: '0.90 – 1.10', city: fmt(full.opa.median_ratio), ours: fmt(full.model.median_ratio) },
+  { stat: 'Median ratio', target: '0.90 to 1.10', city: fmt(full.opa.median_ratio), ours: fmt(full.model.median_ratio) },
   { stat: 'COD', target: '≤ 15', city: fmt(full.opa.cod, 1), ours: fmt(full.model.cod, 1) },
   { stat: 'PRD', target: '0.98 – 1.03', city: fmt(full.opa.prd), ours: fmt(full.model.prd) },
   { stat: 'PRB', target: '±0.05', city: fmt(full.opa.prb), ours: fmt(full.model.prb) },
-  { stat: 'Typical error (MAPE)', target: '—', city: `${full.opa.mape_pct}%`, ours: `${full.model.mape_pct}%` },
+  { stat: 'Typical error (MAPE)', target: 'no target', city: `${full.opa.mape_pct}%`, ours: `${full.model.mape_pct}%` },
 ]
 </script>
 
@@ -100,7 +100,7 @@ const fullCard = [
         </span>
         <p class="mt-2 text-body-sm text-body">
           <strong class="text-ink">We use the official test.</strong> Assessors nationwide are
-          graded with the same ratio-study standards we apply here — not a test we invented.
+          graded with the same ratio-study standards we apply here. We did not invent this test.
         </p>
       </div>
       <div class="rounded-lg border border-line-soft bg-white p-4">
@@ -112,7 +112,7 @@ const fullCard = [
         </span>
         <p class="mt-2 text-body-sm text-body">
           <strong class="text-ink">We test the hard way.</strong> Our model is graded only on sales
-          it never saw — like grading a student on questions they never studied.
+          it never saw. It is like grading a student on questions they never studied.
         </p>
       </div>
       <div class="rounded-lg border border-line-soft bg-white p-4">
@@ -132,7 +132,7 @@ const fullCard = [
     <!-- the head-to-head -->
     <SectionCard
       title="The official test, head to head"
-      subtitle="The IAAO ratio study compares values to what homes actually sold for — on mortgage-financed sales, the standard's own market-value definition. Same homes, same sales, official scoring."
+      subtitle="The IAAO ratio study compares values to what homes actually sold for, using mortgage-financed sales, which is the standard's own market-value definition. Same homes, same sales, official scoring."
     >
       <div class="space-y-3">
         <div
@@ -153,7 +153,7 @@ const fullCard = [
               </span>
               <span>
                 City’s roll: <strong class="money">{{ row.city }}</strong>
-                <span class="sr-only">{{ row.cityPass ? '— passes' : '— fails' }}</span>
+                <span class="sr-only">{{ row.cityPass ? ', passes' : ', fails' }}</span>
               </span>
             </div>
             <div class="flex items-center gap-2">
@@ -166,7 +166,7 @@ const fullCard = [
               </span>
               <span>
                 Our model: <strong class="money">{{ row.ours }}</strong>
-                <span class="sr-only">{{ row.oursPass ? '— passes' : '— fails' }}</span>
+                <span class="sr-only">{{ row.oursPass ? ', passes' : ', fails' }}</span>
                 <span v-if="row.oursNote" class="text-muted"> ({{ row.oursNote }})</span>
               </span>
             </div>
@@ -181,8 +181,8 @@ const fullCard = [
       <InfoTip label="What these tests mean, in plain words">
         “Median ratio” asks whether values are centered on real prices. “COD” asks whether similar
         homes get similar treatment. “PRD” and “PRB” ask the fairness question that matters most:
-        are cheaper homes valued too high relative to expensive ones? That pattern — cheap homes
-        over-assessed — means lower-income owners quietly pay more than their share of tax.
+        are cheaper homes valued too high relative to expensive ones? That pattern, cheap homes
+        over-assessed, means lower-income owners quietly pay more than their share of tax.
       </InfoTip>
     </SectionCard>
 
@@ -191,12 +191,12 @@ const fullCard = [
       <ul class="list-disc space-y-2 pl-5 text-body">
         <li>
           <strong>The model never sees the answer key.</strong> We grade it only on sales that
-          happened <em>after</em> everything it learned from — the hardest version of the test, and
-          the one that matches how assessments really work.
+          happened <em>after</em> everything it learned from. That is the hardest version of the
+          test, and the one that matches how assessments really work.
         </li>
         <li>
-          <strong>The city’s number is never an input.</strong> Our model can’t copy OPA’s value —
-          it never sees it. Otherwise the comparison would be circular.
+          <strong>The city’s number is never an input.</strong> Our model can’t copy OPA’s value,
+          because it never sees it. Otherwise the comparison would be circular.
         </li>
         <li>
           <strong>Two methods must agree before we flag your home.</strong> A property is only
@@ -218,17 +218,17 @@ const fullCard = [
     >
       <ul class="list-disc space-y-2 pl-5 text-body">
         <li>
-          <strong>OPA is not gaming its numbers.</strong> A known trick called “sales chasing” —
-          quietly matching assessments to recent sales so the official study looks good — shows
-          <em>no evidence</em> in Philadelphia. We ran the standard detection test across two tax
-          years; it came back clean each time.
+          <strong>OPA is not gaming its numbers.</strong> A known trick called “sales chasing”
+          means quietly matching assessments to recent sales so the official study looks good. We
+          found <em>no evidence</em> of it in Philadelphia. We ran the standard detection test
+          across two tax years, and it came back clean each time.
         </li>
         <li>
           <strong>This is a national problem, not a Philadelphia scandal.</strong> Research covering
           roughly 26 million U.S. sales finds the same pattern almost everywhere: the cheapest homes
           are assessed at roughly twice the rate of the most expensive, relative to what they sell
-          for. Philadelphia sits inside a structural, nationwide failure — a better model moves it;
-          nothing fully fixes it yet.
+          for. Philadelphia sits inside a structural, nationwide failure. A better model moves it,
+          but nothing fully fixes it yet.
         </li>
       </ul>
     </SectionCard>
@@ -238,15 +238,15 @@ const fullCard = [
       <div class="rounded-md border border-gold-border bg-gold-soft p-4">
         <ul class="list-disc space-y-2 pl-5 text-body">
           <li>
-            <strong>Nobody passes the unfiltered test — including us.</strong> The official standard
+            <strong>Nobody passes the unfiltered test, including us.</strong> The official standard
             excludes foreclosures, cash-market distress sales, and extreme cases. Scored on
             <em>every</em> sale with no exclusions, the city’s roll fails badly and our model fails
-            too — by a much smaller margin (see the full table below). “Passes the official test”
+            too, by a much smaller margin (see the full table below). “Passes the official test”
             and “fair to every neighborhood” are different claims.
           </li>
           <li>
             <strong>Our model is still imperfect on cheap homes.</strong> Homes that sell for cash
-            in disinvested neighborhoods are the hardest to value — for the city and for us. Our
+            in disinvested neighborhoods are the hardest to value, for the city and for us. Our
             estimates there carry wider ranges, and we show those ranges instead of hiding them.
           </li>
           <li>
@@ -264,7 +264,7 @@ const fullCard = [
     >
       <details class="rounded-md border border-line-faint p-3">
         <summary class="cursor-pointer font-semibold text-brand-600">
-          Full table — official IAAO basis (time-adjusted, 3×IQR-trimmed)
+          Full table: official IAAO basis (time-adjusted, 3×IQR-trimmed)
         </summary>
         <table class="mt-3 w-full text-left text-body-sm">
           <caption class="sr-only">IAAO-standard ratio statistics, city versus our model</caption>
@@ -289,7 +289,7 @@ const fullCard = [
 
       <details class="mt-3 rounded-md border border-line-faint p-3">
         <summary class="cursor-pointer font-semibold text-brand-600">
-          Full table — every arms-length sale, no exclusions
+          Full table: every arms-length sale, no exclusions
         </summary>
         <table class="mt-3 w-full text-left text-body-sm">
           <caption class="sr-only">Full-sample ratio statistics, city versus our model</caption>
@@ -312,8 +312,8 @@ const fullCard = [
         </table>
         <p class="mt-2 text-caption text-faint">
           Neither passes; ours fails by a fraction of the margin (PRB −0.06 vs −0.23, COD 25.9 vs
-          34.5). The gap between the two tables is the 3×IQR trim removing the cash/distressed tail
-          — an exclusion built into the official standard itself.
+          34.5). The gap between the two tables is the 3×IQR trim removing the cash/distressed tail.
+          That exclusion is built into the official standard itself.
         </p>
       </details>
 
@@ -325,15 +325,15 @@ const fullCard = [
             <dd>Assessed value ÷ sale price. 1.00 means the assessment matched the market.</dd>
           </div>
           <div>
-            <dt class="font-bold text-ink">COD — coefficient of dispersion</dt>
+            <dt class="font-bold text-ink">COD: coefficient of dispersion</dt>
             <dd>Average % spread of ratios around the median. Lower = similar homes treated alike.</dd>
           </div>
           <div>
-            <dt class="font-bold text-ink">PRD — price-related differential</dt>
+            <dt class="font-bold text-ink">PRD: price-related differential</dt>
             <dd>Above 1.03 means cheaper homes carry relatively higher assessments (regressive).</dd>
           </div>
           <div>
-            <dt class="font-bold text-ink">PRB — price-related bias</dt>
+            <dt class="font-bold text-ink">PRB: price-related bias</dt>
             <dd>
               The preferred regressivity test: % change in ratio as value doubles. Negative =
               regressive; −0.234 means ratios fall ~23% per doubling of value.
@@ -350,11 +350,10 @@ const fullCard = [
         <a :href="SITE.githubUrl" rel="noopener" class="font-semibold text-brand-600 underline"
           >open-source pipeline</a
         >
-        (<code>fair-measure train-baseline</code>, <code>fair-measure ratio-study</code>) and documented — with
-        the measurements that did NOT work — in the
+        (<code>fair-measure train-baseline</code>, <code>fair-measure ratio-study</code>) and documented in the
         <a :href="SITE.modelDocsUrl" rel="noopener" class="font-semibold text-brand-600 underline"
           >technical model documentation</a
-        >.
+        >, including the measurements that did NOT work.
       </p>
     </SectionCard>
 

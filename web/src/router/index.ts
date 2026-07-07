@@ -65,7 +65,7 @@ const router = createRouter({
       meta: {
         title: 'Why trust these numbers',
         description:
-          "How Fair Measure's estimates hold up against industry accuracy standards — and straight answers to the reasons you might not trust a model.",
+          "How Fair Measure's estimates hold up against industry accuracy standards, plus straight answers to the reasons you might not trust a model.",
       },
     },
     {
@@ -91,7 +91,7 @@ const router = createRouter({
 
 router.afterEach((to) => {
   const title = (to.meta.title as string) ?? 'Fair Measure'
-  document.title = to.name === 'home' ? title : `${title} — Fair Measure`
+  document.title = to.name === 'home' ? title : `${title} · Fair Measure`
   document
     .querySelector('meta[name="description"]')
     ?.setAttribute('content', (to.meta.description as string) ?? DEFAULT_DESCRIPTION)

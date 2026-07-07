@@ -28,7 +28,7 @@ const runDate = new Date(`${stats.meta.generated_at}T00:00:00Z`).toLocaleDateStr
       class="mx-auto flex max-w-5xl items-center justify-between gap-1.5 px-4 py-3 sm:gap-4"
       aria-label="Main"
     >
-      <RouterLink to="/" class="flex items-center gap-1.5 min-[480px]:gap-2.5" aria-label="Fair Measure (beta) — home">
+      <RouterLink to="/" class="flex items-center gap-1.5 min-[480px]:gap-2.5" aria-label="Fair Measure home">
         <svg width="26" height="17" viewBox="0 0 26 17" aria-hidden="true" class="shrink-0">
           <rect x="1" y="6" width="24" height="7" rx="3.5" fill="#b9d2ee" />
           <rect x="11" y="2" width="3.5" height="15" rx="1.2" fill="#0f4d90" />
@@ -93,8 +93,8 @@ const runDate = new Date(`${stats.meta.generated_at}T00:00:00Z`).toLocaleDateStr
         </svg>
         <p class="mt-2 max-w-3xl text-body-sm leading-relaxed text-muted">
           <strong class="text-ink">Fair Measure</strong> is a free, independent tool built only
-          from the City of Philadelphia’s own open data — it is not run by the city. Our estimates
-          are not appraisals, and nothing here is legal or tax advice; before you act, check the
+          from the City of Philadelphia’s own open data. It is not run by the city. Our estimates
+          are not appraisals, and nothing here is legal or tax advice. Before you act, check the
           city’s records at
           <a
             href="https://property.phila.gov"
@@ -119,7 +119,7 @@ const runDate = new Date(`${stats.meta.generated_at}T00:00:00Z`).toLocaleDateStr
 
       <!-- beta + run provenance: one factual line, updated by every export -->
       <p class="mt-4 text-center text-caption text-muted">
-        Fair Measure is in beta — estimates come from the {{ runDate }} model run and can shift
+        Fair Measure is in beta. Estimates come from the {{ runDate }} model run and can shift
         as the model improves. Spot a problem?
         <a :href="`${SITE.githubUrl}/issues`" rel="noopener" class="font-semibold text-brand-600 underline"
           >Open an issue</a
@@ -132,7 +132,7 @@ const runDate = new Date(`${stats.meta.generated_at}T00:00:00Z`).toLocaleDateStr
         <a :href="SITE.creatorUrl" rel="noopener" class="font-semibold text-brand-600 underline"
           >{{ SITE.creatorName }}</a
         >
-        · No ads, no cookies — anonymous usage statistics only · Independent, not a City of
+        · No ads, no cookies, anonymous usage statistics only · Independent, not a City of
         Philadelphia product
       </p>
     </div>

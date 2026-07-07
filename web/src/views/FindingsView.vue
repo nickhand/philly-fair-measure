@@ -48,22 +48,21 @@ function colH(m: number): number {
     </h1>
     <p class="mt-2.5 text-base leading-relaxed text-body">
       We compared ten years of Philadelphia assessments with what homes actually sold for. Four
-      findings matter most — including one in the city’s favor.
+      findings matter most, including one in the city’s favor.
     </p>
 
     <!-- Finding 1: regressivity is real — and fixable -->
     <section class="mt-5 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
       <p class="text-caption font-bold text-brand-600">FINDING 1</p>
       <h2 class="mt-1 text-title font-bold text-ink">
-        Cheaper homes are over-assessed — and it doesn’t have to be that way.
+        Cheaper homes are over-assessed, and it doesn’t have to be this way.
       </h2>
       <p class="mt-1.5 text-body-sm leading-relaxed text-body">
         100% means the city’s value matches what homes really sell for. The cheapest fifth of
-        Philadelphia homes is assessed at <strong>{{ t.q1.opa_pct }}%</strong> — owners pay tax on
-        more value than their homes have. The priciest fifth sits at
-        <strong>{{ t.q5.opa_pct }}%</strong>. Economists call this
-        <em>regressivity</em>; in plain terms, it quietly shifts tax from expensive homes onto
-        cheap ones.
+        Philadelphia homes is assessed at <strong>{{ t.q1.opa_pct }}%</strong>. Those owners pay tax
+        on more value than their homes have. The priciest fifth sits at
+        <strong>{{ t.q5.opa_pct }}%</strong>. Economists call this <em>regressivity</em>. In plain
+        words, it quietly shifts tax off expensive homes and onto cheap ones.
       </p>
 
       <div
@@ -92,10 +91,10 @@ function colH(m: number): number {
         <p class="text-caption text-faint" aria-hidden="true">dashed line = 100% (fair)</p>
       </div>
       <p class="mt-2 text-body-sm leading-relaxed text-body">
-        The blue bars are the point: this pattern is not a foregone conclusion. Using only the
+        The blue bars show the point: this pattern does not have to happen. Using only the
         city’s own open data, our model puts the same groups at
         <strong>{{ t.q1.model_pct }}%</strong> and <strong>{{ t.q5.model_pct }}%</strong> on the
-        same sales — most of the gap is gone. Regressive assessments are a modeling problem, and
+        same sales. Most of the gap is gone. Regressive assessments are a modeling problem, and
         modeling problems can be fixed.
         <RouterLink to="/trust" class="font-semibold text-brand-600 underline">See the proof</RouterLink>.
       </p>
@@ -115,8 +114,8 @@ function colH(m: number): number {
         Comparing each year’s roll to a fair one, lower-value homes over-paid about
         <strong>${{ redis.total_financed_musd }} million</strong> from
         {{ redis.year_span.replace('–', ' to ') }} (about ${{ redis.per_resident_usd }} per
-        Philadelphian) — <strong>${{ worstYearM }} million in the worst single year</strong>. On
-        a stricter all-sales benchmark the total is closer to
+        Philadelphian). <strong>${{ worstYearM }} million of that came in the worst single
+        year.</strong> On a stricter all-sales benchmark the total is closer to
         <strong>${{ redis.total_raw_musd }} million</strong>.
       </p>
 
@@ -140,9 +139,9 @@ function colH(m: number): number {
       </div>
 
       <div class="mt-3 rounded-md border border-gold-border bg-gold-soft p-3 text-body-sm leading-relaxed text-body">
-        <strong class="text-gold-700">The 2020–22 dip does not mean the problem was fixed.</strong> The city froze
-        assessments while prices boomed, so rising prices temporarily hid the pattern. It snapped
-        right back with the 2023 reassessment.
+        <strong class="text-gold-700">The 2020 to 2022 dip does not mean the problem was fixed.</strong> The city
+        froze assessments while prices boomed, so rising prices hid the pattern for a while. It
+        snapped right back with the 2023 reassessment.
       </div>
     </section>
 
@@ -151,35 +150,36 @@ function colH(m: number): number {
       <p class="text-caption font-bold text-brand-600">FINDING 3</p>
       <h2 class="mt-1 text-title font-bold text-ink">Philadelphia has two housing markets.</h2>
       <p class="mt-1.5 text-body-sm leading-relaxed text-body">
-        About <strong>{{ cashAllOf10 }} in 10</strong> Philadelphia home sales are all-cash —
-        investors and wholesalers, concentrated in disinvested neighborhoods — and those homes
-        sell for roughly <strong>{{ Math.abs(cash.discount_pct ?? 0) }}% less</strong> than
+        About <strong>{{ cashAllOf10 }} in 10</strong> Philadelphia home sales are all-cash. These
+        are mostly investors and wholesalers, and they cluster in disinvested neighborhoods. Those
+        homes sell for roughly <strong>{{ Math.abs(cash.discount_pct ?? 0) }}% less</strong> than
         financed homes in the same district. In the cheapest fifth of recent sales,
         <strong>{{ cashQ1Of10 }} in 10</strong> are cash.
       </p>
       <p class="mt-2 text-body-sm leading-relaxed text-body">
-        This complicates the story honestly: measured against regular mortgage-financed sales, the
-        city’s fairness problem shrinks a lot. Much of the unfairness lives in the
-        <em>cash market</em> — homes taxed on values they cannot actually fetch. Any serious fix
-        has to decide which market an assessment should reflect. We publish both views.
+        This part makes the story more complicated. Measured against regular mortgage-financed
+        sales, the city’s fairness problem shrinks a lot. Much of the unfairness lives in the
+        <em>cash market</em>, where homes are taxed on values they cannot actually fetch. Any real
+        fix has to decide which market an assessment should reflect. We show both views.
       </p>
     </section>
 
     <!-- Finding 4: in the city's favor -->
     <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
-      <p class="text-caption font-bold text-brand-600">FINDING 4 — IN THE CITY’S FAVOR</p>
+      <p class="text-caption font-bold text-brand-600">FINDING 4 · IN THE CITY’S FAVOR</p>
       <h2 class="mt-1 text-title font-bold text-ink">The same pattern shows up across the country.</h2>
       <ul class="mt-1.5 list-disc space-y-1.5 pl-5 text-body-sm leading-relaxed text-body">
         <li>
-          <strong>No number-gaming.</strong> We tested for “sales chasing” — quietly matching
-          assessments to recent sales so official studies look good. Philadelphia comes back clean.
+          <strong>No number-gaming.</strong> We tested for “sales chasing,” which means quietly
+          matching assessments to recent sales so official studies look good. Philadelphia comes
+          back clean.
         </li>
         <li>
-          <strong>Almost every city has this pattern.</strong> Research covering ~26 million U.S.
-          sales finds the cheapest homes assessed at roughly twice the rate of the most expensive,
-          nearly everywhere. Philadelphia isn’t uniquely bad — it sits inside a structural,
-          nationwide failure. (Which is also why Finding 1 matters: the fix is a method, not a
-          miracle.)
+          <strong>Almost every city has this pattern.</strong> Research covering about 26 million
+          U.S. sales finds the cheapest homes assessed at roughly twice the rate of the most
+          expensive, nearly everywhere. Philadelphia isn’t uniquely bad. It sits inside a
+          structural, nationwide failure. That is also why Finding 1 matters: the fix is a method
+          other cities could use too.
         </li>
       </ul>
     </section>
@@ -188,7 +188,7 @@ function colH(m: number): number {
     <section class="mt-4 rounded-xl border border-line-soft bg-brand-50 p-4 sm:p-5">
       <h2 class="text-title font-bold text-brand-900">What this site does about it</h2>
       <p class="mt-1.5 text-body-sm leading-relaxed text-body">
-        A fairer model, free for anyone to check their own home — plus the evidence to fix wrong
+        A fairer model, free for anyone to check their own home, plus the evidence to fix wrong
         records or appeal.
         <RouterLink to="/" class="font-semibold text-brand-600 underline">Check your home</RouterLink>,
         <RouterLink to="/map" class="font-semibold text-brand-600 underline">explore the map</RouterLink>,
