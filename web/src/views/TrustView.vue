@@ -6,9 +6,10 @@
  * what we say in the city's favor → what we can NOT claim → full technical
  * tables behind <details> for the reader who wants them.
  *
- * Numbers: out-of-time test of baseline run 20260705T015912Z (n ≈ 19.5k
- * arms-length sales) — docs/vertical-equity-report-card.md in the repo.
- * Regenerate when the model retrains. */
+ * Numbers: out-of-time test of the latest baseline run (see
+ * stats.meta.model_run_id; n ≈ 19.5k arms-length sales) —
+ * docs/vertical-equity-report-card.md in the repo. Every figure is bound to
+ * siteStats.json, so it regenerates when the model retrains. */
 import { Check, Scale, X } from 'lucide-vue-next'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import { SITE } from '@/config/site'
@@ -311,9 +312,10 @@ const fullCard = [
           </tbody>
         </table>
         <p class="mt-2 text-caption text-faint">
-          Neither passes; ours fails by a fraction of the margin (PRB −0.06 vs −0.23, COD 25.9 vs
-          34.5). The gap between the two tables is the 3×IQR trim removing the cash/distressed tail.
-          That exclusion is built into the official standard itself.
+          Neither passes; ours fails by a fraction of the margin (PRB {{ fmt(full.model.prb, 2) }} vs
+          {{ fmt(full.opa.prb, 2) }}, COD {{ fmt(full.model.cod, 1) }} vs {{ fmt(full.opa.cod, 1) }}).
+          The gap between the two tables is the 3×IQR trim removing the cash/distressed tail. That
+          exclusion is built into the official standard itself.
         </p>
       </details>
 
@@ -336,7 +338,9 @@ const fullCard = [
             <dt class="font-bold text-ink">PRB: price-related bias</dt>
             <dd>
               The preferred regressivity test: % change in ratio as value doubles. Negative =
-              regressive; −0.234 means ratios fall ~23% per doubling of value.
+              regressive; {{ fmt(full.opa.prb) }} means ratios fall ~{{
+                Math.round(Math.abs(full.opa.prb) * 100)
+              }}% per doubling of value.
             </dd>
           </div>
         </dl>

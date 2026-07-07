@@ -13,6 +13,15 @@ const mapeOpa = Math.round(stats.full_card.opa.mape_pct)
 const nTest = stats.meta.n_test
 const coveragePct = stats.meta.interval_coverage_pct
 
+/** Page provenance date — same source and formatting as the global footer, so
+ * it tracks every export automatically instead of being hand-frozen. */
+const dataUpdated = new Date(`${stats.meta.generated_at}T00:00:00Z`).toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  timeZone: 'UTC',
+})
+
 /** Evenhandedness = the IAAO vertical-equity bands (median ratio, PRD, PRB)
  * on the financed/time-adjusted card — the same rule the trust page scores. */
 function evenhanded(card: { median_ratio: number; prd: number; prb: number }): boolean {
@@ -195,8 +204,8 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
     </section>
 
     <p class="mt-4 text-caption leading-normal text-faint">
-      Data updated 2026-07-04 · Model code and validation are public · Independent, not a City of
-      Philadelphia site
+      Data updated {{ dataUpdated }} · Model code and validation are public · Independent, not a City
+      of Philadelphia site
     </p>
   </div>
 </template>

@@ -78,7 +78,7 @@
      report always carries its true address (final domain undecided). */
   .report-root::after {
     content: 'Live report with sources: ' attr(data-url)
-      '  ·  Independent — not a City of Philadelphia product  ·  Data updated ' attr(data-updated);
+      '  ·  Independent, not a City of Philadelphia product  ·  Data updated ' attr(data-updated);
     display: block;
     margin-top: 12pt;
     padding-top: 6pt;
