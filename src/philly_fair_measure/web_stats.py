@@ -53,6 +53,50 @@ def _iqr_trim_mask(ratio: np.ndarray) -> np.ndarray:
     return np.asarray(~_iaao_outlier_mask(ratio))
 
 
+# Philadelphia FY2025 property-tax rate: 0.6317% city + 0.7681% school.
+MILLAGE = 0.013998
+
+
+def _tax_shift(screen: pl.DataFrame) -> dict[str, Any]:
+    """What adopting our assessments would do at today's tax rate.
+
+    Philadelphia under-assesses its most expensive homes, so correcting the roll
+    is found revenue, not just a reshuffle: at the current rate the city collects
+    more, and the increase falls on the top, while the over-assessed cheapest
+    homes get relief. No rate change and no new tax law. Because the increase at
+    the top outweighs the relief at the bottom, the net is positive. Uses the
+    displayed model estimate (`display_median`) against OPA's market value over
+    every scored residential + condo property.
+    """
+    opa = screen["opa_market_value"].to_numpy().astype(np.float64)
+    model = screen["display_median"].to_numpy().astype(np.float64)
+    ok = np.isfinite(opa) & (opa > 0) & np.isfinite(model) & (model > 0)
+    opa, model = opa[ok], model[ok]
+
+    home_shift = MILLAGE * (model - opa)  # per-home change in yearly tax at today's rate
+    edges = np.quantile(opa, [0.2, 0.4, 0.6, 0.8])
+    bucket = np.digitize(opa, edges)  # 0..4, cheapest to priciest by OPA value
+    names = ["cheapest fifth", "second fifth", "middle fifth", "fourth fifth", "priciest fifth"]
+    tiers: list[dict[str, Any]] = [
+        {
+            "name": name,
+            "home_usd": round(float(home_shift[bucket == i].mean())),
+            "total_musd": round(float(home_shift[bucket == i].sum()) / 1e6, 1),
+        }
+        for i, name in enumerate(names)
+    ]
+    return {
+        "millage_pct": round(MILLAGE * 100, 2),
+        "base_change_pct": round((model.sum() / opa.sum() - 1) * 100, 1),
+        # Net new revenue at the current rate — the city collects more because the
+        # under-assessed top pays more than the over-assessed bottom is relieved.
+        "new_revenue_musd": round(float(home_shift.sum()) / 1e6),
+        "cheapest_home_usd": tiers[0]["home_usd"],
+        "priciest_home_usd": tiers[-1]["home_usd"],
+        "tiers": tiers,
+    }
+
+
 def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT) -> dict[str, Any]:
     root = data_dir if data_dir is not None else config.data_dir()
     run_dir = latest_run_dir("baseline", root)
@@ -186,6 +230,8 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
         "by_family_flag": flags,
     }
 
+    tax_shift = _tax_shift(screen_df)
+
     evaluation = pl.read_parquet(run_dir / "evaluation.parquet")
     overall = evaluation.filter(
         (pl.col("segment_type") == "overall") & (pl.col("convention") == "out_of_time")
@@ -241,6 +287,7 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
             "discount_pct": discount_pct,
         },
         "redistribution": redistribution,
+        "tax_shift": tax_shift,
         "screen": screen,
         "results_table": results_table,
     }

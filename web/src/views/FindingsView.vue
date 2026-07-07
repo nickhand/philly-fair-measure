@@ -38,6 +38,26 @@ function barW(pct: number): number {
 function colH(m: number): number {
   return (Math.abs(m) / SHIFT_MAX) * 100
 }
+
+const shift = stats.tax_shift
+/** Per-home yearly tax change by value quintile, for the diverging bars. */
+const shiftTiers = shift.tiers
+const SHIFT_HOME_MAX = Math.max(...shiftTiers.map((s) => Math.abs(s.home_usd)), 1)
+/** Bar half-width from the zero centerline, as a % of the track. */
+function shiftW(usd: number): number {
+  return (Math.abs(usd) / SHIFT_HOME_MAX) * 46
+}
+const taxShiftAria =
+  'Change in a typical home’s yearly tax bill by value group if the city adopted our ' +
+  'assessments at today’s rate: ' +
+  shiftTiers
+    .map((s) =>
+      s.home_usd < 0
+        ? `${s.name} pays ${Math.abs(s.home_usd)} dollars less`
+        : `${s.name} pays ${s.home_usd} dollars more`,
+    )
+    .join('; ') +
+  '.'
 </script>
 
 <template>
@@ -47,7 +67,7 @@ function colH(m: number): number {
       What we found
     </h1>
     <p class="mt-2.5 text-base leading-relaxed text-body">
-      We compared ten years of Philadelphia assessments with what homes actually sold for. Four
+      We compared ten years of Philadelphia assessments with what homes actually sold for. Five
       findings matter most, including one in the city’s favor.
     </p>
 
@@ -182,6 +202,77 @@ function colH(m: number): number {
           other cities could use too.
         </li>
       </ul>
+    </section>
+
+    <!-- Finding 5: accurate assessments = found revenue + a fair-share correction -->
+    <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
+      <p class="text-caption font-bold text-brand-600">FINDING 5 · THE FIX</p>
+      <h2 class="mt-1 text-title font-bold text-ink">
+        Make the wealthy pay their fair share.
+      </h2>
+      <p class="mt-1.5 text-body-sm leading-relaxed text-body">
+        Cities everywhere are scrambling for revenue, and passing a new tax is a long, hard fight.
+        Philadelphia has an easier option that needs no new law and no rate hike: fix the assessments
+        it already has. Today the priciest homes are under-assessed, so their owners are billed on
+        less than their homes are worth.
+      </p>
+      <p class="mt-2 text-body-sm leading-relaxed text-body">
+        Correcting that makes the wealthiest homeowners pay their fair share, and it gives the
+        over-assessed cheapest homes a break. The typical priciest-fifth home would pay about
+        <strong>${{ shift.priciest_home_usd }} more</strong> a year; the typical cheapest-fifth home
+        pays about <strong>${{ Math.abs(shift.cheapest_home_usd) }} less</strong>.
+      </p>
+      <p class="mt-2 text-body-sm leading-relaxed text-body">
+        Because the increase at the top outweighs the relief at the bottom, the city comes out ahead:
+        an estimated <strong>${{ shift.new_revenue_musd }} million a year</strong> it is not
+        collecting today, at the same rate, with no new tax. Struggling for revenue and struggling
+        for fairness turn out to be the same problem, with the same fix.
+      </p>
+
+      <div class="mt-4" role="img" :aria-label="taxShiftAria">
+        <p class="mb-2 text-caption text-faint" aria-hidden="true">
+          Change in a typical home’s yearly tax bill, by value group
+        </p>
+        <div class="space-y-2" aria-hidden="true">
+          <div v-for="s in shiftTiers" :key="s.name">
+            <div class="flex items-baseline justify-between">
+              <span class="text-caption font-semibold capitalize text-ink">{{ s.name }}</span>
+              <span
+                class="money text-caption font-bold"
+                :class="s.home_usd < 0 ? 'text-muted' : 'text-brand-600'"
+                >{{ s.home_usd < 0 ? `−$${Math.abs(s.home_usd)}` : `+$${s.home_usd}` }}</span
+              >
+            </div>
+            <div class="relative mt-1 h-3.5">
+              <div class="absolute inset-y-0 left-1/2 w-px bg-[#8593a4]"></div>
+              <div
+                class="absolute top-0 h-3.5"
+                :class="s.home_usd < 0 ? 'rounded-l-sm bg-[#9db1c7]' : 'rounded-r-sm bg-brand-600'"
+                :style="
+                  s.home_usd < 0
+                    ? { right: '50%', width: `${shiftW(s.home_usd)}%` }
+                    : { left: '50%', width: `${shiftW(s.home_usd)}%` }
+                "
+              ></div>
+            </div>
+          </div>
+        </div>
+        <p class="mt-1.5 text-center text-caption text-faint" aria-hidden="true">
+          ← pays less · pays more →
+        </p>
+      </div>
+
+      <div class="mt-3 rounded-md bg-brand-50 p-3 text-body-sm leading-relaxed text-body">
+        <strong class="text-brand-900">No new tax. No new law. No rate hike.</strong> Just an
+        accurate roll. The wealthiest homeowners are under-assessed right now, so making them pay
+        their fair share is the simplest tax reform on the table, and it pays for itself.
+      </div>
+      <p class="mt-2 text-caption text-muted">
+        An estimate across every home the model scores; the corrected values run about
+        {{ shift.base_change_pct }}% higher citywide, concentrated in the most expensive homes.
+        Residential and condo property only. The city could instead keep total collections flat and
+        cut the rate for everyone; either way the regressive tilt is gone.
+      </p>
     </section>
 
     <!-- what we do about it -->

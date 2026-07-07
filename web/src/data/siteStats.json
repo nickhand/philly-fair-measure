@@ -135,6 +135,40 @@
     "per_resident_usd": 226,
     "year_span": "2016\u20132025"
   },
+  "tax_shift": {
+    "millage_pct": 1.4,
+    "base_change_pct": 1.0,
+    "new_revenue_musd": 20,
+    "cheapest_home_usd": -180,
+    "priciest_home_usd": 287,
+    "tiers": [
+      {
+        "name": "cheapest fifth",
+        "home_usd": -180,
+        "total_musd": -17.8
+      },
+      {
+        "name": "second fifth",
+        "home_usd": -72,
+        "total_musd": -7.2
+      },
+      {
+        "name": "middle fifth",
+        "home_usd": 45,
+        "total_musd": 4.4
+      },
+      {
+        "name": "fourth fifth",
+        "home_usd": 121,
+        "total_musd": 12.1
+      },
+      {
+        "name": "priciest fifth",
+        "home_usd": 287,
+        "total_musd": 28.6
+      }
+    ]
+  },
   "screen": {
     "properties": 496975,
     "over": 1135,
