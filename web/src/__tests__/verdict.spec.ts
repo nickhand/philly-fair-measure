@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { verdictFor, VERDICTS, WATCH_VERDICTS } from '@/utils/verdict'
+import { verdictFor, VERDICTS, WATCH_BEYOND_VERDICTS, WATCH_VERDICTS } from '@/utils/verdict'
 
 describe('verdictFor', () => {
   it('maps every screen flag to plain-language copy', () => {
@@ -36,6 +36,41 @@ describe('verdictFor', () => {
     expect(WATCH_VERDICTS.high.headline).toMatch(/near the top/)
     expect(WATCH_VERDICTS.high.detail).toMatch(/not proof/)
     expect(WATCH_VERDICTS.low.headline).toMatch(/near the bottom/)
+  })
+
+  it('says "above/below our range" when the city value is beyond the shown band', () => {
+    // the copy must match the drawn chart: "inside but near the edge" would
+    // be false for a marker rendered outside the band
+    const band = { bandLo: 288_000, bandHi: 918_000 }
+    const above = verdictFor('within_range', 'high', { cityValue: 1_290_200, ...band })
+    expect(above).toBe(WATCH_BEYOND_VERDICTS.high)
+    expect(above.headline).toMatch(/above our range/)
+    expect(above.detail).toMatch(/do not agree/)
+    const below = verdictFor('within_range', 'low', { cityValue: 150_000, ...band })
+    expect(below).toBe(WATCH_BEYOND_VERDICTS.low)
+    expect(below.headline).toMatch(/below our range/)
+    // in-band watch rows keep the near-the-edge wording
+    expect(verdictFor('within_range', 'high', { cityValue: 900_000, ...band })).toBe(
+      WATCH_VERDICTS.high,
+    )
+    // colors and next steps are shared: the tier is the same, only the
+    // position statement changes
+    expect(WATCH_BEYOND_VERDICTS.high.hex).toBe(WATCH_VERDICTS.high.hex)
+    expect(WATCH_BEYOND_VERDICTS.high.nextStep).toBe(WATCH_VERDICTS.high.nextStep)
+  })
+
+  it('explains new-build above-range rows without the disagreement claim', () => {
+    // for new builds both methods can read the value as high — the flag is
+    // withheld by rule, so "our checks disagree" would be false
+    const v = verdictFor('within_range', 'high', {
+      cityValue: 1_290_200,
+      bandLo: 288_000,
+      bandHi: 918_000,
+      newBuild: true,
+    })
+    expect(v.headline).toMatch(/above our range/)
+    expect(v.detail).toMatch(/newly built/)
+    expect(v.detail).not.toMatch(/do not agree/)
   })
 
   it('uses the colorblind-safe blue/orange pair', () => {

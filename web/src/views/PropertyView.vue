@@ -69,7 +69,14 @@ async function load(id: string) {
 watch(() => props.parcelId, load, { immediate: true })
 
 const verdict = computed(() =>
-  core.value ? verdictFor(core.value.flag, core.value.attention) : null,
+  core.value
+    ? verdictFor(core.value.flag, core.value.attention, {
+        cityValue: core.value.opa_market_value,
+        bandLo: core.value.display_pi_low_90 ?? core.value.model_pi_low_90,
+        bandHi: core.value.display_pi_high_90 ?? core.value.model_pi_high_90,
+        newBuild: core.value.new_build,
+      })
+    : null,
 )
 const hasInterval = computed(
   () =>
@@ -96,9 +103,10 @@ const deltaPill = computed(() => {
   const high = bandHi.value
   if (flag === 'over_assessed_candidate') return `${money(opa! - high!)} above our highest estimate`
   if (flag === 'under_assessed_candidate') return `${money(low! - opa!)} below our lowest estimate`
-  if (flag === 'within_range' && attention === 'high') return 'Near the top of our estimated range'
+  if (flag === 'within_range' && attention === 'high')
+    return opa! > high! ? 'Above our estimated range' : 'Near the top of our estimated range'
   if (flag === 'within_range' && attention === 'low')
-    return 'Near the bottom of our estimated range'
+    return opa! < low! ? 'Below our estimated range' : 'Near the bottom of our estimated range'
   if (flag === 'within_range') return 'Inside our estimated range'
   return null
 })

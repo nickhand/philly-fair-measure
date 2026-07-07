@@ -4,9 +4,11 @@ Two layers:
 
 - ``assert_screen_invariants`` — structural truths of the screen that code
   changes must never break: no flag the second uncertainty machine disputes,
-  and no display band that excludes its own median. ``build_assessment_screen``
-  calls this on every build and refuses to write a mart that violates them
-  (these are exactly the two bug classes found in the 2026-07-06 review).
+  no display band that excludes its own median, no estimate pinned to a band
+  edge, and no watch tier contradicting the displayed geometry.
+  ``build_assessment_screen`` calls this on every build and refuses to write
+  a mart that violates them (each one is a bug class actually shipped and
+  then caught, 2026-07-06/07).
 
 - ``audit_screen`` / ``run_screen_audit`` — the wider health report: flag and
   watch counts, band-width quantiles per family, extreme-value tallies. The
@@ -24,7 +26,7 @@ from typing import Any
 import polars as pl
 
 from philly_fair_measure import config
-from philly_fair_measure.vocab import AssessmentFlag
+from philly_fair_measure.vocab import ATTENTION_BAND_FRACTION, AssessmentFlag, AttentionTier
 
 AUDIT_NAME = "assessment_screen_audit.json"
 _FLAGGED = [str(AssessmentFlag.OVER), str(AssessmentFlag.UNDER)]
@@ -75,15 +77,46 @@ def incoherent_display_count(df: pl.DataFrame) -> int:
     ).height
 
 
+def incoherent_attention_count(df: pl.DataFrame) -> int:
+    """Watch-tier rows whose claim disagrees with the displayed geometry:
+    "high" must sit above the shown estimate in the shown band's outer
+    ATTENTION_BAND_FRACTION (or beyond it); "low" is the mirror. The tier is
+    derived from exactly this geometry in finalize_screen — this invariant
+    keeps the two from drifting apart again (the 2026-07-07 128 Rochelle Ave
+    bug: a z-based tier claiming "near the top of our range" at the shown
+    band's 55th percentile, below the shown estimate)."""
+    if "attention" not in df.columns:
+        return 0
+    if not {"display_pi_low_90", "display_pi_high_90"}.issubset(df.columns):
+        return 0
+    est = _shown_estimate(df)
+    pos = (pl.col("opa_market_value") - pl.col("display_pi_low_90")) / (
+        pl.col("display_pi_high_90") - pl.col("display_pi_low_90")
+    )
+    tol = 1e-9  # float-identical recomputation; tolerance only for serialization
+    return df.filter(
+        (
+            (pl.col("attention") == AttentionTier.HIGH)
+            & ((pl.col("opa_market_value") <= est) | (pos < 1.0 - ATTENTION_BAND_FRACTION - tol))
+        )
+        | (
+            (pl.col("attention") == AttentionTier.LOW)
+            & ((pl.col("opa_market_value") >= est) | (pos > ATTENTION_BAND_FRACTION + tol))
+        )
+    ).height
+
+
 def assert_screen_invariants(df: pl.DataFrame) -> None:
     disputed = disputed_flag_count(df)
     incoherent = incoherent_display_count(df)
     pinned = audit_screen(df)["invariants"]["median_pinned_to_display_edge"]
-    if disputed or incoherent or pinned:
+    misplaced_watch = incoherent_attention_count(df)
+    if disputed or incoherent or pinned or misplaced_watch:
         raise ScreenInvariantError(
             f"screen invariants violated: {disputed} flags disputed by the conformal band, "
             f"{incoherent} rows with the median outside the display band, "
-            f"{pinned} rows with the estimate pinned to a display edge. "
+            f"{pinned} rows with the estimate pinned to a display edge, "
+            f"{misplaced_watch} watch rows contradicting the displayed geometry. "
             "Refusing to write the mart — see validation/screen_audit.py."
         )
 
@@ -138,6 +171,7 @@ def audit_screen(df: pl.DataFrame) -> dict[str, Any]:
             "disputed_flags": disputed_flag_count(df),
             "median_outside_display": incoherent_display_count(df),
             "median_pinned_to_display_edge": pinned,
+            "attention_contradicts_display": incoherent_attention_count(df),
         },
         "bands": bands,
         "extremes": {

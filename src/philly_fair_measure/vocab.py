@@ -53,12 +53,20 @@ class AssessmentFlag(StrEnum):
 
 
 class AttentionTier(StrEnum):
-    """Within-range rows whose OPA value sits in the outer part of the
-    interval (|screen_z| above the attention threshold) — weaker evidence
-    than a flag, presented as "worth a closer look" (validation/opa.py)."""
+    """Within-range rows whose OPA value sits in the outer
+    ATTENTION_BAND_FRACTION of the *display* band (or beyond it), on the far
+    side of the display median — weaker evidence than a flag, presented as
+    "worth a closer look" (validation/opa.py)."""
 
     HIGH = "high"
     LOW = "low"
+
+
+# The attention tier's geometry: "near the edge" means the outer fifth of the
+# displayed band. Shared by the tier definition (validation/opa.py) and the
+# invariant that keeps tier and displayed geometry from drifting apart again
+# (validation/screen_audit.py) — they must never disagree.
+ATTENTION_BAND_FRACTION = 0.2
 
 
 class IntervalMethod(StrEnum):

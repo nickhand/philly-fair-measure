@@ -46,9 +46,12 @@ finalize_screen); `screen_z` stays anchored to `model_pi_*`.
 (log(OPA/median) scaled by the interval's log-width / 3.29, i.e. ~standard
 normal if the predictive distribution is right), so properties are ranked by
 how confidently the model disagrees — not just by raw dollar gap. Within-range
-rows additionally carry `attention` ("high"/"low"/null) when |screen_z| >
-_ATTENTION_Z: the OPA value is still inside the sale-plausibility interval but
-in its outer part — surfaced as "worth a closer look", never as a flag. Interpret
+rows additionally carry `attention` ("high"/"low"/null) when the OPA value
+sits in (or beyond) the outer _ATTENTION_BAND_FRACTION of the *display* band,
+on the display median's far side — surfaced as "worth a closer look", never as
+a flag. The tier is display-geometric on purpose: it feeds user-visible copy
+("near the top of our range"), so it must be true of the band the page
+actually shows, not of the Bayesian band the gate uses. Interpret
 candidates as *screening leads for comp-level review*, not verdicts: the
 models inherit every current_only characteristics caveat documented in
 docs/features.md.
@@ -76,16 +79,38 @@ from philly_fair_measure.models.scoring import (
     score_bayesian_intervals,
     score_lightgbm,
 )
-from philly_fair_measure.vocab import AssessmentFlag, AttentionTier, IntervalMethod, ModelFamily
+from philly_fair_measure.vocab import (
+    ATTENTION_BAND_FRACTION,
+    AssessmentFlag,
+    AttentionTier,
+    IntervalMethod,
+    ModelFamily,
+)
 
 logger = logging.getLogger(__name__)
 
 _Z_SCALE = 3.29  # log-width of a 90% interval in standard-normal units (2 * 1.645)
-# Attention tier: within-range rows whose OPA value sits beyond ~1 predictive
-# sd of the model median. Deliberately weaker than a flag (|z| > ~1.645): with
-# the median rowhome interval, z=1 still means OPA ~1.7x or ~0.6x our estimate,
-# but per-home sale noise keeps it short of a defensible over/under call.
-_ATTENTION_Z = 1.0
+# Attention tier: within-range rows whose OPA value sits in the outer fifth of
+# the DISPLAY band (or beyond it), on the far side of the display median.
+# Deliberately weaker than a flag. Measured 2026-07-07: the previous
+# |screen_z| > 1 (Bayesian-band) definition left 49% of watch rows mid-band in
+# the geometry the page draws, and 23k within-range rows fully outside it —
+# 128 Rochelle Ave read "near the top of our range" while the city's value sat
+# at the shown band's 55th percentile, below the shown estimate. The fraction
+# itself lives in vocab.ATTENTION_BAND_FRACTION, shared with the audit
+# invariant that enforces tier/geometry coherence.
+_ATTENTION_BAND_FRACTION = ATTENTION_BAND_FRACTION
+
+
+def _display_band_position() -> pl.Expr:
+    """OPA's linear position within the display band (0 = bottom edge, 1 = top
+    edge, outside [0, 1] = beyond the shown band) — the geometry the property
+    page draws. The display clamp guarantees a positive band width wherever a
+    display band exists, so the division is safe; rows without a band yield
+    null, which every `when` treats as not-matched."""
+    return (pl.col("opa_market_value") - pl.col("display_pi_low_90")) / (
+        pl.col("display_pi_high_90") - pl.col("display_pi_low_90")
+    )
 
 
 class StaleRunError(RuntimeError):
@@ -148,8 +173,10 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     # reflect the older stock it replaced, so a sale-comparison model runs
     # low (measured: new-build over-flag assessments at 3.2x our medians,
     # with listings agreeing with OPA). An "over" call is not defensible
-    # here — it demotes to within-range, where the attention tier picks it
-    # up as "worth a look"; the report carries a plain-language caveat.
+    # here — it demotes to within-range. The attention tier still picks it
+    # up ("worth a look"): a demoted over means OPA exceeds both machines'
+    # bands, so it sits beyond the shown band's top by construction. The
+    # report carries a plain-language caveat.
     # Under-flags stay: a new build the city still prices as the old parcel
     # is a genuine lead. Two-year window: OPA's recorded year wobbles within
     # a single development (202 vs 204/206 Kalos St differ by a year on
@@ -165,9 +192,11 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     # the conformal band disputed 30% of Bayesian-only flags (253 over /
     # 1,070 under), concentrated on gentrification-edge blocks where the two
     # arms disagree about the price level — one machine's word is not enough
-    # to tell an owner to appeal. Disputed rows land within-range, where the
-    # attention tier picks them up (|z| > 1.64 by construction, so every
-    # demoted flag surfaces as "worth a look"). Rows without conformal
+    # to tell an owner to appeal. Disputed rows land within-range; the ones
+    # sitting in the shown band's outer fifth surface in the attention tier,
+    # while mid-band disputed rows read as plain within-range — the shown
+    # (better-calibrated) band comfortably contains them, and screen_z keeps
+    # the disagreement visible in the mart and report. Rows without conformal
     # columns (condos, minimal fixtures) gate on their native band alone.
     if {"conformal_pi_low_90", "conformal_pi_high_90"}.issubset(df.columns):
         conformal_agrees_over = pl.col("conformal_pi_high_90").is_null() | (
@@ -263,17 +292,27 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
         )
         .with_columns(pl.col("screen_z").abs().alias("screen_abs_z"))
         .with_columns(
-            # attention: inside the interval but in its outer part — "worth a
-            # closer look", explicitly weaker language than a flag
+            # attention: the shown band's outer fifth, or beyond it — "worth a
+            # closer look", explicitly weaker language than a flag. Computed
+            # from the display band (linear position, matching the drawn
+            # chart) with a display-median side guard, so the copy the tier
+            # triggers is true of the picture next to it. Demoted over-flags
+            # whose OPA exceeds the shown band land here naturally (position
+            # > 1); mid-band disputed rows read as plain within-range because
+            # the better-calibrated shown band comfortably contains them —
+            # screen_z stays in the mart and the report for that story.
             pl.when(
                 (pl.col("assessment_flag") == AssessmentFlag.WITHIN)
-                & (pl.col("screen_abs_z") > _ATTENTION_Z)
+                & (pl.col("opa_market_value") > pl.col("display_median"))
+                & (_display_band_position() >= 1.0 - _ATTENTION_BAND_FRACTION)
             )
-            .then(
-                pl.when(pl.col("screen_z") > 0)
-                .then(pl.lit(AttentionTier.HIGH))
-                .otherwise(pl.lit(AttentionTier.LOW))
+            .then(pl.lit(AttentionTier.HIGH))
+            .when(
+                (pl.col("assessment_flag") == AssessmentFlag.WITHIN)
+                & (pl.col("opa_market_value") < pl.col("display_median"))
+                & (_display_band_position() <= _ATTENTION_BAND_FRACTION)
             )
+            .then(pl.lit(AttentionTier.LOW))
             .otherwise(pl.lit(None, dtype=pl.String))
             .alias("attention")
         )

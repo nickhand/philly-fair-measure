@@ -87,9 +87,11 @@ export const VERDICTS: Record<Flag, Verdict> = {
   },
 }
 
-/** Watch tier: within the interval but near its edge (|screen_z| > 1).
- * Deliberately weaker language than a flag — "worth a look", never "may be
- * wrong" — with tinted (not full-strength) versions of the over/under hexes. */
+/** Watch tier: the city's value sits in the shown band's outer fifth, on the
+ * far side of the shown estimate (computed server-side from the display band,
+ * so this copy is true of the chart drawn next to it). Deliberately weaker
+ * language than a flag — "worth a look", never "may be wrong" — with tinted
+ * (not full-strength) versions of the over/under hexes. */
 export const WATCH_VERDICTS: Record<'high' | 'low', Verdict> = {
   high: {
     flag: 'within_range',
@@ -116,7 +118,54 @@ export const WATCH_VERDICTS: Record<'high' | 'low', Verdict> = {
   },
 }
 
-export function verdictFor(flag: Flag, attention: Attention = null): Verdict {
-  if (flag === 'within_range' && attention) return WATCH_VERDICTS[attention]
+/** Watch rows whose city value sits beyond the shown band entirely. These are
+ * one-machine calls: a flag needs both checking methods to agree, and here
+ * they don't (or the home is a new build, where the over call is withheld by
+ * rule). The chart draws the marker outside the band, so the copy must say
+ * "above/below", not "inside but near the edge". */
+export const WATCH_BEYOND_VERDICTS: Record<'high' | 'low', Verdict> = {
+  high: {
+    ...WATCH_VERDICTS.high,
+    headline: 'Your assessment is above our range',
+    detail:
+      "The city's value is higher than the top of the range shown here. We don't flag it, because our two ways of checking this home do not agree about it. That is not proof of a problem — it is a reason to look closer.",
+  },
+  low: {
+    ...WATCH_VERDICTS.low,
+    headline: 'Your assessment is below our range',
+    detail:
+      "The city's value is lower than the bottom of the range shown here. We don't flag it, because our two ways of checking this home do not agree about it. A lower assessment usually means a lower tax bill.",
+  },
+}
+
+/** New builds get "above our range" for a different reason: both methods can
+ * read the city's value as high, but the range itself likely runs low (it is
+ * built from nearby sales of mostly older homes), so the over call is
+ * withheld. The disagreement sentence would be false here. */
+const WATCH_ABOVE_NEW_BUILD: Verdict = {
+  ...WATCH_BEYOND_VERDICTS.high,
+  detail:
+    "The city's value is higher than the top of the range shown here. This home is newly built, and our range comes from nearby sales of mostly older homes, so it can run low. The note below explains.",
+}
+
+export interface VerdictContext {
+  /** The numbers the page draws, so watch copy can tell "near the top of the
+   * shown band" from "above it". Omit (map dots, legends) to get the in-band
+   * wording — colors are identical either way. */
+  cityValue?: number | null
+  bandLo?: number | null
+  bandHi?: number | null
+  newBuild?: boolean
+}
+
+export function verdictFor(flag: Flag, attention: Attention = null, ctx: VerdictContext = {}): Verdict {
+  if (flag === 'within_range' && attention) {
+    const { cityValue, bandLo, bandHi, newBuild } = ctx
+    if (attention === 'high' && cityValue != null && bandHi != null && cityValue > bandHi)
+      return newBuild ? WATCH_ABOVE_NEW_BUILD : WATCH_BEYOND_VERDICTS.high
+    if (attention === 'low' && cityValue != null && bandLo != null && cityValue < bandLo)
+      return WATCH_BEYOND_VERDICTS.low
+    return WATCH_VERDICTS[attention]
+  }
   return VERDICTS[flag] ?? VERDICTS.no_assessment
 }

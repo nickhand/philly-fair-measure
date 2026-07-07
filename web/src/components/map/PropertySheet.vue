@@ -12,7 +12,14 @@ import { verdictFor } from '@/utils/verdict'
 const props = defineProps<{ property: PropertyCore }>()
 defineEmits<{ close: [] }>()
 
-const verdict = computed(() => verdictFor(props.property.flag, props.property.attention))
+const verdict = computed(() =>
+  verdictFor(props.property.flag, props.property.attention, {
+    cityValue: props.property.opa_market_value,
+    bandLo: props.property.display_pi_low_90 ?? props.property.model_pi_low_90,
+    bandHi: props.property.display_pi_high_90 ?? props.property.model_pi_high_90,
+    newBuild: props.property.new_build,
+  }),
+)
 const hasInterval = computed(
   () =>
     props.property.model_pi_low_90 != null &&

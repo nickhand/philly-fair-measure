@@ -235,17 +235,22 @@ def test_finalize_screen_insufficient_record_and_newbuild_guard():
 
 
 def test_finalize_screen_attention_tier():
-    # interval 150k-600k around a 300k median: log-width 1.386, sd ≈ 0.421.
-    # watch_high: opa 497k → z ≈ +1.2, inside the interval → attention "high";
-    # watch_low: opa 181k → z ≈ -1.2 → "low"; mid: opa 370k → z ≈ 0.5 → null.
+    # The tier follows the DISPLAYED band's linear geometry (the picture the
+    # property page draws), band 150k-600k around a 300k estimate here:
+    # watch_high: opa 520k → position 0.82, above the estimate → "high";
+    # watch_low: opa 181k → position 0.07, below it → "low";
+    # mid: opa 370k → position 0.49 → null (497k, the old z-based trigger,
+    # would sit at 0.77 — visibly NOT "near the top" on the drawn chart);
+    # near_edge_wrong_side: opa 240k sits at position 0.20 but ABOVE nothing —
+    # below the estimate it can never read "near the top".
     df = pl.DataFrame(
         {
-            "parcel_id": ["watch_high", "watch_low", "mid"],
-            "opa_market_value": [497_000.0, 181_000.0, 370_000.0],
-            "pred_lightgbm_calibrated": [300_000.0] * 3,
-            "model_median": [300_000.0] * 3,
-            "model_pi_low_90": [150_000.0] * 3,
-            "model_pi_high_90": [600_000.0] * 3,
+            "parcel_id": ["watch_high", "watch_low", "mid", "old_trigger"],
+            "opa_market_value": [520_000.0, 181_000.0, 370_000.0, 497_000.0],
+            "pred_lightgbm_calibrated": [300_000.0] * 4,
+            "model_median": [300_000.0] * 4,
+            "model_pi_low_90": [150_000.0] * 4,
+            "model_pi_high_90": [600_000.0] * 4,
         }
     )
     out = {row["parcel_id"]: row for row in finalize_screen(df).to_dicts()}
@@ -253,6 +258,7 @@ def test_finalize_screen_attention_tier():
     assert out["watch_high"]["attention"] == "high"
     assert out["watch_low"]["attention"] == "low"
     assert out["mid"]["attention"] is None
+    assert out["old_trigger"]["attention"] is None
 
 
 def test_finalize_screen_agreement_gate_and_display_band():
@@ -282,10 +288,16 @@ def test_finalize_screen_agreement_gate_and_display_band():
     out = {row["parcel_id"]: row for row in finalize_screen(df).to_dicts()}
     # both machines outside on the same side -> flag stands
     assert out["agreed_over"]["assessment_flag"] == "over_assessed_candidate"
-    # one machine's word is not enough: disputed flags demote to the
-    # attention tier (|z| > 1.64 by construction, so they stay visible)
+    # one machine's word is not enough: disputed flags demote to within-range.
+    # disputed_over lands mid-band in the shown geometry (900k at position
+    # 0.68 of the 250k-1.2M conformal band the page displays) — no attention
+    # chip, because "near the top of our range" would be visibly false;
+    # screen_z keeps the disagreement in the mart. disputed_under sits in the
+    # shown band's outer fifth (100k at position 0.05 of 80k-500k), so it
+    # keeps its "worth a look".
     assert out["disputed_over"]["assessment_flag"] == "within_range"
-    assert out["disputed_over"]["attention"] == "high"
+    assert out["disputed_over"]["attention"] is None
+    assert abs(out["disputed_over"]["screen_z"]) > 1.64
     assert out["disputed_under"]["assessment_flag"] == "within_range"
     assert out["disputed_under"]["attention"] == "low"
     # Stage 5 role separation: the display pair is the calibrated LightGBM
@@ -329,6 +341,7 @@ def test_screen_audit_invariants_and_report():
         "disputed_flags": 0,
         "median_outside_display": 0,
         "median_pinned_to_display_edge": 0,
+        "attention_contradicts_display": 0,
     }
     assert report["flags"]["residential/over_assessed_candidate"] == 1
     assert report["bands"]["residential"]["display"]["max"] > 1
@@ -338,6 +351,11 @@ def test_screen_audit_invariants_and_report():
     corrupt = clean.with_columns(pl.lit(2_000_000.0).alias("conformal_pi_high_90"))
     with pytest.raises(ScreenInvariantError):
         assert_screen_invariants(corrupt)
+    # a watch chip contradicting the drawn geometry (row b: "high" while the
+    # city's value sits below the shown estimate) must also refuse to ship
+    misplaced = clean.with_columns(pl.lit("high").alias("attention"))
+    with pytest.raises(ScreenInvariantError, match="watch rows contradicting"):
+        assert_screen_invariants(misplaced)
 
 
 def test_screen_refuses_stale_runs(tmp_path):
