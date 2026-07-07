@@ -62,11 +62,13 @@ class AttentionTier(StrEnum):
     LOW = "low"
 
 
-# The attention tier's geometry: "near the edge" means the outer fifth of the
-# displayed band. Shared by the tier definition (validation/opa.py) and the
-# invariant that keeps tier and displayed geometry from drifting apart again
-# (validation/screen_audit.py) — they must never disagree.
-ATTENTION_BAND_FRACTION = 0.2
+# The attention tier's geometry: "near the edge" means the outer tenth of the
+# displayed band — roughly the model's 90th percentile under a log-normal
+# predictive, i.e. outside the 80% interval but inside the 90% band a flag
+# needs (one interval-step in from the flag). Shared by the tier definition
+# (validation/opa.py) and the invariant that keeps tier and displayed geometry
+# from drifting apart (validation/screen_audit.py) — they must never disagree.
+ATTENTION_BAND_FRACTION = 0.1
 
 
 class IntervalMethod(StrEnum):

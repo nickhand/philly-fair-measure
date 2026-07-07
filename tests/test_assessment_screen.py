@@ -236,17 +236,17 @@ def test_finalize_screen_insufficient_record_and_newbuild_guard():
 
 def test_finalize_screen_attention_tier():
     # The tier follows the DISPLAYED band's linear geometry (the picture the
-    # property page draws), band 150k-600k around a 300k estimate here:
-    # watch_high: opa 520k → position 0.82, above the estimate → "high";
-    # watch_low: opa 181k → position 0.07, below it → "low";
-    # mid: opa 370k → position 0.49 → null (497k, the old z-based trigger,
-    # would sit at 0.77 — visibly NOT "near the top" on the drawn chart);
-    # near_edge_wrong_side: opa 240k sits at position 0.20 but ABOVE nothing —
-    # below the estimate it can never read "near the top".
+    # property page draws) at the outer TENTH, band 150k-600k around a 300k
+    # estimate here:
+    # watch_high: opa 560k → position 0.91, above the estimate → "high";
+    # watch_low: opa 175k → position 0.06, below it → "low";
+    # mid: opa 370k → position 0.49 → null;
+    # outer_fifth: opa 520k → position 0.82 → null — inside the old fifth but
+    #   not the tenth; guards the 2026-07-07 tightening from regressing.
     df = pl.DataFrame(
         {
-            "parcel_id": ["watch_high", "watch_low", "mid", "old_trigger"],
-            "opa_market_value": [520_000.0, 181_000.0, 370_000.0, 497_000.0],
+            "parcel_id": ["watch_high", "watch_low", "mid", "outer_fifth"],
+            "opa_market_value": [560_000.0, 175_000.0, 370_000.0, 520_000.0],
             "pred_lightgbm_calibrated": [300_000.0] * 4,
             "model_median": [300_000.0] * 4,
             "model_pi_low_90": [150_000.0] * 4,
@@ -258,7 +258,7 @@ def test_finalize_screen_attention_tier():
     assert out["watch_high"]["attention"] == "high"
     assert out["watch_low"]["attention"] == "low"
     assert out["mid"]["attention"] is None
-    assert out["old_trigger"]["attention"] is None
+    assert out["outer_fifth"]["attention"] is None
 
 
 def test_finalize_screen_agreement_gate_and_display_band():
@@ -293,7 +293,7 @@ def test_finalize_screen_agreement_gate_and_display_band():
     # 0.68 of the 250k-1.2M conformal band the page displays) — no attention
     # chip, because "near the top of our range" would be visibly false;
     # screen_z keeps the disagreement in the mart. disputed_under sits in the
-    # shown band's outer fifth (100k at position 0.05 of 80k-500k), so it
+    # shown band's outer tenth (100k at position 0.05 of 80k-500k), so it
     # keeps its "worth a look".
     assert out["disputed_over"]["assessment_flag"] == "within_range"
     assert out["disputed_over"]["attention"] is None

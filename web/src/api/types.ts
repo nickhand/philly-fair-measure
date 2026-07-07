@@ -7,8 +7,8 @@ export type Flag =
   | 'no_assessment'
   | 'insufficient_record'
 
-/** Within-range but in the outer part of the interval — "worth a closer
- * look", deliberately weaker language than a flag. */
+/** Within-range but in the displayed band's outer tenth (or beyond it) —
+ * "worth a closer look", deliberately weaker language than a flag. */
 export type Attention = 'high' | 'low' | null
 
 export interface SearchHit {

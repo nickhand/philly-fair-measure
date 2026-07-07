@@ -90,15 +90,18 @@ from philly_fair_measure.vocab import (
 logger = logging.getLogger(__name__)
 
 _Z_SCALE = 3.29  # log-width of a 90% interval in standard-normal units (2 * 1.645)
-# Attention tier: within-range rows whose OPA value sits in the outer fifth of
+# Attention tier: within-range rows whose OPA value sits in the outer tenth of
 # the DISPLAY band (or beyond it), on the far side of the display median.
-# Deliberately weaker than a flag. Measured 2026-07-07: the previous
-# |screen_z| > 1 (Bayesian-band) definition left 49% of watch rows mid-band in
-# the geometry the page draws, and 23k within-range rows fully outside it —
-# 128 Rochelle Ave read "near the top of our range" while the city's value sat
-# at the shown band's 55th percentile, below the shown estimate. The fraction
-# itself lives in vocab.ATTENTION_BAND_FRACTION, shared with the audit
-# invariant that enforces tier/geometry coherence.
+# Deliberately weaker than a flag. Two decisions, both measured 2026-07-07:
+# (1) geometry over z — the previous |screen_z| > 1 (Bayesian-band) definition
+# left 49% of watch rows mid-band in the picture the page draws, and 23k
+# within-range rows fully outside it (128 Rochelle Ave read "near the top of
+# our range" while the city's value sat at the shown band's 55th percentile,
+# below the shown estimate); (2) the outer tenth, not fifth — the tenth is
+# ~the model's 90th percentile (outside the 80% interval but inside the 90%
+# band a flag needs) and restores the ~44k watch volume the fifth inflated to
+# 88k. The fraction lives in vocab.ATTENTION_BAND_FRACTION, shared with the
+# audit invariant that enforces tier/geometry coherence.
 _ATTENTION_BAND_FRACTION = ATTENTION_BAND_FRACTION
 
 
@@ -193,7 +196,7 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     # 1,070 under), concentrated on gentrification-edge blocks where the two
     # arms disagree about the price level — one machine's word is not enough
     # to tell an owner to appeal. Disputed rows land within-range; the ones
-    # sitting in the shown band's outer fifth surface in the attention tier,
+    # sitting in the shown band's outer tenth surface in the attention tier,
     # while mid-band disputed rows read as plain within-range — the shown
     # (better-calibrated) band comfortably contains them, and screen_z keeps
     # the disagreement visible in the mart and report. Rows without conformal
@@ -292,7 +295,7 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
         )
         .with_columns(pl.col("screen_z").abs().alias("screen_abs_z"))
         .with_columns(
-            # attention: the shown band's outer fifth, or beyond it — "worth a
+            # attention: the shown band's outer tenth, or beyond it — "worth a
             # closer look", explicitly weaker language than a flag. Computed
             # from the display band (linear position, matching the drawn
             # chart) with a display-median side guard, so the copy the tier

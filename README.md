@@ -15,7 +15,7 @@ comparisons — is published in a per-property report.
 As of the latest run (Tax Year 2027 assessments), the screen covers
 **496,975** residential properties and condos: **1,694** flagged
 as likely over-assessed, **6,175** as likely under-assessed, and
-**87,620** unflagged but at or beyond the edge of the published
+**43,351** unflagged but at or beyond the edge of the published
 range ("worth a look").
 A residential flag requires two independent uncertainty methods — the
 Bayesian posterior interval and a spatially weighted

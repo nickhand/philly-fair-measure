@@ -260,15 +260,19 @@ Guards keep the flags honest where the record, not the value, is the problem:
 - **Insufficient records** (no recorded livable area) are reported as
   `insufficient_record` and are not valued at all rather than being priced as
   if the missing size were real.
-- **Attention tier** ("worth a look"): properties inside the interval but in
-  its outer part (|`screen_z`| > 1) are labeled high/low attention rather than
-  flagged, so the strong flags stay reserved for cases outside the model's
-  stated uncertainty.
+- **Attention tier** ("worth a look"): properties inside the displayed 90%
+  band but in its outer tenth — on the far side of the estimate, roughly the
+  model's 90th percentile — are labeled high/low attention rather than
+  flagged, so the strong flags stay reserved for cases the two methods place
+  outside the band entirely. The tier is measured on the band the site
+  actually draws (not the Bayesian `screen_z`, which still ranks every row),
+  so the "near the top/bottom of our range" copy is always true of the chart
+  beside it.
 
 <!-- generated:model-screen-counts:begin -->
 As of run `20260707T002634Z` (Tax Year 2027 roll): 496,975 properties
 screened — 1,694 over-assessed candidates, 6,175 under-assessed
-candidates, 87,620 in the attention tier, 93 insufficient
+candidates, 43,351 in the attention tier, 93 insufficient
 records.
 <!-- generated:model-screen-counts:end -->
 (The constant-quality index of 2026-07-06 cut under-assessed candidates

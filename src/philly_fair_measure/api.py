@@ -92,7 +92,7 @@ class PropertyCore(BaseModel):
     ratio: float | None
     screen_z: float | None
     flag: str
-    # within-range but at/beyond the outer fifth of the DISPLAYED band
+    # within-range but at/beyond the outer tenth of the DISPLAYED band
     # ("high"/"low") — weaker evidence than a flag, "worth a closer look"
     attention: str | None = None
     # built within ~a year of the valuation date: comp evidence runs low on

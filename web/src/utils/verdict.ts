@@ -87,7 +87,7 @@ export const VERDICTS: Record<Flag, Verdict> = {
   },
 }
 
-/** Watch tier: the city's value sits in the shown band's outer fifth, on the
+/** Watch tier: the city's value sits in the shown band's outer tenth, on the
  * far side of the shown estimate (computed server-side from the display band,
  * so this copy is true of the chart drawn next to it). Deliberately weaker
  * language than a flag — "worth a look", never "may be wrong" — with tinted
