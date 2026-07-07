@@ -205,8 +205,12 @@ policies, are in [CONTRIBUTING.md](CONTRIBUTING.md).
 - Condo accuracy: the model beats OPA on error (rmse 0.252 vs 0.278) and
   sits within half a COD point of OPA's uniformity (19.3 vs 18.8) — condos
   remain OPA's best segment.
-- OPA's interior-condition fields are stale and cannot be independently
-  verified; the model routes around them with distress and permit signals.
+- OPA's recorded condition codes cannot be independently verified (the city
+  does not inspect interiors), and in a measured ~10–20% tail the distress
+  codes are contradicted by later permits or sale prices. The model uses them
+  — recent sale prices confirm the codes carry real signal — alongside
+  independent distress and permit signals, and the per-property report labels
+  them "on record."
 - Single metro; no cross-city validation.
 
 ## License

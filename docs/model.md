@@ -303,6 +303,7 @@ pipeline · a full model-vs-OPA benchmark on every run.
 
 Cash-market dispersion is partly irreducible; condos remain OPA's best
 segment (we beat their rmse, trail their COD by ~0.5); interval
-undercoverage in q1; OPA's interior-condition fields are stale and unavailable
-to verify (the model routes around them via distress/permit signals); single
-metro, no cross-city validation.
+undercoverage in q1; OPA's condition codes cannot be independently verified
+(no interior inspections) and are stale in a measured ~10–20% tail — the
+model uses them, sale-price-confirmed, alongside independent distress/permit
+signals; single metro, no cross-city validation.
