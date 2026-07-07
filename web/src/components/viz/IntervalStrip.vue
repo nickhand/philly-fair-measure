@@ -103,7 +103,9 @@ const ariaLabel = computed(
   () =>
     `Our model estimates this home is worth between ${money(props.low)} and ${money(props.high)}, ` +
     `with a best estimate of ${money(props.median)}. The city's value is ${money(props.opa)}, ` +
-    `which is ${props.flag === 'within_range' ? 'inside' : 'outside'} that range.`,
+    // inside/outside must describe the drawn band, not the flag: a demoted
+    // (new-build or one-machine) row is within_range with a marker beyond it
+    `which is ${props.opa >= props.low && props.opa <= props.high ? 'inside' : 'outside'} that range.`,
 )
 </script>
 

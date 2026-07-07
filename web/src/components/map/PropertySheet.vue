@@ -45,10 +45,14 @@ const x = computed(() => {
 })
 const ariaLabel = computed(() => {
   const c = props.property
+  const opa = c.opa_market_value
+  // inside/outside must describe the drawn band, not the flag (demoted rows
+  // are within_range with the city marker beyond the band)
+  const inside = opa != null && opa >= bandLo.value! && opa <= bandHi.value!
   return (
     `Estimate range ${money(bandLo.value)} to ${money(bandHi.value)}, ` +
-    `best estimate ${money(c.model_median)}. City value ${money(c.opa_market_value)} is ` +
-    `${c.flag === 'within_range' ? 'inside' : 'outside'} the range.`
+    `best estimate ${money(c.model_median)}. City value ${money(opa)} is ` +
+    `${inside ? 'inside' : 'outside'} the range.`
   )
 })
 
