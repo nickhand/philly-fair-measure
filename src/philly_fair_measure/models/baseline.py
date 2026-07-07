@@ -124,9 +124,11 @@ NUMERIC_FEATURES: Final = (
     "evt_n_investigations_5y_before",
     "evt_n_precourt_5y_before",
     "evt_n_appeal_granted_before",
-    "ten_rental_license_at_sale",
-    "ten_owner_occupied_rental",
-    "ten_rental_units",
+    # tenure: owner-occupancy via the homestead exemption (owner-occupant-only,
+    # so a clean signal). The three rental-license features were dropped
+    # 2026-07-07 — a stale/messy feed, and an ablation showed they added zero
+    # accuracy (COD/RMSE unchanged) while mislabelling owner-occupied homes.
+    "ten_owner_occupied_at_sale",
     # mortgage forensics (RTT MORTGAGE docs; amounts unrecorded — presence,
     # timing, lender identity only). fin_cash_sale/fin_hard_money_sale are
     # transaction attributes and stay OUT of the model (asmt_-style analysis

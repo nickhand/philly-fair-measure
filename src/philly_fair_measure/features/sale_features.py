@@ -199,6 +199,7 @@ DISTRESS_TENURE_COUNTS = [
     "evt_n_appeal_granted_before",
     "ten_rental_license_at_sale",
     "ten_owner_occupied_rental",
+    "ten_owner_occupied_at_sale",
 ]
 DISTRESS_TENURE_COLUMNS = [
     *DISTRESS_TENURE_COUNTS,
@@ -207,12 +208,70 @@ DISTRESS_TENURE_COLUMNS = [
 ]
 
 
+def homestead_history(assessments: pl.LazyFrame) -> pl.DataFrame:
+    """(parcel_id, hs_year, is_homestead) from the assessment-roll history.
+
+    A parcel had the owner-occupant homestead exemption in a given year when its
+    building exemption equals that year's most common exemption amount — the
+    citywide homestead value ($100k for 2027; $80k/$40k/$30k in earlier cycles).
+    The homestead is granted only to owner-occupants, so it is a clean tenure
+    signal where the rental-license feed is noisy and frequently stale.
+    """
+    empty = pl.DataFrame(
+        schema={"parcel_id": pl.String, "hs_year": pl.Int32, "is_homestead": pl.Boolean}
+    )
+    if "exempt_building" not in assessments.collect_schema().names():
+        return empty  # minimal marts / test fixtures without the exemption history
+    rows = (
+        assessments.select(
+            pl.col("parcel_number").cast(pl.String).str.zfill(9).alias("parcel_id"),
+            pl.col("year_parsed").cast(pl.Int32).alias("hs_year"),
+            pl.col("exempt_building").cast(pl.Float64),
+        )
+        .filter(pl.col("hs_year").is_not_null() & pl.col("exempt_building").is_not_null())
+        .collect()
+    )
+    modal = (
+        rows.filter(pl.col("exempt_building") > 0)
+        .group_by("hs_year", "exempt_building")
+        .len()
+        .sort("len", descending=True)
+        .unique(subset="hs_year", keep="first")
+        .select("hs_year", pl.col("exempt_building").alias("hs_amount"))
+    )
+    return rows.join(modal, on="hs_year", how="left").select(
+        "parcel_id",
+        "hs_year",
+        (pl.col("exempt_building") == pl.col("hs_amount")).alias("is_homestead"),
+    )
+
+
+def homestead_now(opa: pl.LazyFrame, year: int) -> pl.DataFrame:
+    """(parcel_id, hs_year, is_homestead) for one valuation year, read straight
+    from the current roll's `homestead_exemption` field (owner-occupant-only).
+
+    The scoring counterpart to `homestead_history`: the screen anchors on the
+    valuation date, so it only needs current owner-occupancy, which the roll
+    states directly (no modal inference required)."""
+    empty = pl.DataFrame(
+        schema={"parcel_id": pl.String, "hs_year": pl.Int32, "is_homestead": pl.Boolean}
+    )
+    if "homestead_exemption" not in opa.collect_schema().names():
+        return empty
+    return opa.select(
+        pl.col("parcel_number").cast(pl.String).str.zfill(9).alias("parcel_id"),
+        pl.lit(year, dtype=pl.Int32).alias("hs_year"),
+        (pl.col("homestead_exemption").cast(pl.Float64) > 0).alias("is_homestead"),
+    ).collect()
+
+
 def distress_tenure_features(
     targets: pl.DataFrame,
     complaints: pl.LazyFrame | None = None,
     investigations: pl.LazyFrame | None = None,
     rental_licenses: pl.LazyFrame | None = None,
     appeals: pl.LazyFrame | None = None,
+    homestead: pl.DataFrame | None = None,
 ) -> pl.DataFrame:
     """as_of_sale distress (evt_) and tenure (ten_) block, shared by the sale
     mart and the assessment screen.
@@ -342,6 +401,27 @@ def distress_tenure_features(
                 .cast(pl.Float64)
                 .alias("ten_owner_occupied_rental"),
                 pl.col("units").max().alias("ten_rental_units"),
+            )
+        )
+        out = out.join(feats, on="sale_id", how="left")
+
+    if homestead is not None:
+        # owner-occupancy as-of the anchor: did the parcel hold the homestead
+        # exemption in the anchor year (sale year for training, valuation year
+        # for the screen). Leakage-safe — the year's roll is certified in advance.
+        feats = (
+            targets.select(
+                "sale_id",
+                pl.col("parcel_id").cast(pl.String).str.zfill(9).alias("parcel_id"),
+                pl.col("sale_date").dt.year().cast(pl.Int32).alias("hs_year"),
+            )
+            .join(homestead, on=["parcel_id", "hs_year"], how="left")
+            .select(
+                "sale_id",
+                pl.col("is_homestead")
+                .cast(pl.Float64)
+                .fill_null(0.0)
+                .alias("ten_owner_occupied_at_sale"),
             )
         )
         out = out.join(feats, on="sale_id", how="left")
@@ -925,6 +1005,7 @@ def assemble_sale_features(
                 investigations,
                 rental_licenses,
                 appeals,
+                homestead_history(assessments),
             ),
             on="sale_id",
             how="left",

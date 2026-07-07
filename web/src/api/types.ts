@@ -23,7 +23,7 @@ export interface Signals {
   vacancy_complaints_5y: number | null
   unpermitted_work_complaints_5y: number | null
   tax_delinquent: boolean
-  rental_license: boolean
+  owner_occupied: boolean
   linked_parcels: number | null
 }
 

@@ -7,7 +7,7 @@ happens to every home, including the cash/distressed tail the standard excludes)
 
 <!-- generated:veq-meta:begin -->
 Numbers are the out-of-time test slice of baseline run
-`20260707T030251Z-baseline` (n ≈ 19.5k residential arms-length sales).
+`20260707T224139Z-baseline` (n ≈ 19.5k residential arms-length sales).
 Reproduce with `fair-measure train-baseline` then `fair-measure ratio-study`. This
 report card is deliberately not a "we made it fair" claim, see the honest reading below.
 <!-- generated:veq-meta:end -->
@@ -30,10 +30,10 @@ The convention on which an assessor's performance is officially measured.
 <!-- generated:veq-card-iaao:begin -->
 | Statistic | Target | OPA | Our model |
 | --- | --- | --- | --- |
-| Median ratio | 0.90–1.10 | 0.920 ✓ | 1.004 ✓ |
+| Median ratio | 0.90–1.10 | 0.920 ✓ | 1.005 ✓ |
 | COD | ≤ 15 | 23.0 ✗ | 18.6 ⚠︎ |
-| PRD | 0.98–1.03 | 1.065 ✗ | 1.021 ✓ |
-| PRB | ±0.05 | -0.056 ✗ | +0.007 ✓ |
+| PRD | 0.98–1.03 | 1.065 ✗ | 1.023 ✓ |
+| PRB | ±0.05 | -0.056 ✗ | +0.004 ✓ |
 <!-- generated:veq-card-iaao:end -->
 
 **Our model passes both vertical-equity tests (PRD and PRB) and sits just above
@@ -51,11 +51,11 @@ homeowner actually experiences, and nobody passes it.
 <!-- generated:veq-card-full:begin -->
 | Statistic | Target | OPA | Our model |
 | --- | --- | --- | --- |
-| Median ratio | 0.90–1.10 | 0.983 ✓ | 1.037 ✓ |
-| COD | ≤ 15 | 34.5 ✗ | 24.9 ✗ |
-| PRD | 0.98–1.03 | 1.190 ✗ | 1.086 ✗ |
-| PRB | ±0.05 | -0.234 ✗ | -0.084 ✗ |
-| MAPE | n/a | 34.0% | 26.0% |
+| Median ratio | 0.90–1.10 | 0.983 ✓ | 1.035 ✓ |
+| COD | ≤ 15 | 34.5 ✗ | 25.0 ✗ |
+| PRD | 0.98–1.03 | 1.190 ✗ | 1.088 ✗ |
+| PRB | ±0.05 | -0.234 ✗ | -0.086 ✗ |
+| MAPE | n/a | 34.0% | 26.1% |
 <!-- generated:veq-card-full:end -->
 
 On the full sample the model is still mildly regressive and above the uniformity

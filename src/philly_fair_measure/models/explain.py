@@ -130,6 +130,7 @@ FEATURE_LABELS: dict[str, tuple[str, str]] = {
     "evt_n_vacant_complaints_5y_before": ("vacancy complaints", _DISTRESS),
     "ten_rental_license_at_sale": ("rental license", _HOME),
     "ten_rental_units": ("rental units", _HOME),
+    "ten_owner_occupied_at_sale": ("owner-occupied (homestead)", _HOME),
     # condo-model features (the condo run shares this explain layer)
     "char_unit_area": ("unit size", _HOME),
     "char_floor": ("floor", _HOME),

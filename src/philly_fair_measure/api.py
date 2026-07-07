@@ -70,7 +70,7 @@ class Signals(BaseModel):
     vacancy_complaints_5y: int | None
     unpermitted_work_complaints_5y: int | None
     tax_delinquent: bool
-    rental_license: bool
+    owner_occupied: bool
     linked_parcels: int | None
 
 
@@ -295,7 +295,7 @@ def _core(s: dict[str, Any]) -> PropertyCore:
             vacancy_complaints_5y=_i(s.get("evt_n_vacant_complaints_5y_before")),
             unpermitted_work_complaints_5y=_i(s.get("evt_n_unpermitted_work_complaints_5y_before")),
             tax_delinquent=bool(_f(s.get("dist_tax_delinquent")) or 0.0),
-            rental_license=bool(_f(s.get("ten_rental_license_at_sale")) or 0.0),
+            owner_occupied=bool(_f(s.get("ten_owner_occupied_at_sale")) or 0.0),
             linked_parcels=_i(s.get("shp_n_linked_parcels")),
         ),
     )

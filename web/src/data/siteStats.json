@@ -1,8 +1,8 @@
 {
   "meta": {
     "generated_at": "2026-07-07",
-    "model_run_id": "20260707T030251Z-baseline",
-    "interval_run_id": "20260707T032349Z-bayesian",
+    "model_run_id": "20260707T224139Z-baseline",
+    "interval_run_id": "20260707T230308Z-bayesian",
     "n_test": 19484,
     "interval_nominal_pct": 90,
     "interval_coverage_pct": 91
@@ -16,11 +16,11 @@
       "mape_pct": 34.0
     },
     "model": {
-      "median_ratio": 1.037,
-      "cod": 24.9,
-      "prd": 1.086,
-      "prb": -0.084,
-      "mape_pct": 26.0
+      "median_ratio": 1.035,
+      "cod": 25.0,
+      "prd": 1.088,
+      "prb": -0.086,
+      "mape_pct": 26.1
     }
   },
   "iaao_card": {
@@ -32,10 +32,10 @@
       "mape_pct": 22.4
     },
     "model": {
-      "median_ratio": 1.004,
+      "median_ratio": 1.005,
       "cod": 18.6,
-      "prd": 1.021,
-      "prb": 0.007,
+      "prd": 1.023,
+      "prb": 0.004,
       "mape_pct": 18.7
     }
   },
@@ -137,63 +137,63 @@
   },
   "tax_shift": {
     "millage_pct": 1.4,
-    "base_change_pct": 1.0,
-    "new_revenue_musd": 20,
-    "cheapest_home_usd": -180,
-    "priciest_home_usd": 287,
+    "base_change_pct": 1.1,
+    "new_revenue_musd": 22,
+    "cheapest_home_usd": -167,
+    "priciest_home_usd": 277,
     "tiers": [
       {
         "name": "cheapest fifth",
-        "home_usd": -180,
-        "total_musd": -17.8
+        "home_usd": -167,
+        "total_musd": -16.6
       },
       {
         "name": "second fifth",
-        "home_usd": -72,
-        "total_musd": -7.2
+        "home_usd": -61,
+        "total_musd": -6.0
       },
       {
         "name": "middle fifth",
-        "home_usd": 45,
-        "total_musd": 4.4
+        "home_usd": 50,
+        "total_musd": 4.9
       },
       {
         "name": "fourth fifth",
-        "home_usd": 121,
-        "total_musd": 12.1
+        "home_usd": 119,
+        "total_musd": 11.8
       },
       {
         "name": "priciest fifth",
-        "home_usd": 287,
-        "total_musd": 28.6
+        "home_usd": 277,
+        "total_musd": 27.5
       }
     ]
   },
   "screen": {
     "properties": 496975,
-    "over": 1135,
-    "under": 7267,
-    "watch": 44799,
+    "over": 1159,
+    "under": 7286,
+    "watch": 44077,
     "insufficient": 93,
     "by_family_flag": {
       "condo/over_assessed_candidate": 796,
       "condo/under_assessed_candidate": 3938,
       "condo/within_range": 27419,
       "residential/insufficient_record": 93,
-      "residential/over_assessed_candidate": 339,
-      "residential/under_assessed_candidate": 3329,
-      "residential/within_range": 461061
+      "residential/over_assessed_candidate": 363,
+      "residential/under_assessed_candidate": 3348,
+      "residential/within_range": 461018
     }
   },
   "results_table": {
     "lightgbm": {
-      "rmse_log": 0.33,
+      "rmse_log": 0.331,
       "mape_pct": 26.1,
-      "median_ratio": 1.037,
-      "cod": 24.9,
-      "prd": 1.086,
-      "prb": -0.084,
-      "mki": 0.911
+      "median_ratio": 1.035,
+      "cod": 25.0,
+      "prd": 1.088,
+      "prb": -0.086,
+      "mki": 0.908
     },
     "ridge": {
       "rmse_log": 0.425,

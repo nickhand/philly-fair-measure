@@ -532,6 +532,7 @@ def build_assessment_screen(
         "evt_vacant_complaint_days_since",
         "evt_n_unpermitted_work_complaints_5y_before",
         "ten_rental_license_at_sale",
+        "ten_owner_occupied_at_sale",
         "opa_market_value",
     ).with_columns(
         pl.Series("pred_lightgbm", pred_lgb),

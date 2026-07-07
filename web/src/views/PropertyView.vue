@@ -122,7 +122,7 @@ const signalChips = computed(() => {
   if ((s.unpermitted_work_complaints_5y ?? 0) > 0)
     chips.push(`${s.unpermitted_work_complaints_5y} unpermitted-work complaint(s)`)
   if (s.tax_delinquent) chips.push('Property tax balance owed')
-  if (s.rental_license) chips.push('Has a rental license')
+  if (s.owner_occupied) chips.push('Owner-occupied (homestead exemption)')
   if ((s.linked_parcels ?? 0) > 1) chips.push('Owner holds a neighboring lot')
   return chips
 })

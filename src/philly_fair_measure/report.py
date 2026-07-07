@@ -292,8 +292,8 @@ def _evidence_rows(s: dict) -> list[tuple[str, str]]:
         )
     if s.get("dist_tax_delinquent"):
         rows.append(("Tax delinquency", "currently delinquent per the city roll"))
-    if s.get("ten_rental_license_at_sale"):
-        rows.append(("Rental license", "active rental license on this parcel"))
+    if s.get("ten_owner_occupied_at_sale"):
+        rows.append(("Owner-occupied", "has the homestead exemption (owner-occupants only)"))
     if s.get("shp_n_linked_parcels"):
         rows.append(
             (
