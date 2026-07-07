@@ -196,23 +196,23 @@ On the same homes the model is **more accurate**, **more uniform**, and
 **markedly less regressive** than OPA on every measure in the table above
 (RMSE, MAPE, COD, and both PRD and PRB). The raw-sample median ratio runs
 ~1.04 (the financed-calibrated booster sits above the cash-heavy raw test
-slice); on the IAAO financed/TASP basis the median is 1.00 with COD 18.6,
-inside the vertical-equity bands (the site's ratio card and the
-[vertical-equity report card](vertical-equity-report-card.md) carry the
-current figures). IAAO ratio statistics (COD, PRD, PRB, MKI) come from
-assesspy; definitions in [ccao-lessons.md](ccao-lessons.md).
+slice); on the IAAO financed/TASP basis it clears the vertical-equity bands
+where OPA does not (the live figures are the
+[vertical-equity report card](vertical-equity-report-card.md), generated from
+the same run). IAAO ratio statistics (COD, PRD, PRB, MKI) come from assesspy;
+definitions in [ccao-lessons.md](ccao-lessons.md).
 
 Honest caveats:
 
 - The full-sample **COD (in the table above) is above the IAAO ≤15 target**,
   it includes the cash/distressed tail. On the IAAO-standard trimmed
-  arm's-length sample the model clears the vertical-equity bands (COD 18.6,
-  PRD 1.02, PRB +0.01) while OPA does not, see the
-  [vertical-equity report card](vertical-equity-report-card.md).
-- **Condos** were long OPA's strongest segment (homogeneous, frequently sold,
-  where mass appraisal already does well); the market-area price index closed
-  that gap, and the condo LightGBM now edges ahead on both error and
-  uniformity (RMSE 0.243 vs 0.278, COD 17.5 vs 18.8; run 20260707T030251Z).
+  arm's-length sample the model clears the vertical-equity bands while OPA does
+  not, see the [vertical-equity report card](vertical-equity-report-card.md).
+<!-- generated:condo-card:begin -->
+- Condo accuracy: the model beats OPA on error (rmse 0.243 vs 0.278) and on
+  uniformity (COD 17.5 vs 18.8). Condos were long OPA's strongest segment; the
+  market-area price index closed the last gap.
+<!-- generated:condo-card:end -->
 - **Interval undercoverage in the cheap tail:** at nominal 90%, realized
   coverage is ~89–91% overall but only **~81–86% in the cheapest quintile**
   across every interval method built (Bayesian 0.81, fixed-offset conformal

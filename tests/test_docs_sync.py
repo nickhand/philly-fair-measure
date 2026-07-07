@@ -6,10 +6,13 @@ from pathlib import Path
 
 from philly_fair_measure.docs_sync import (
     STATS_PATH,
+    condo_bullet,
     model_md_results_table,
     readme_results_tables,
     readme_screen_counts,
     sync_docs,
+    veq_card_full,
+    veq_card_iaao,
 )
 
 STATS = {
@@ -64,6 +67,24 @@ STATS = {
             "mki": 0.787,
         },
     },
+    "condo_card": {
+        "model": {
+            "rmse_log": 0.243,
+            "cod": 17.5,
+            "median_ratio": 1.053,
+            "prd": 1.06,
+            "prb": -0.042,
+            "mape_pct": 19.2,
+        },
+        "opa": {
+            "rmse_log": 0.278,
+            "cod": 18.8,
+            "median_ratio": 0.915,
+            "prd": 1.03,
+            "prb": -0.001,
+            "mape_pct": 18.9,
+        },
+    },
 }
 
 
@@ -78,6 +99,17 @@ def test_builders_render_the_numbers():
     assert "| Ridge | 0.427 |" in model_table
 
 
+def test_veq_and_condo_builders_render_with_pass_marks():
+    iaao = veq_card_iaao(STATS)
+    # model passes both vertical-equity tests, sits marginal on COD; OPA fails
+    assert "| PRB | ±0.05 | -0.058 ✗ | +0.010 ✓ |" in iaao
+    assert "| COD | ≤ 15 | 24.7 ✗ | 19.3 ⚠︎ |" in iaao
+    full = veq_card_full(STATS)
+    assert "| MAPE | n/a | 34.0% | 26.4% |" in full  # full card carries a MAPE row
+    condo = condo_bullet(STATS)
+    assert "rmse 0.243 vs 0.278" in condo and "COD 17.5 vs 18.8" in condo
+
+
 def _repo(tmp_path: Path) -> Path:
     (tmp_path / STATS_PATH).parent.mkdir(parents=True)
     (tmp_path / STATS_PATH).write_text(json.dumps(STATS))
@@ -90,7 +122,14 @@ def _repo(tmp_path: Path) -> Path:
     (tmp_path / "docs" / "model.md").write_text(
         "## 6. Results\n\n"
         "<!-- generated:model-results-table:begin -->\n"
-        "<!-- generated:model-results-table:end -->\n"
+        "<!-- generated:model-results-table:end -->\n\n"
+        "<!-- generated:condo-card:begin -->\n<!-- generated:condo-card:end -->\n"
+    )
+    (tmp_path / "docs" / "vertical-equity-report-card.md").write_text(
+        "# card\n\n"
+        "<!-- generated:veq-meta:begin -->\n<!-- generated:veq-meta:end -->\n\n"
+        "<!-- generated:veq-card-iaao:begin -->\n<!-- generated:veq-card-iaao:end -->\n\n"
+        "<!-- generated:veq-card-full:begin -->\n<!-- generated:veq-card-full:end -->\n"
     )
     return tmp_path
 
@@ -101,6 +140,10 @@ def test_sync_rewrites_then_is_idempotent_and_check_passes(tmp_path):
     assert set(first.changed) == {
         "README.md:readme-screen-counts",
         "docs/model.md:model-results-table",
+        "docs/model.md:condo-card",
+        "docs/vertical-equity-report-card.md:veq-meta",
+        "docs/vertical-equity-report-card.md:veq-card-iaao",
+        "docs/vertical-equity-report-card.md:veq-card-full",
     }
     readme = (root / "README.md").read_text()
     assert "**496,975**" in readme and "stale" not in readme

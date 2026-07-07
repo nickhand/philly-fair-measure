@@ -1,8 +1,10 @@
 """Sync generated number blocks in the docs from the committed stats JSON.
 
-README.md and docs/model.md quote screen counts and results tables that
-change on every retrain. Hand-editing them drifted three times in one day
-(2026-07-06); this module makes the numbers mechanical:
+README.md, docs/model.md, and docs/vertical-equity-report-card.md quote screen
+counts, results tables, and ratio-study report cards that change on every
+retrain. Hand-editing them drifted repeatedly (the report card sat on a run
+five generations stale); this module makes every run-dependent number
+mechanical, so `sync-docs --check` in CI fails the moment a doc goes stale:
 
 - `web/src/data/siteStats.json` is the single committed source (written by
   `fair-measure export-web-stats`, which reads the run artifacts and marts).
@@ -131,14 +133,113 @@ def model_md_screen_counts(stats: dict[str, Any]) -> str:
     )
 
 
+def _mark_ratio(v: float) -> str:
+    return "✓" if 0.90 <= v <= 1.10 else "✗"
+
+
+def _mark_cod(v: float) -> str:
+    return "✓" if v <= 15 else "⚠︎" if v <= 20 else "✗"
+
+
+def _mark_prd(v: float) -> str:
+    return "✓" if 0.98 <= v <= 1.03 else "✗"
+
+
+def _mark_prb(v: float) -> str:
+    return "✓" if abs(v) <= 0.05 else "✗"
+
+
+def _veq_card(card: dict[str, Any], *, mape: bool) -> str:
+    """A vertical-equity report-card table (OPA vs model) with IAAO pass marks."""
+    opa, model = card["opa"], card["model"]
+    rows = [
+        _row(["Statistic", "Target", "OPA", "Our model"]),
+        _row(["---"] * 4),
+        _row(
+            [
+                "Median ratio",
+                "0.90–1.10",
+                f"{opa['median_ratio']:.3f} {_mark_ratio(opa['median_ratio'])}",
+                f"{model['median_ratio']:.3f} {_mark_ratio(model['median_ratio'])}",
+            ]
+        ),
+        _row(
+            [
+                "COD",
+                "≤ 15",
+                f"{opa['cod']:.1f} {_mark_cod(opa['cod'])}",
+                f"{model['cod']:.1f} {_mark_cod(model['cod'])}",
+            ]
+        ),
+        _row(
+            [
+                "PRD",
+                "0.98–1.03",
+                f"{opa['prd']:.3f} {_mark_prd(opa['prd'])}",
+                f"{model['prd']:.3f} {_mark_prd(model['prd'])}",
+            ]
+        ),
+        _row(
+            [
+                "PRB",
+                "±0.05",
+                f"{opa['prb']:+.3f} {_mark_prb(opa['prb'])}",
+                f"{model['prb']:+.3f} {_mark_prb(model['prb'])}",
+            ]
+        ),
+    ]
+    if mape:
+        rows.append(_row(["MAPE", "n/a", f"{opa['mape_pct']:.1f}%", f"{model['mape_pct']:.1f}%"]))
+    return "\n".join(rows) + "\n"
+
+
+def veq_card_iaao(stats: dict[str, Any]) -> str:
+    return _veq_card(stats["iaao_card"], mape=False)
+
+
+def veq_card_full(stats: dict[str, Any]) -> str:
+    return _veq_card(stats["full_card"], mape=True)
+
+
+def veq_meta(stats: dict[str, Any]) -> str:
+    m = stats["meta"]
+    return (
+        f"Numbers are the out-of-time test slice of baseline run\n"
+        f"`{m['model_run_id']}` (n ≈ {m['n_test'] / 1000:.1f}k residential arms-length sales).\n"
+        f"Reproduce with `fair-measure train-baseline` then `fair-measure ratio-study`. This\n"
+        f'report card is deliberately not a "we made it fair" claim, see the honest '
+        f"reading below.\n"
+    )
+
+
+def condo_bullet(stats: dict[str, Any]) -> str:
+    """The condo accuracy line, shared by README limitations and model.md §6."""
+    c, o = stats["condo_card"]["model"], stats["condo_card"]["opa"]
+    return (
+        f"- Condo accuracy: the model beats OPA on error (rmse {c['rmse_log']:.3f} vs "
+        f"{o['rmse_log']:.3f}) and on\n"
+        f"  uniformity (COD {c['cod']:.1f} vs {o['cod']:.1f}). Condos were long OPA's strongest "
+        f"segment; the\n"
+        f"  market-area price index closed the last gap.\n"
+    )
+
+
 BLOCKS: dict[str, Any] = {
     "readme-screen-counts": readme_screen_counts,
     "readme-results-tables": readme_results_tables,
     "model-results-table": model_md_results_table,
     "model-screen-counts": model_md_screen_counts,
+    "veq-meta": veq_meta,
+    "veq-card-iaao": veq_card_iaao,
+    "veq-card-full": veq_card_full,
+    "condo-card": condo_bullet,
 }
 
-DOC_FILES = (Path("README.md"), Path("docs/model.md"))
+DOC_FILES = (
+    Path("README.md"),
+    Path("docs/model.md"),
+    Path("docs/vertical-equity-report-card.md"),
+)
 
 
 @dataclass(frozen=True)

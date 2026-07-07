@@ -5,10 +5,12 @@ against the IAAO ratio-study standards, on two bases: the **IAAO-standard sample
 (what assessors are officially judged on) and the **full sample** (what actually
 happens to every home, including the cash/distressed tail the standard excludes).
 
+<!-- generated:veq-meta:begin -->
 Numbers are the out-of-time test slice of baseline run
-`20260705T015912Z` (n ≈ 19.5k residential arms-length sales). Reproduce with
-`fair-measure train-baseline` then `fair-measure ratio-study`. This report card is
-deliberately not a "we made it fair" claim, see the honest reading below.
+`20260707T030251Z-baseline` (n ≈ 19.5k residential arms-length sales).
+Reproduce with `fair-measure train-baseline` then `fair-measure ratio-study`. This
+report card is deliberately not a "we made it fair" claim, see the honest reading below.
+<!-- generated:veq-meta:end -->
 
 ## The standards (IAAO Standard on Ratio Studies)
 
@@ -25,40 +27,45 @@ PRD > 1 / PRB < 0 = **regressive** (cheap homes over-assessed relative to expens
 
 The convention on which an assessor's performance is officially measured.
 
+<!-- generated:veq-card-iaao:begin -->
 | Statistic | Target | OPA | Our model |
-|---|---|---|---|
-| Median ratio | 0.90–1.10 | 0.938 ✓ | 0.972 ✓ |
-| COD | ≤ 15 | 25.4 ✗ | 17.0 ⚠︎ |
-| PRD | 0.98–1.03 | 1.115 ✗ | **1.029 ✓** |
-| PRB | ±0.05 | −0.148 ✗ | **−0.022 ✓** |
+| --- | --- | --- | --- |
+| Median ratio | 0.90–1.10 | 0.920 ✓ | 1.004 ✓ |
+| COD | ≤ 15 | 23.0 ✗ | 18.6 ⚠︎ |
+| PRD | 0.98–1.03 | 1.065 ✗ | 1.021 ✓ |
+| PRB | ±0.05 | -0.056 ✗ | +0.007 ✓ |
+<!-- generated:veq-card-iaao:end -->
 
-**Our model passes both vertical-equity tests and is just above the uniformity
-target; OPA fails all three.** COD 17 is marginally over the strict single-family
-15, but within the tolerance IAAO allows for old, heterogeneous stock, which
-Philadelphia's rowhome fabric is. By building style, the model's trimmed COD is
-15.1 (detached) / 15.3 (twin) / 17.4 (row).
+**Our model passes both vertical-equity tests (PRD and PRB) and sits just above
+the uniformity target, where OPA fails all three.** The model's COD is
+marginally over the strict single-family 15, but within the tolerance IAAO
+allows for old, heterogeneous stock, which Philadelphia's rowhome fabric is. By
+building style the model's trimmed COD is tightest on detached and twin homes
+and loosest on rowhomes.
 
 ## Card 2, Full sample (out-of-time, no trim)
 
 Every arms-length sale, including the cash and distressed tail. This is what a
 homeowner actually experiences, and nobody passes it.
 
+<!-- generated:veq-card-full:begin -->
 | Statistic | Target | OPA | Our model |
-|---|---|---|---|
-| Median ratio | 0.90–1.10 | 0.983 ✓ | 0.975 ✓ |
-| COD | ≤ 15 | 34.5 ✗ | 25.9 ✗ |
-| PRD | 0.98–1.03 | 1.190 ✗ | 1.071 ✗ |
-| PRB | ±0.05 | −0.234 ✗ | −0.060 ✗ |
-| MAPE |, | 34.0% | 25.4% |
+| --- | --- | --- | --- |
+| Median ratio | 0.90–1.10 | 0.983 ✓ | 1.037 ✓ |
+| COD | ≤ 15 | 34.5 ✗ | 24.9 ✗ |
+| PRD | 0.98–1.03 | 1.190 ✗ | 1.086 ✗ |
+| PRB | ±0.05 | -0.234 ✗ | -0.084 ✗ |
+| MAPE | n/a | 34.0% | 26.0% |
+<!-- generated:veq-card-full:end -->
 
 On the full sample the model is still mildly regressive and above the uniformity
-target, but a **fraction** of OPA's regressivity (PRB −0.06 vs −0.23, roughly a
-quarter; PRD 1.07 vs 1.19) and much tighter dispersion (COD 25.9 vs 34.5).
+target, but carries a **fraction** of OPA's regressivity (its PRB is roughly a
+quarter of OPA's) and much tighter dispersion, as the card shows.
 
 ## The honest reading
 
 1. **The gap between the two cards is the whole story.** Going from full to
-   IAAO-standard drops the model's COD 25.9 → 17.0 and its PRB −0.06 → −0.02. That
+   IAAO-standard drops the model's COD and PRB toward the bands. That
    improvement is not the model getting fairer, it is the **3×IQR trim removing
    the cash/distressed tail**. The mainstream way jurisdictions "pass" is to
    exclude exactly those sales (foreclosures, non-arms-length, extreme ratios).

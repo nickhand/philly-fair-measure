@@ -203,6 +203,25 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
         for r in overall.to_dicts()
     }
 
+    # Condo out-of-time card (condo LightGBM vs OPA). The condo evaluation has
+    # no convention column — it is out-of-time by construction.
+    condo_overall = pl.read_parquet(latest_run_dir("condo", root) / "evaluation.parquet").filter(
+        pl.col("segment_type") == "overall"
+    )
+
+    def _condo(model_name: str) -> dict[str, float]:
+        r = condo_overall.filter(pl.col("model") == model_name).to_dicts()[0]
+        return {
+            "rmse_log": round(float(r["rmse_log"]), 3),
+            "mape_pct": round(float(r["mape"]) * 100, 1),
+            "median_ratio": round(float(r["median_ratio"]), 3),
+            "cod": round(float(r["cod"]), 1),
+            "prd": round(float(r["prd"]), 3),
+            "prb": round(float(r["prb"]), 3),
+        }
+
+    condo_card = {"model": _condo("condo_lightgbm"), "opa": _condo("opa_assessment")}
+
     stats: dict[str, Any] = {
         "meta": {
             "generated_at": datetime.now(UTC).strftime("%Y-%m-%d"),
@@ -214,6 +233,7 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
         },
         "full_card": full_card,
         "iaao_card": iaao_card,
+        "condo_card": condo_card,
         "tiers_financed": tiers,
         "cash": {
             "share_all_pct": round(share_all * 100),

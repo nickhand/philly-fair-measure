@@ -39,6 +39,24 @@
       "mape_pct": 18.7
     }
   },
+  "condo_card": {
+    "model": {
+      "rmse_log": 0.243,
+      "mape_pct": 19.2,
+      "median_ratio": 1.053,
+      "cod": 17.5,
+      "prd": 1.06,
+      "prb": -0.042
+    },
+    "opa": {
+      "rmse_log": 0.278,
+      "mape_pct": 18.9,
+      "median_ratio": 0.915,
+      "cod": 18.8,
+      "prd": 1.032,
+      "prb": -0.001
+    }
+  },
   "tiers_financed": {
     "q1": {
       "opa_pct": 124,
