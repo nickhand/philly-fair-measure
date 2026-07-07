@@ -1,6 +1,6 @@
 # The Model: Architecture, Methodology, Results
 
-A technical description of the Philadelphia residential AVM — the models, the
+A technical description of the Philadelphia residential AVM, the models, the
 training discipline, and how it is evaluated against OPA. For *why* the design
 choices are made (OPA's methodology, the 2026 AVM literature) see
 [research-notes.md](research-notes.md); for the full input catalog see
@@ -58,8 +58,8 @@ the persisted split fractions.
 |---|---|
 | Hedonic (`char_`) | area, beds/baths, year built, style, era, construction |
 | Learned market areas (`loc_`) | k-means sale-price geography replacing OPA's hand-drawn zones |
-| Constant-quality price index (`time_adj_log`) | BMN repeat-sales curves per district (ridge-shrunk to citywide) + shrunken per-market-area drift — a mix index overstated gentrifying-district appreciation by up to ±28% vs repeat-sale truth |
-| As-of kNN surface (`mkt_knn_`) | distance-weighted mean of the *k* nearest **strictly earlier** sales — the between-block gradient trees can't interpolate; quarter-blocked against look-ahead |
+| Constant-quality price index (`time_adj_log`) | Three-level BMN repeat-sales hierarchy, citywide, per-district (shrunk to citywide), per-market-area (shrunk to district), replacing a mix index that overstated gentrifying-district appreciation up to ±28% vs repeat-sale truth |
+| As-of kNN surface (`mkt_knn_`) | distance-weighted mean of the *k* nearest **strictly earlier** sales, the between-block gradient trees can't interpolate; quarter-blocked against look-ahead |
 | Rolling means (`mkt_*_roll_`) | block/building leave-one-out $/sqft level (the CCAO workhorse) |
 | Parcel geometry (`shp_`) | area, perimeter, vertex/angle SDs, min-rotated-rect ratios from PWD polygons |
 | Distress & tenure (`dist_`, `evt_`, `ten_`) | delinquency, severe violations, vacancy complaints, rental licenses (the q1 tail signal) |
@@ -68,15 +68,15 @@ the persisted split fractions.
 
 ## 5. Models
 
-### 5.1 LightGBM — primary point estimate
+### 5.1 LightGBM: primary point estimate
 Gradient-boosted trees on the 92-feature encoding. `learning_rate=0.05`,
 `num_leaves=255`, `min_data_in_leaf=40`, `feature_fraction=0.8`,
 `bagging_fraction=0.8`, `lambda_l1=0.1`, `lambda_l2=1.0`, ≤5000 rounds with
 100-round early stopping on the validation slice; categoricals passed natively.
 
-### 5.2 Isotonic vertical calibration — the regressivity corrector
+### 5.2 Isotonic vertical calibration: the regressivity corrector
 GBDTs compress toward segment means at the tails (over-valuing cheap homes,
-under-valuing expensive ones — exactly PRD > 1). An isotonic regression of the
+under-valuing expensive ones, exactly PRD > 1). An isotonic regression of the
 residual on the prediction, fit on the validation slice, removes that gradient
 while remaining **monotone in the raw prediction** (it never reorders homes).
 Serialized as knot coordinates to `vertical_calibration.json`.
@@ -84,18 +84,18 @@ Serialized as knot coordinates to `vertical_calibration.json`.
 The isotonic is fit on the **financed** validation slice (`calibrate_on_financed`,
 default on), so predictions land on the *typical-financing market-value* standard
 rather than the cash-blended sale level. Measured 2026-07-05: this moves the
-financed-sample median ratio 0.95 → 1.00 with COD/PRD/PRB unchanged — a pure
+financed-sample median ratio 0.95 → 1.00 with COD/PRD/PRB unchanged, a pure
 centering gain that keeps the full training set (cash sales carry location signal;
 see [research-notes.md](research-notes.md)). It falls back to the whole slice when
 the financed subset is thin. Consequence: ratios against *cash* sale prices then
-sit above 1.0 by design (cash homes transact below market value — the channel gap
+sit above 1.0 by design (cash homes transact below market value, the channel gap
 the retail convention prices explicitly, §7). The §6 table predates this default.
 
-### 5.3 Ridge — benchmark
+### 5.3 Ridge: benchmark
 A regularized linear pipeline (median-impute → standardize → one-hot) as a
 transparent floor: if the GBDT can't beat a linear model, something is wrong.
 
-### 5.4 Bayesian hierarchical model — uncertainty + the screen
+### 5.4 Bayesian hierarchical model: uncertainty + the screen
 A PyMC model sampled with nutpie (Rust NUTS) providing the posterior predictive
 intervals the screen consumes:
 
@@ -104,9 +104,9 @@ intervals the screen consumes:
   HalfNormal(0.3)`).
 - **Hedonic effects** `beta ~ N(0, 1)` per standardized covariate.
 - **Optional per-parcel latent quality**, identified by repeat sales,
-  non-centered, with a zero slot absorbing singletons (off by default — adds
+  non-centered, with a zero slot absorbing singletons (off by default, adds
   ~nothing over the prior-price covariate; measured 2026-07-04).
-- **Optional RBF spatial basis** (off by default — overlapping bumps are
+- **Optional RBF spatial basis** (off by default, overlapping bumps are
   collinear, sample >15× slower, and the kNN covariate already carries the
   surface; measured 2026-07-03).
 - **Heteroscedastic noise** `log σ = g₀ + z·g + district effect`, widening
@@ -124,7 +124,7 @@ feature (~9k mostly-singleton levels would overfit); the rolling mean carries
 the building signal, and the unit's own prior sale enters as the same
 repeat-sales carry-forward the residential model uses (measured 2026-07-06:
 repeat-segment COD 23.9 → 21.6, median ratio 1.063 → 1.035). The screen pairs
-this LightGBM point estimate with conformal offsets (§5.6) — a
+this LightGBM point estimate with conformal offsets (§5.6), a
 self-consistent anchor. The condo family also has a Bayesian arm (the §5.4
 hierarchy on condo covariates with an evidence-only σ design), kept as a
 research artifact rather than the screen's anchor: its median runs ~25% hot
@@ -147,16 +147,16 @@ two years of the valuation date never flag "over" (they demote to the
 attention tier with a report caveat), and records with no recorded living
 area get `insufficient_record` instead of a verdict.
 
-### 5.6 Conformal intervals — frequentist cross-check
+### 5.6 Conformal intervals, frequentist cross-check
 Split-conformal intervals around the LightGBM point model, sharing **nothing**
-with the Bayesian arm except the feature mart — different model, different
+with the Bayesian arm except the feature mart, different model, different
 uncertainty mechanism. Offsets are asymmetric (the cheap-tail residual
 distribution is left-skewed), in global / Mondrian-by-district / kNN-locally-
 weighted variants. Where **both** the Bayesian posterior and the conformal band
 put OPA's value outside their 90% interval, the flag is robust to either
 method's assumptions.
 
-### 5.7 Conformalized quantile regression — bake-off and adoption
+### 5.7 Conformalized quantile regression, bake-off and adoption
 `fair-measure cqr-check` trains LightGBM quantile heads (q05/q95) on the fit
 slice, conformalizes their miss on the validation slice (globally and with
 the same spatially weighted kNN correction as 5.6), and compares every
@@ -167,28 +167,28 @@ Bayesian posterior's 91.1% at 1.31; in the expensive quintiles cqr is much
 sharper (q4/q5 width 0.65 vs 0.74/0.75 conformal) at 89–92% coverage, and its
 by-district coverage floor is the best of the four (0.864 vs 0.856 conformal,
 0.770 raw Bayesian). **No method fixes the cheap-tail undercoverage** (q1:
-cqr 0.850, conformal 0.858, Bayesian 0.790 — vs 90 nominal); q1 misses are
+cqr 0.850, conformal 0.858, Bayesian 0.790, vs 90 nominal); q1 misses are
 genuine outliers, not a width-model failure. **Adopted for the residential
 screen (Stage 3b):** every baseline/retail run persists q05/q95 quantile
-heads (trained on the fit slice only — the validation slice stays clean as
+heads (trained on the fit slice only, the validation slice stays clean as
 the CQR calibration set), and the screen's second machine is the spatially
 weighted CQR band around them. Measured effect on flags: over-candidates
-429 → 222 — the feature-adaptive band widens exactly on the high-variance
+429 → 222, the feature-adaptive band widens exactly on the high-variance
 homes that produce marginal over-calls, so the agreement gate vetoes them
-into the watch tier — while under-candidates are ~unchanged (6,353 → 6,289).
+into the watch tier, while under-candidates are ~unchanged (6,353 → 6,289).
 Condos keep the 5.6 fixed-offset variant (their band is the flag anchor, not
 a cross-check, and the bake-off was residential-only).
 
 ## 6. Results
 
 <!-- generated:model-results-table:begin -->
-Out-of-time test set, n≈19.5k, run `20260707T002634Z-baseline`. Identical test
+Out-of-time test set, n≈19.5k, run `20260707T020247Z-baseline`. Identical test
 set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **LightGBM** | **0.335** | **26.6%** | 1.032 | **25.6** | **1.087** | **-0.072** | 0.905 |
-| Ridge | 0.427 | 37.4% | 1.045 | 35.5 | 1.061 | -0.080 | 0.981 |
+| **LightGBM** | **0.330** | **26.2%** | 1.037 | **25.0** | **1.086** | **-0.083** | 0.911 |
+| Ridge | 0.425 | 37.0% | 1.039 | 35.5 | 1.054 | -0.102 | 0.999 |
 | **OPA (incumbent)** | **0.449** | **34.0%** | 0.983 | **34.5** | **1.190** | **-0.234** | 0.787 |
 <!-- generated:model-results-table:end -->
 
@@ -203,17 +203,17 @@ statistics (COD, PRD, PRB, MKI) come from assesspy; definitions in
 
 Honest caveats:
 
-- The full-sample **COD 25.9 is above the IAAO ≤15 target** — it includes the
+- The full-sample **COD 25.9 is above the IAAO ≤15 target**, it includes the
   cash/distressed tail. On an IAAO-standard trimmed arm's-length sample the model
   clears the vertical-equity bands (COD 17.0, PRD 1.03, PRB −0.02) while OPA does
-  not — see the [vertical-equity report card](vertical-equity-report-card.md).
+  not, see the [vertical-equity report card](vertical-equity-report-card.md).
 - **Condos are the exception:** the condo LightGBM roughly *ties* OPA
   (RMSE 0.280 vs 0.278, COD 22.4 vs 18.8; 2026-07-04). Condos are homogeneous
-  and sell frequently — where OPA's mass appraisal already does well.
+  and sell frequently, where OPA's mass appraisal already does well.
 - **Interval undercoverage in the cheap tail:** at nominal 90%, realized
   coverage is ~89–91% overall but only **~81–86% in the cheapest quintile**
   across every interval method built (Bayesian 0.81, fixed-offset conformal
-  0.86, CQR 0.85 — see §5.7). Q1 dispersion is partly irreducible; the
+  0.86, CQR 0.85, see §5.7). Q1 dispersion is partly irreducible; the
   machines report the shortfall rather than hide it.
 
 Stability is checked by temporal cross-validation (rolling out-of-time folds)
@@ -225,12 +225,12 @@ temporal-cv` / `spatial-cv` commands and [equity-diagnostics.md](equity-diagnost
 Scoring the full roll yields, per parcel: a point value, a 90% predictive
 interval, an `over_assessed_candidate` / `under_assessed_candidate` /
 `within_range` flag driven by whether OPA's value falls outside that interval,
-and `screen_z` — the disagreement expressed in predictive-uncertainty units
+and `screen_z`, the disagreement expressed in predictive-uncertainty units
 (log-ratio of OPA to the estimate, divided by the interval's log-width scaled
 to one standard deviation). The interval method is chosen per family to be
 self-consistent with the point estimate:
 
-- **Houses** — the hierarchical Bayesian posterior predictive interval
+- **Houses**, the hierarchical Bayesian posterior predictive interval
   (`interval_method="bayesian_posterior"`), with the spatially weighted CQR
   band around the LightGBM quantile heads as the second machine: an
   over/under flag requires **both** to place OPA outside on the same side
@@ -238,13 +238,13 @@ self-consistent with the point estimate:
   flags, concentrated on gentrification-edge blocks where the two arms
   disagree about the price level; disputed rows demote to the attention
   tier). **Surfaces show one self-consistent pair** (`display_median` /
-  `display_pi_*`): the calibrated LightGBM point — the machine the drivers
-  and comps panels explain — with its own CQR band. Intersecting the two
+  `display_pi_*`): the calibrated LightGBM point, the machine the drivers
+  and comps panels explain, with its own CQR band. Intersecting the two
   bands was measured and retired: two 90% bands intersected guarantee only
   80% (union bound), and the shipped intersection realized 86.0% overall /
   72.9% in q1 against its "90%" label, while the CQR band alone realizes
   89.1% at the narrowest valid width.
-- **Condos** — split-conformal, kNN-locally-weighted offsets around the condo
+- **Condos**, split-conformal, kNN-locally-weighted offsets around the condo
   LightGBM prediction (`interval_method="conformal_knn"`), a single
   self-consistent machine. The Bayesian condo arm exists as a research
   artifact but does not drive flags: its district index over-adjusts
@@ -254,15 +254,15 @@ self-consistent with the point estimate:
 Guards keep the flags honest where the record, not the value, is the problem:
 
 - **New construction** (year built within two years of the valuation year)
-  never flags as over-assessed — the sale history the model learns from lags
+  never flags as over-assessed, the sale history the model learns from lags
   the finished building. Such homes demote to within-range, surface in the
   attention tier instead, and carry an explicit caveat on their report.
 - **Insufficient records** (no recorded livable area) are reported as
   `insufficient_record` and are not valued at all rather than being priced as
   if the missing size were real.
 - **Attention tier** ("worth a look"): properties inside the displayed 90%
-  band but in its outer tenth — on the far side of the estimate, roughly the
-  model's 90th percentile — are labeled high/low attention rather than
+  band but in its outer tenth, on the far side of the estimate, roughly the
+  model's 90th percentile, are labeled high/low attention rather than
   flagged, so the strong flags stay reserved for cases the two methods place
   outside the band entirely. The tier is measured on the band the site
   actually draws (not the Bayesian `screen_z`, which still ranks every row),
@@ -270,9 +270,9 @@ Guards keep the flags honest where the record, not the value, is the problem:
   beside it.
 
 <!-- generated:model-screen-counts:begin -->
-As of run `20260707T002634Z` (Tax Year 2027 roll): 496,975 properties
-screened — 1,694 over-assessed candidates, 6,175 under-assessed
-candidates, 43,351 in the attention tier, 93 insufficient
+As of run `20260707T020247Z` (Tax Year 2027 roll): 496,975 properties
+screened: 1,103 over-assessed candidates, 8,412 under-assessed
+candidates, 47,612 in the attention tier, 93 insufficient
 records.
 <!-- generated:model-screen-counts:end -->
 (The constant-quality index of 2026-07-06 cut under-assessed candidates
@@ -286,9 +286,9 @@ median) plus a run-over-run audit (`fair-measure screen-audit`).
 
 Two value conventions are surfaced explicitly:
 
-- **Blend** — predicts the actual (cash-and-financed) market; matches realized
+- **Blend**, predicts the actual (cash-and-financed) market; matches realized
   sale prices.
-- **Retail** — trained on financed sales only (the legal "typical-financing
+- **Retail**, trained on financed sales only (the legal "typical-financing
   market value" standard); for cash-market homes it applies a **published
   per-quintile channel discount**, not a hidden propensity score, so an owner
   or a board can inspect the exact number. The bifurcation is quantified in
@@ -308,6 +308,6 @@ pipeline · a full model-vs-OPA benchmark on every run.
 Cash-market dispersion is partly irreducible; condos remain OPA's best
 segment (we beat their rmse, trail their COD by ~0.5); interval
 undercoverage in q1; OPA's condition codes cannot be independently verified
-(no interior inspections) and are stale in a measured ~10–20% tail — the
+(no interior inspections) and are stale in a measured ~10–20% tail, the
 model uses them, sale-price-confirmed, alongside independent distress/permit
 signals; single metro, no cross-city validation.

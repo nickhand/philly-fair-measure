@@ -1,4 +1,4 @@
-# Fair Measure — public dashboard
+# Fair Measure, public dashboard
 
 The Vue 3 + TypeScript front end for the Fair Measure assessment check, live
 at [nickhand.dev/fair-measure](https://nickhand.dev/fair-measure/). It renders

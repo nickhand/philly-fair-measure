@@ -2,26 +2,26 @@
 
 > **Results (Tier 1 executed 2026-07-02, same out-of-time test):** LightGBM
 > RMSE(log) 0.350 → **0.341**, R² 0.796 → **0.807**, median ratio 0.919 →
-> **0.990** (target hit — time adjustment removed the drift), COD 25.5 → 26.0
+> **0.990** (target hit, time adjustment removed the drift), COD 25.5 → 26.0
 > (flat), PRD ≈ 1.11 (flat). Deeper trees add nothing (COD 25.95), so the
 > residual dispersion is an information limit, not model capacity: the path to
 > COD ≤ 20 runs through richer characteristics/ACS sensitivity, heteroscedastic
-> or segmented modeling, and the Tier-3 Bayesian bundle — not more boosting.
+> or segmented modeling, and the Tier-3 Bayesian bundle, not more boosting.
 > TASP convention on identical sales: ours COD 26.0 vs OPA 33.0 (Keene's 10.1
-> is on OPA's curated in-window sample — mostly a sample-selection gap).
+> is on OPA's curated in-window sample, mostly a sample-selection gap).
 > Style gradient matches Keene's ordering (detached 18.8 < twin 21.9 < row 27.0).
 >
-> **Follow-ups executed 2026-07-03:** Tier 2.1 parcel shapes — null result in
+> **Follow-ups executed 2026-07-03:** Tier 2.1 parcel shapes, null result in
 > Philly (uniform rectangular rowhome lots; kept, 1.9% of gain). Spatial GP
-> field — *measured unnecessary*: after the kNN surface + market areas,
+> field, *measured unnecessary*: after the kNN surface + market areas,
 > test-residual Moran's I is 0.051 with a noise-level correlogram at every
 > range; HSGP/PyINLA remain documented options if the residual field ever
-> reappears. PRD work — objective swaps don't help (L1 worsens to 1.135;
+> reappears. PRD work, objective swaps don't help (L1 worsens to 1.135;
 > Huber ≈ L2); isotonic vertical calibration (validation-fitted, persisted,
 > applied in scoring) took PRD 1.112 → **1.073** and PRB → −0.072 at zero
 > accuracy cost; MKI added to the suite (ours 0.938 vs OPA 0.804). The
 > remaining q1 median gradient (≈1.21) is conditional-on-prediction
-> information deficit — fixable only by tail-informative features
+> information deficit, fixable only by tail-informative features
 > (condition granularity, violation severity, distress signals), not by any
 > recalibration of the prediction.
 
@@ -34,9 +34,9 @@ which it should move a metric.
 
 | | RMSE(log) | COD | PRD | median ratio | 90% coverage / rel. width |
 |---|---|---|---|---|---|
-| LightGBM | 0.350 | 25.5 | 1.108 | 0.919 | — |
+| LightGBM | 0.350 | 25.5 | 1.108 | 0.919 |, |
 | Bayesian | 0.426 | 33.4 | 1.138 | 1.118 | 0.913 / 1.60 |
-| OPA (same convention) | 0.450 | 34.6 | 1.190 | 0.983 | — |
+| OPA (same convention) | 0.450 | 34.6 | 1.190 | 0.983 |, |
 
 **Targets for v2:** LightGBM COD ≤ 20 and median ratio ≈ 1.00 ± 0.02;
 PRD ≤ 1.05; Bayesian relative interval width ≤ 1.2 at coverage 0.88–0.92,
@@ -46,7 +46,7 @@ COD 10.1 on equal terms.
 
 ---
 
-## Tier 1 — highest expected value, data already on disk
+## Tier 1, highest expected value, data already on disk
 
 ### 1.1 Local monthly market index + time-adjusted prices *(the big one)*
 OPA time-adjusts every sale to the valuation date with a compound monthly
@@ -70,12 +70,12 @@ time-adjusted $/sqft level) with spatial contiguity (two-stage cluster
 approach, arXiv:2508.03156). Emit `loc_market_area` + cluster-level median
 $/sqft. Use as: LightGBM categorical, Bayesian hierarchy level
 (ward → market_area), and the index geography for 1.1.
-**Mechanism:** captures the sub-market boundaries OPA encodes manually —
+**Mechanism:** captures the sub-market boundaries OPA encodes manually,
 the largest known location signal we currently lack. COD ↓, tract-level
 coverage evens out.
 
 ### 1.3 Smooth spatial value surface (OPA's `SPATIAL`, done right)
-- LightGBM: k-nearest-sales feature — distance-decayed mean **time-adjusted
+- LightGBM: k-nearest-sales feature, distance-decayed mean **time-adjusted
   $/sqft of the ~15 nearest arms-length sales** (excluding same parcel),
   computed as-of sale date (kd-tree; leakage-tested like the block roll).
 - Bayesian: **HSGP** over (lon, lat) (`pm.gp.HSGP`, ~250 basis functions)
@@ -93,29 +93,29 @@ disentangles, helping small/large homes at the price tails → PRD ↓.
 ### 1.5 Structured style + era features
 Parse `char_building_type` into style (ROW / TWIN / DETACHED / RANCHER / ...)
 and stories; band `char_year_built` into OPA-style eras. OPA models styles
-separately and its COD differs by style (singles 6.7 vs rows 10.7) — style
+separately and its COD differs by style (singles 6.7 vs rows 10.7), style
 interactions matter. **Mechanism:** COD ↓ within styles; also enables
 style-segmented evaluation like Keene's.
 
 ### 1.6 Off-street parking × Center City
 `off_street_open` (OPA column, currently unused) + garage, interacted with
-the Center City market areas — OPA applies parking value only "where
+the Center City market areas, OPA applies parking value only "where
 valuable." **Mechanism:** targeted error reduction in the highest-price zones
 (our q5 MAPE is 17.6%).
 
-## Tier 2 — new but verified data pulls
+## Tier 2, new but verified data pulls
 
 ### 2.1 PWD parcel polygons (ArcGIS fetcher)
 `brt_id` bridge + geometry → parcel-shape features (CCAO's proven set),
-corner-lot flag, `num_brt`/`num_accounts` multi-account signal (side yards —
+corner-lot flag, `num_brt`/`num_accounts` multi-account signal (side yards,
 the user's own case). **Mechanism:** lot-quality signal orthogonal to sqft.
 
 ### 2.2 Street classification + proximity set
-City street centerline classes (arterial vs local — OPA uses "street
+City street centerline classes (arterial vs local, OPA uses "street
 classification"), SEPTA GTFS stop distances, park/water distances.
 **Mechanism:** micro-location beyond the block roll; known CCAO features.
 
-### 2.3 ACS tract context — diagnostics only
+### 2.3 ACS tract context, diagnostics only
 arXiv:2605.15020 shows census context improves accuracy *and* fairness, but
 OPA is legally barred from people-data and our valuation model should remain
 appeal-comparable. Build as a **toggled feature group**: excluded from the
@@ -123,15 +123,15 @@ default valuation model; reported as a sensitivity run; used in equity
 diagnostics. **Mechanism:** measures how much accuracy the legal constraint
 costs, without contaminating the defensible model.
 
-## Tier 3 — Bayesian model upgrades (modern practice)
+## Tier 3, Bayesian model upgrades (modern practice)
 
-1. **Student-t likelihood** (ν learned) — tails stop inflating σ; intervals
+1. **Student-t likelihood** (ν learned), tails stop inflating σ; intervals
    narrow at equal coverage (target rel. width 1.60 → ≤1.2).
-2. **Monthly random-walk time effect** (or adopt 1.1's time-adjusted design) —
+2. **Monthly random-walk time effect** (or adopt 1.1's time-adjusted design),
    kills the linear-trend overshoot.
 3. **HSGP spatial surface** (1.3) + hierarchy ward → market area → tract.
 4. **Heteroscedastic σ**: log-linear in evidence density (block_roll_n,
-   block_roll_missing) and price tier — sharper where data are dense, honest
+   block_roll_missing) and price tier, sharper where data are dense, honest
    where sparse; Case–Shiller models variance explicitly.
 5. **Calibration reporting**: coverage + PIT by zone/style/quintile (the
    spatially-weighted-conformal lesson: marginal coverage hides local
@@ -144,14 +144,14 @@ costs, without contaminating the defensible model.
 
 - **Time-adjusted ratio study mode**: evaluate model and OPA against
   time-adjusted sale prices within a sales window (their convention, COD 10.1)
-  *alongside* our out-of-time convention — report both.
+  *alongside* our out-of-time convention, report both.
 - Style-segmented metrics (singles/twins/rows) matching Keene's table.
 - Coverage by zone × quintile as a first-class output of every Bayesian run.
 
 ## Sequencing
 
 1. Market-area learning (1.2) → monthly index (1.1) → retrain both models on
-   time-adjusted prices — biggest single expected jump; everything else layers
+   time-adjusted prices, biggest single expected jump; everything else layers
    on top.
 2. k-NN spatial surface + per-sqft features + style/era (1.3–1.5) → retrain.
 3. Bayesian upgrade bundle (Tier 3) with the new features.

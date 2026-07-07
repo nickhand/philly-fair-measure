@@ -12,12 +12,12 @@ access does not.
 
 | Repo | What it is | Relevance here |
 |---|---|---|
-| `model-res-avm` | Residential AVM (LightGBM, R/Tidymodels), exhaustively documented | Model design, features, CV, provenance — the core reference |
+| `model-res-avm` | Residential AVM (LightGBM, R/Tidymodels), exhaustively documented | Model design, features, CV, provenance, the core reference |
 | `model-condo-avm` | Condo AVM | Playbook for valuing property with missing characteristics |
 | `model-sales-val` | Non-arms-length sale flagging (Python) | Direct template for Milestone 4 sales validation |
 | `data-architecture` | dbt + Athena lakehouse: transforms, tests, docs, freshness checks | Template for our staged/marts layers (dbt-duckdb analog) |
 | `service-spark-iasworld` | System-of-record → Hive-partitioned Parquet → S3 → Athena mirror | Validates our raw snapshot design (CARTO → Parquet → DuckDB) |
-| `assesspy` / `assessr` | Ratio study stats: COD, PRD, PRB, MKI, sales chasing | `pip install assesspy` — use directly, don't reimplement |
+| `assesspy` / `assessr` | Ratio study stats: COD, PRD, PRB, MKI, sales chasing | `pip install assesspy`, use directly, don't reimplement |
 | `ccao` | Data dictionary + rename/recode utilities as package data | Pattern for our normalize layer |
 | `homeval` | Static per-PIN report: characteristics, comps, SHAPs (Hugo) | Endgame for comp-based explanations |
 | `ptaxsim` | R package + versioned SQLite DB of tax bills 2006–2024 | Distribution pattern: versioned data artifact + query package |
@@ -33,7 +33,7 @@ access does not.
 1. **Raw 1:1 mirror first.** `service-spark-iasworld` extracts source tables verbatim
    to Hive-partitioned Parquet on S3, queried via Athena. No transformation at ingest.
    Our analog: CARTO/ArcGIS → `data/raw/source=.../dataset=.../fetched_at=.../*.parquet`
-   → DuckDB. Post-load, they trigger validation (dbt tests) — our manifests should
+   → DuckDB. Post-load, they trigger validation (dbt tests), our manifests should
    record row counts/schema and a validation pass should follow each snapshot.
 2. **dbt as the transform + test + docs layer.** All staged/mart tables are dbt models
    with schema tests, daily test runs, source-freshness checks, and an auto-generated
@@ -44,7 +44,7 @@ access does not.
 3. **`run_id` on everything.** Every model run gets a unique run ID; all outputs
    (values, comps, SHAPs, performance, hyperparameters, timings, git SHA, DVC hash of
    inputs) are stored keyed by `(year, run_id)` in perpetuity. Sales-val flags carry
-   `run_id` + a per-sale `version` that increments on re-flagging. Adopt from day one —
+   `run_id` + a per-sale `version` that increments on re-flagging. Adopt from day one,
    it is cheap early and impossible to retrofit.
 4. **params.yaml + DVC pipelines.** One YAML controls every stage; DVC tracks
    stage dependencies, caches unchanged stages, and versions input data on S3.
@@ -56,7 +56,7 @@ access does not.
    tests, and freshness checks daily; `service-alerts` fires when an expected job
    produced no logs. A snapshot cron that silently dies is worse than none.
 
-## Sales validation (`model-sales-val`) — template for Milestone 4
+## Sales validation (`model-sales-val`), template for Milestone 4
 
 Mechanics:
 
@@ -65,7 +65,7 @@ Mechanics:
   Flag beyond N standard deviations (both directions).
 - **Pre-exclusions** before grouping: sales < $10k, multi-PIN sales, duplicate price
   for same parcel within 365 days.
-- **Heuristic flags** (supplementary — they do NOT alone set `is_outlier`; only
+- **Heuristic flags** (supplementary, they do NOT alone set `is_outlier`; only
   price-deviation reasons do): family sale (buyer/seller last-name match), non-person
   legal entity keywords (LLC, bank, builder, trust...), short-term owner, price swing +
   short hold ("flip"), raw price ceiling, transfer-form fields indicating distress
@@ -78,7 +78,7 @@ Mechanics:
   (the group stats used, so any flag is fully explainable after the fact).
 
 Philadelphia mapping: `rtt_summary` (5.1M rows on CARTO) carries document type,
-consideration/price, grantor/grantee names, and parcel linkage — enough for the
+consideration/price, grantor/grantee names, and parcel linkage, enough for the
 group-stats core plus name-match, entity-keyword, sheriff's-deed, short-hold, and
 multi-parcel heuristics. Multi-parcel transfer detection matters personally: the
 motivating property was a two-lot purchase.
@@ -104,7 +104,7 @@ motivating property was a two-lot purchase.
   min-rotated-rect ratios, centroid-distance SD), time encodings, and market signals
   (`meta_sale_count_past_n_years`, `char_recent_renovation` = renovated in last 3 yrs).
 - **Deliberate exclusions + why:** property condition (98% identical → no signal),
-  crime (collinear with income/location), interior quality (unobservable — same
+  crime (collinear with income/location), interior quality (unobservable, same
   problem we have), FEMA flood zones (First Street factor + lat/lon absorbed it).
 - **Post-modeling:** multi-card and prorated-PIN aggregation rules, complex-level
   value averaging for near-identical rowhomes/townhomes (fuzzy grouping to stop
@@ -114,17 +114,17 @@ motivating property was a two-lot purchase.
   (`sold_in_last_2_years ~ characteristics + location FE`) to detect unrepresentative
   sales samples.
 - **Evaluation:** RMSE/MAE/MAPE/R² plus assessor metrics COD/PRD/PRB/MKI, computed by
-  geography × class × price quantile — quantile breakouts expose regressivity that
+  geography × class × price quantile, quantile breakouts expose regressivity that
   aggregates hide.
 - **Interpretability:** per-property SHAP values, global feature importance, and
   experimental **comps from LightGBM leaf-node co-assignment** (sales that land in
-  the same leaves as the target are its comps) — feeds `homeval` reports.
+  the same leaves as the target are its comps), feeds `homeval` reports.
 - **Transparency posture:** README documents every choice + rationale, an "Ongoing
   Issues" section admits data problems (stale/missing characteristics,
   non-arms-length leakage, disclosure incentives), and FAQs pre-empt "why isn't my
   assessment my sale price" (sales chasing). Emulate this tone in our docs.
 
-## Condo model (`model-condo-avm`) — the missing-characteristics playbook
+## Condo model (`model-condo-avm`), the missing-characteristics playbook
 
 Condos: interiors unobservable, only age/location/sale/% ownership complete. Their fix:
 
@@ -147,10 +147,10 @@ chasing detection. Use it for all OPA-vs-model and OPA-vs-sale comparisons
 
 ## What we deliberately do differently
 
-- **Public data only** — no iasWorld equivalent. Our raw layer is OpenDataPhilly
+- **Public data only**, no iasWorld equivalent. Our raw layer is OpenDataPhilly
   (CARTO SQL API) + city ArcGIS REST, and snapshot history *is* our system of record.
-- **DuckDB local, not Athena/AWS** — same Parquet-mirror idea, zero infra.
-- **Bayesian hierarchical layer** — CCAO stops at LightGBM point estimates; our added
+- **DuckDB local, not Athena/AWS**, same Parquet-mirror idea, zero infra.
+- **Bayesian hierarchical layer**, CCAO stops at LightGBM point estimates; our added
   value is calibrated uncertainty (a per-property credible interval matters for
   appeal decisions). Keep their LightGBM+linear baseline as the benchmark to beat.
 - **Assessment-error detection is the product**, not the assessment roll. CCAO

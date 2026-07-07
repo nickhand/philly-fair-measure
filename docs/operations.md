@@ -1,6 +1,6 @@
 # Operations: recurring snapshots
 
-Snapshotting is a core feature — the time series only accrues value once
+Snapshotting is a core feature, the time series only accrues value once
 captures happen on a schedule, and a scheduler that silently dies is worse
 than none. Two commands cover this:
 
@@ -32,7 +32,7 @@ tail -f data/logs/snapshot.log
 Runs Mondays 07:00 local time; launchd fires missed runs at the next wake, so
 a closed laptop on Monday morning still snapshots later that day.
 
-## Heartbeat — silence is not success
+## Heartbeat, silence is not success
 
 The freshness check is the alarm for a scheduler that stopped running
 (the CCAO runs a dedicated service for exactly this failure mode). Check it
@@ -41,7 +41,7 @@ nag or a weekly reminder:
 
 ```bash
 cd /Users/nhand/DataProjects/philly-fair-measure && uv run fair-measure freshness \
-  || echo "⚠️  Philly snapshots are stale — check data/logs/snapshot.log"
+  || echo "⚠️  Philly snapshots are stale, check data/logs/snapshot.log"
 ```
 
 After a fresh capture, rebuild derived layers:
@@ -60,7 +60,7 @@ when a run predates its mart). The full order:
 ```bash
 uv run fair-measure stage
 uv run fair-measure validate-sales
-uv run fair-measure build-market-areas   # optional; relabels geography — forces retrains
+uv run fair-measure build-market-areas   # optional; relabels geography, forces retrains
 uv run fair-measure build-price-index
 uv run fair-measure build-proximity      # after refreshing SEPTA/parks/centerline snapshots
 uv run fair-measure build-features
@@ -85,10 +85,10 @@ uv run fair-measure screen-assessments    # rerun to embed aerial_change_score/f
 ```
 
 Scores come from free PASDA orthophotos (only the 2020/2023/2024/2025
-services render — probe before assuming other vintages). The threshold is
+services render, probe before assuming other vintages). The threshold is
 recalibrated per vintage pair from a fresh quiet-control sample (90th
 percentile ≈ 10% false-positive budget; catches ~42% of known structural
-change per the pilot). Keep runs to the flagged set — citywide would be ~1M
+change per the pilot). Keep runs to the flagged set, citywide would be ~1M
 requests against Penn State's free service. `fair-measure aerial-pilot` re-runs
 the ground-truth validation.
 

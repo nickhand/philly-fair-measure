@@ -62,9 +62,9 @@ def readme_screen_counts(stats: dict[str, Any]) -> str:
         f"as likely over-assessed, **{s['under']:,}** as likely under-assessed, and\n"
         f"**{s['watch']:,}** unflagged but at or beyond the edge of the published\n"
         f'range ("worth a look").\n'
-        f"A residential flag requires two independent uncertainty methods — the\n"
+        f"A residential flag requires two independent uncertainty methods: the\n"
         f"Bayesian posterior interval and a spatially weighted\n"
-        f"conformalized-quantile-regression band — to both place the city's value\n"
+        f"conformalized-quantile-regression band. Both must place the city's value\n"
         f"outside on the same side. {s['insufficient']} records with no recorded livable\n"
         f"area are reported as insufficient rather than valued.\n"
     )
@@ -77,7 +77,7 @@ def readme_results_tables(stats: dict[str, Any]) -> str:
     return (
         f"Out-of-time test set (n = {meta['n_test']:,}), run `{meta['model_run_id']}`. The same\n"
         f"homes, the same treatment; OPA's assessed values are the incumbent benchmark.\n\n"
-        f"On the IAAO ratio-study basis (financed, arm's-length sales — the standard\n"
+        f"On the IAAO ratio-study basis (financed, arm's-length sales, the standard\n"
         f"assessment offices are evaluated on):\n\n"
         f"{header}\n{divider}\n"
         f"{_card_row('This model', iaao['model'])}\n"
@@ -125,7 +125,7 @@ def model_md_screen_counts(stats: dict[str, Any]) -> str:
     return (
         f"As of run `{meta['model_run_id'].removesuffix('-baseline')}` (Tax Year 2027 roll): "
         f"{s['properties']:,} properties\n"
-        f"screened — {s['over']:,} over-assessed candidates, {s['under']:,} under-assessed\n"
+        f"screened: {s['over']:,} over-assessed candidates, {s['under']:,} under-assessed\n"
         f"candidates, {s['watch']:,} in the attention tier, {s['insufficient']} insufficient\n"
         f"records.\n"
     )

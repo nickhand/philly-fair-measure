@@ -1,25 +1,25 @@
-# Fair Measure — Philadelphia property assessment check
+# Fair Measure: a Philadelphia property assessment check
 
 An independent, open-data check of Philadelphia's property assessments. The
 system ingests the city's own published records, trains automated valuation
 models on them, and compares the Office of Property Assessment's (OPA) value
 for every residential property against a model estimate with a 90% predictive
 interval. Where the city's value falls outside that interval, the property is
-flagged, and the evidence — comparable sales, assessment history, peer
-comparisons — is published in a per-property report.
+flagged, and the evidence (comparable sales, assessment history, peer
+comparisons) is published in a per-property report.
 
 **Live site:** [nickhand.dev/fair-measure](https://nickhand.dev/fair-measure/)
 · **Model documentation:** [docs/model.md](docs/model.md)
 
 <!-- generated:readme-screen-counts:begin -->
 As of the latest run (Tax Year 2027 assessments), the screen covers
-**496,975** residential properties and condos: **1,694** flagged
-as likely over-assessed, **6,175** as likely under-assessed, and
-**43,351** unflagged but at or beyond the edge of the published
+**496,975** residential properties and condos: **1,103** flagged
+as likely over-assessed, **8,412** as likely under-assessed, and
+**47,612** unflagged but at or beyond the edge of the published
 range ("worth a look").
-A residential flag requires two independent uncertainty methods — the
+A residential flag requires two independent uncertainty methods: the
 Bayesian posterior interval and a spatially weighted
-conformalized-quantile-regression band — to both place the city's value
+conformalized-quantile-regression band. Both must place the city's value
 outside on the same side. 93 records with no recorded livable
 area are reported as insufficient rather than valued.
 <!-- generated:readme-screen-counts:end -->
@@ -33,7 +33,7 @@ area are reported as insufficient rather than valued.
   following the Cook County Assessor's published methodology.
 - Trains valuation models on public data only: a LightGBM point model with
   financed-market calibration and conformalized-quantile-regression intervals
-  (what the site displays), cross-examined by a hierarchical Bayesian model —
+  (what the site displays), cross-examined by a hierarchical Bayesian model,
   a flag requires both methods to agree.
 - Screens every assessment: OPA's value is compared against the model's 90%
   interval, and the disagreement is expressed in predictive-uncertainty units
@@ -46,22 +46,22 @@ area are reported as insufficient rather than valued.
 ## Results
 
 <!-- generated:readme-results-tables:begin -->
-Out-of-time test set (n = 19,484), run `20260707T002634Z-baseline`. The same
+Out-of-time test set (n = 19,484), run `20260707T020247Z-baseline`. The same
 homes, the same treatment; OPA's assessed values are the incumbent benchmark.
 
-On the IAAO ratio-study basis (financed, arm's-length sales — the standard
+On the IAAO ratio-study basis (financed, arm's-length sales, the standard
 assessment offices are evaluated on):
 
 |  | Median ratio | COD | PRD | PRB | MAPE |
 | --- | --- | --- | --- | --- | --- |
-| This model | 0.999 | 19.5 | 1.024 | +0.010 | 19.4% |
-| OPA | 0.893 | 23.2 | 1.065 | -0.058 | 22.9% |
+| This model | 1.005 | 18.7 | 1.022 | +0.007 | 18.9% |
+| OPA | 0.921 | 23.1 | 1.065 | -0.058 | 22.5% |
 
 On the full untrimmed sample, including cash and distressed sales:
 
 |  | Median ratio | COD | PRD | PRB | MAPE |
 | --- | --- | --- | --- | --- | --- |
-| This model | 1.032 | 25.6 | 1.087 | -0.072 | 26.6% |
+| This model | 1.037 | 25.0 | 1.085 | -0.083 | 26.2% |
 | OPA | 0.983 | 34.5 | 1.190 | -0.234 | 34.0% |
 <!-- generated:readme-results-tables:end -->
 
@@ -69,12 +69,12 @@ IAAO targets for reference: median ratio 0.90–1.10, COD ≤ 15 (single-family)
 PRD 0.98–1.03, |PRB| ≤ 0.05. The model meets the median-ratio and PRD/PRB
 bands on the IAAO basis; neither the model nor OPA meets the COD target on the
 full sample, which includes the cash/distressed tail. PRD above 1 and PRB
-below 0 indicate regressivity — cheaper homes over-assessed relative to
-expensive ones — and the persistent finding is that the model is substantially
+below 0 indicate regressivity (cheaper homes over-assessed relative to
+expensive ones), and the persistent finding is that the model is substantially
 less regressive than OPA on identical data.
 
 Full methodology, caveats (including interval undercoverage in the cheapest
-quintile and condo parity with OPA), and stability checks are in
+quintile and where condos now edge past OPA), and stability checks are in
 [docs/model.md](docs/model.md) and the
 [vertical-equity report card](docs/vertical-equity-report-card.md).
 
@@ -169,7 +169,7 @@ data/                  # local data lake (gitignored): raw/ staged/ marts/ runs/
 
 | Document | Contents |
 |---|---|
-| [docs/model.md](docs/model.md) | Model architecture, methodology, results — the site's "model documentation" link |
+| [docs/model.md](docs/model.md) | Model architecture, methodology, results, the site's "model documentation" link |
 | [docs/features.md](docs/features.md) | Input feature registry |
 | [docs/source_inventory.md](docs/source_inventory.md) | Verified public dataset inventory |
 | [docs/vertical-equity-report-card.md](docs/vertical-equity-report-card.md) | Model vs. OPA vs. IAAO bands, full and trimmed samples |
@@ -197,19 +197,19 @@ policies, are in [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Limitations
 
 - Model estimates are statistical, not appraisals. A flag means the city's
-  value is outside what public data supports — it is a reason to check the
+  value is outside what public data supports. It is a reason to check the
   record, not proof of an error.
 - Cash-market price dispersion is partly irreducible from public data; the
   full-sample COD reflects that.
 - Predictive intervals undercover in the cheapest quintile (~76–79% realized
   vs. 90% nominal); the site reports interval-based results with that caveat.
-- Condo accuracy: the model beats OPA on error (rmse 0.252 vs 0.278) and
-  sits within half a COD point of OPA's uniformity (19.3 vs 18.8) — condos
-  remain OPA's best segment.
+- Condo accuracy: the model beats OPA on error (rmse 0.242 vs 0.278) and now
+  edges ahead on uniformity too (COD 17.5 vs 18.8). Condos are OPA's strongest
+  segment, and the market-area price index closed the last gap.
 - OPA's recorded condition codes cannot be independently verified (the city
   does not inspect interiors), and in a measured ~10–20% tail the distress
   codes are contradicted by later permits or sale prices. The model uses them
-  — recent sale prices confirm the codes carry real signal — alongside
+  (recent sale prices confirm the codes carry real signal) alongside
   independent distress and permit signals, and the per-property report labels
   them "on record."
 - Single metro; no cross-city validation.

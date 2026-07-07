@@ -1,7 +1,7 @@
 # What OPA's regressive assessments cost, 2016–2025
 
 How much property tax did Philadelphia's regressive assessments shift, per year,
-in dollars — and to whom. The short version: **the burden shifted by property
+in dollars, and to whom. The short version: **the burden shifted by property
 value is real and adds up to roughly a third of a billion dollars over the
 decade; the burden shifted by race runs the *opposite* of the intuitive story.**
 
@@ -11,27 +11,27 @@ Reproduce with `historical_redistribution()` and `redistribution_by_race()` in
 ## What "cost" means here
 
 Property tax is **revenue-neutral**: the city picks a millage to hit a target
-levy, so a "bad model" doesn't make revenue vanish — it **redistributes** the
+levy, so a "bad model" doesn't make revenue vanish, it **redistributes** the
 burden. Every dollar the bottom over-pays, the top under-pays. So the honest
 quantity is "how much burden was shifted," not "how much the city lost."
 
 **Method.** A sold-home ratio study using *actual sales* as market truth (not
-our model — we have no as-of features for 2016). For each year we compare OPA's
+our model, we have no as-of features for 2016). For each year we compare OPA's
 roll to a uniform-ratio "fair" roll, and extrapolate the bottom-40%'s net
 over-assessment (a share of the levy) to the full residential roll × the flat
 **1.3998%** millage (constant 2016–2027; only the city/school split moved, in
 2025). Two benchmarks for market value, because the choice roughly doubles the
 answer:
 
-- **Financed** — financed sales only, the defensible IAAO-style sample.
-- **Raw sale** — all arms-length sales, cash-inflated on the low end.
+- **Financed**, financed sales only, the defensible IAAO-style sample.
+- **Raw sale**, all arms-length sales, cash-inflated on the low end.
 
 Coverage: 2016–2025 full, 2026 partial (sales still accruing), **2027 impossible**
 (no sales under that roll yet). Tax is on gross assessed value; the homestead
 exemption ($30k→$100k over the period, mildly progressive) would modestly shrink
 the bottom's overpayment and is noted, not modelled.
 
-## Card 1 — burden shifted from lower- to higher-value homes
+## Card 1, burden shifted from lower- to higher-value homes
 
 Bottom-40% (by value) net **over**-payment; the top-60% under-paid the same.
 
@@ -53,19 +53,19 @@ Bottom-40% (by value) net **over**-payment; the top-60% under-paid the same.
 two quintiles, the financed figure is on the order of **$300–350 per
 lower-value home in the regressive years**.
 
-**The shape tells a policy story — but the 2020–22 dip is a trap, not a fix.**
+**The shape tells a policy story, but the 2020–22 dip is a trap, not a fix.**
 Regressivity was worst in the **pre-reform years (2016–18)** and has climbed back
 since the 2023 reassessment. The near-zero **2020–22** stretch is *not* the freeze
 making assessments fairer: the freeze locked the TY2020 roll while the market
 boomed, so rising sale prices pulled every assessed/sale ratio down (the median
-hit **0.63** by 2022 — everyone under-assessed relative to current prices), and
+hit **0.63** by 2022, everyone under-assessed relative to current prices), and
 the previously *over*-assessed cheap end was **absorbed by appreciation**, which
 masked the regressivity and briefly inverted it. It snapped right back at the
 2023 reassessment, and a freeze during a *falling* market would have made it
 worse. So the harm tracks *assessment practice*, but a rising market can
 temporarily hide it.
 
-## Card 2 — by race, the intuitive story reverses
+## Card 2, by race, the intuitive story reverses
 
 Net over/under-payment by **tract majority race**, financed sample, % of levy
 (+ = that group's neighborhoods over-paid):
@@ -80,14 +80,14 @@ Net over/under-payment by **tract majority race**, financed sample, % of levy
 | 2025 | −0.3% | +0.5% | −0.2% |
 
 **Every year for a decade, Black-majority tracts net *under*-paid and
-White-majority tracts over-paid** on the defensible sample — the opposite of
+White-majority tracts over-paid** on the defensible sample, the opposite of
 "regressive assessments overtaxed Black homeowners." The mechanism is value
 composition, not race-targeting: the homes that sell *financed* in Black
 neighborhoods skew to the higher-value end that regressivity *under*-assesses.
 
 The naive claim survives only on the **raw-sale** benchmark, and only as a
 **cash-market artifact**: homes in disinvested neighborhoods sell cash-cheap, so
-OPA *looks* like it over-assesses them relative to those depressed prices — but
+OPA *looks* like it over-assesses them relative to those depressed prices, but
 that's the exact cash trap the IAAO standard excludes, and it evaporates (indeed
 reverses) on financed sales.
 
@@ -100,7 +100,7 @@ reverses) on financed sales.
   assessment standard is built on, it reverses, consistently. If a racial harm
   exists it lives in the **cash-market / unrealizable-value** argument (homes
   taxed above what they can actually fetch), which is a different and harder
-  claim than a ratio study — see [report-assessment-equity.md](report-assessment-equity.md).
+  claim than a ratio study, see [report-assessment-equity.md](report-assessment-equity.md).
 - **Caveats that keep it honest:** the race cut is ecological (tract, not
   person) and on sold financed homes; the citywide dollar figures extrapolate a
   sold-sample share to the full roll (assumes sold homes represent their tier);

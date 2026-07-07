@@ -28,7 +28,7 @@ just gates
 That runs `ruff format --check`, `ruff check`, `mypy` (strict mode) on the
 Python side, then the Vitest suite and a production build on the web side.
 Please run it before opening a pull request. Lint or type errors are fixed,
-not suppressed — including pre-existing ones in files you touch.
+not suppressed, including pre-existing ones in files you touch.
 
 ## Project conventions
 
@@ -49,5 +49,5 @@ not suppressed — including pre-existing ones in files you touch.
 
 If a specific property's estimate or flag looks wrong, an issue with the
 parcel number (OPA account number) and what you expected is the most useful
-form. Model-level concerns — methodology, calibration, equity — are best filed
+form. Model-level concerns, methodology, calibration, equity, are best filed
 as issues referencing the relevant section of [docs/model.md](docs/model.md).
