@@ -12,7 +12,7 @@ import { computed, ref, watch } from 'vue'
 import { api, ApiError } from '@/api/client'
 import type { PropertyCore, Report } from '@/api/types'
 import { money, num, pct } from '@/utils/format'
-import { opaInquiryUrl, SITE } from '@/config/site'
+import { cityPropertyUrl, opaInquiryUrl, SITE } from '@/config/site'
 import { track } from '@/lib/analytics'
 import type { CompRow } from '@/api/types'
 import { verdictFor } from '@/utils/verdict'
@@ -23,6 +23,7 @@ import HistorySpark from '@/components/viz/HistorySpark.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import InfoTip from '@/components/ui/InfoTip.vue'
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue'
+import AppealSteps from '@/components/ui/AppealSteps.vue'
 
 const props = defineProps<{ parcelId: string }>()
 
@@ -126,9 +127,7 @@ const signalChips = computed(() => {
   return chips
 })
 
-const cityLink = computed(() =>
-  core.value ? `https://property.phila.gov/?p=${core.value.parcel_id}` : '#',
-)
+const cityLink = computed(() => (core.value ? cityPropertyUrl(core.value.parcel_id) : '#'))
 const inquiryLink = computed(() =>
   core.value ? opaInquiryUrl(core.value.parcel_id) : '#',
 )
@@ -566,45 +565,7 @@ function printPage() {
           >.
         </p>
 
-        <div class="mt-5 rounded-lg bg-brand-50 p-4 text-body-sm text-[#2c3a4d]">
-          <h3 class="text-body-sm font-extrabold text-brand-900">How to act on this (all free)</h3>
-          <ol class="mt-2 list-decimal space-y-1.5 pl-5">
-            <li>
-              Check the facts on your record at
-              <a :href="cityLink" rel="noopener" class="font-bold text-brand-600 underline"
-                >property.phila.gov</a
-              >.
-            </li>
-            <li>
-              A fact is wrong? Tell OPA through the
-              <a :href="inquiryLink" rel="noopener" class="font-bold text-brand-600 underline"
-                >property inquiry page</a
-              >.
-            </li>
-            <li>
-              Disagree with the value itself? Ask OPA for a
-              <a :href="SITE.flrUrl" rel="noopener" class="font-bold text-brand-600 underline"
-                >First Level Review (FLR)</a
-              >. The form comes in the mail with your new assessment notice, or you can request one
-              from OPA.
-            </li>
-            <li>
-              Still disagree after the review? File a formal appeal with the
-              <strong>Board of Revision of Taxes (BRT)</strong>. The deadline is the first Monday
-              of October each year.
-            </li>
-            <li>Bring this page, photos, and any repair estimates as evidence.</li>
-          </ol>
-          <p class="no-print mt-3">
-            Details:
-            <a
-              href="https://www.phila.gov/services/property-lots-housing/property-taxes/appeal-a-property-assessment/"
-              rel="noopener"
-              class="font-bold text-brand-600 underline"
-              >phila.gov: appeal a property assessment</a
-            >
-          </p>
-        </div>
+        <AppealSteps :parcel-id="props.parcelId" class="mt-5" />
 
         <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p class="text-caption leading-relaxed text-faint">

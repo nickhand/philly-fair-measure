@@ -69,6 +69,16 @@ const router = createRouter({
       },
     },
     {
+      path: '/appeal',
+      name: 'appeal',
+      component: () => import('@/views/AppealView.vue'),
+      meta: {
+        title: 'Appeal your assessment',
+        description:
+          'A free, step-by-step guide to challenging your Philadelphia property assessment: check the facts on file, request a First Level Review, and appeal to the Board of Revision of Taxes.',
+      },
+    },
+    {
       // Leaderboards — intentionally unlinked from public navigation; moves
       // behind a real paywall/admin login when the product tier ships.
       path: '/leaderboards',

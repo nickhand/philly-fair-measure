@@ -2,8 +2,19 @@
 /** Site-wide timing notice: the assessments shown are the newly released
  * Tax Year 2027 values, and the free review/appeal windows are open NOW.
  * Dismissible, persisted per browser. */
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { SITE } from '@/config/site'
+
+const route = useRoute()
+/** On a property report the route param IS the OPA account number, so carry it
+ * into the appeal guide and pre-fill its city deep-links; elsewhere the guide
+ * asks the visitor for it. */
+const appealTo = computed(() =>
+  route.name === 'property' && typeof route.params.parcelId === 'string'
+    ? { name: 'appeal', query: { acct: route.params.parcelId } }
+    : { name: 'appeal' },
+)
 
 const KEY = `fm-ty${SITE.assessmentTaxYear}-banner-dismissed`
 const show = ref(false)
@@ -31,6 +42,11 @@ function dismiss() {
         out.</strong>
         If yours looks wrong, free First Level Reviews are due by
         {{ SITE.flrDeadlineText }}, and formal appeals by {{ SITE.appealDeadlineText }}.
+        <RouterLink
+          :to="appealTo"
+          class="whitespace-nowrap font-bold text-brand-600 underline underline-offset-2 hover:text-brand-900"
+          >How to appeal →</RouterLink
+        >
       </p>
       <button
         type="button"

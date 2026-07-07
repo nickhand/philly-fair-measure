@@ -15,6 +15,12 @@ export const SITE = {
   appealDeadlineText: 'the first Monday of October 2026',
 } as const
 
+/** The city's public record for a property — where an owner reviews the facts
+ * on file (size, condition, year built) that drive the assessment. */
+export function cityPropertyUrl(parcelId: string): string {
+  return `https://property.phila.gov/?p=${encodeURIComponent(parcelId)}`
+}
+
 /** The city's own record of what it has on file for a property — the page an
  * owner should check when a recorded fact looks wrong. */
 export function opaInquiryUrl(parcelId: string): string {

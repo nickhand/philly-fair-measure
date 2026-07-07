@@ -39,12 +39,13 @@ const runDate = new Date(`${stats.meta.generated_at}T00:00:00Z`).toLocaleDateStr
           <span class="text-base font-extrabold tracking-tight text-ink">Fair Measure</span>
           <span class="mt-0.5 text-[9.5px] font-semibold uppercase tracking-[0.09em] text-muted">Philadelphia</span>
         </span>
-        <!-- quiet beta chip: rides the glyph so it shows even in the mark-only
-             mobile header (footer line explains what beta means; kept out of
+        <!-- quiet beta chip: appears with the wordmark at >=480px; hidden on the
+             narrowest phones so the five nav links (incl. the Appeal CTA) fit on
+             one line (footer line explains what beta means; kept out of
              titles/OG). Remove when the model settles. -->
         <span
           aria-hidden="true"
-          class="shrink-0 rounded-full bg-brand-50 px-1 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-brand-600 min-[480px]:px-1.5"
+          class="hidden shrink-0 rounded-full bg-brand-50 px-1 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-brand-600 min-[480px]:inline-block min-[480px]:px-1.5"
           >Beta</span
         >
       </RouterLink>
@@ -72,6 +73,12 @@ const runDate = new Date(`${stats.meta.generated_at}T00:00:00Z`).toLocaleDateStr
           class="rounded-sm px-1 py-2 text-[#334155] hover:bg-brand-50 sm:px-3"
           active-class="bg-brand-50 text-brand-600"
           >The Proof</RouterLink
+        >
+        <RouterLink
+          to="/appeal"
+          class="ml-0.5 rounded-md bg-brand-600 px-1.5 py-1.5 text-white hover:bg-brand-900 sm:ml-1 sm:px-3"
+          active-class="bg-brand-900"
+          >Appeal</RouterLink
         >
       </div>
     </nav>
