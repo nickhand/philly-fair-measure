@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import overload
 
@@ -168,6 +169,40 @@ def _bmn_curve(
             if not supported[qi]:
                 curve[qi] = curve[qi - 1]
     return curve
+
+
+def _snap_area_tail_to_district(
+    index: pl.DataFrame, area_to_district: dict[str, str], cutoff: datetime
+) -> pl.DataFrame:
+    """For months ``>= cutoff``, replace each market area's log_index with its
+    district's.
+
+    Area curves are thin at the recent endpoint (~1-8 pairs/month), and their
+    monthly values there are noise, not signal (ma_146 swung -0.21 -> +0.18 in
+    nine months while its $/sqft stayed flat). The trailing-mean reference fixes
+    the anchor, but the valuation-date move reads the endpoint month directly,
+    so that noise moved every area home's shown estimate by up to ~20%. Snapping
+    the tail to the district keeps each area's HISTORICAL divergence (older
+    months, where it has pair evidence) and tracks the district recently, where
+    it does not. District and citywide rows are untouched (they have no parent)."""
+    parents = pl.DataFrame(
+        {"district": list(area_to_district), "_parent": list(area_to_district.values())}
+    )
+    parent_li = index.select(
+        pl.col("district").alias("_parent"), "month", pl.col("log_index").alias("_parent_li")
+    )
+    return (
+        index.join(parents, on="district", how="left")
+        .join(parent_li, on=["_parent", "month"], how="left")
+        .with_columns(
+            pl.when(pl.col("_parent").is_not_null() & (pl.col("month") >= cutoff))
+            .then(pl.col("_parent_li"))
+            .otherwise(pl.col("log_index"))
+            .alias("log_index")
+        )
+        .drop("_parent", "_parent_li")
+        .sort("district", "month")
+    )
 
 
 def build_price_index(data_dir: Path | None = None) -> BuildResult:
@@ -378,6 +413,11 @@ def _build_repeat_sales(
         .select("district", "month", "log_index", "n_sales", "ref_month")
         .sort("district", "month")
     )
+
+    if eligible:
+        month_list = months.sort()
+        cutoff = month_list[max(0, month_list.len() - REFERENCE_TRAILING_MONTHS)]
+        index = _snap_area_tail_to_district(index, area_to_district, cutoff)
 
     inputs = []
     for path in paths.values():

@@ -7,7 +7,7 @@ sub-area that lagged its district carries its older sales forward by LESS
 (the 2314 Wallace St fix).
 """
 
-from datetime import date
+from datetime import date, datetime
 
 import numpy as np
 import polars as pl
@@ -18,6 +18,7 @@ from philly_fair_measure.features.price_index import (
     _bmn_curve,
     _quarter_ix,
     _repeat_pairs,
+    _snap_area_tail_to_district,
     with_time_adjustment,
 )
 
@@ -100,6 +101,35 @@ def test_with_time_adjustment_prefers_area_then_district_then_city():
     # sales at the reference month need no adjustment in any geography
     at_ref = with_time_adjustment(frame.with_columns(pl.lit(months[1]).alias("sale_date")), index)
     assert at_ref["time_adj_log"].to_list() == pytest.approx([0.0, 0.0, 0.0])
+
+
+def test_snap_area_tail_to_district_keeps_history_drops_recent_noise():
+    months = [datetime(2020, 1, 1), datetime(2024, 1, 1), datetime(2025, 1, 1)]
+    # ma_x diverges from d_0 by -0.45 historically (2020, real, well-supported)
+    # and spikes to +0.20 recently (2024, thin-pair noise while d_0 sits at -0.05)
+    index = pl.DataFrame(
+        {
+            "district": ["d_0"] * 3 + ["ma_x"] * 3 + [CITYWIDE] * 3,
+            "month": months * 3,
+            "log_index": [-0.30, -0.05, 0.0, -0.45, 0.20, 0.0, -0.28, -0.04, 0.0],
+            "n_sales": [100] * 9,
+            "ref_month": [months[-1]] * 9,
+        }
+    )
+    out = _snap_area_tail_to_district(index, {"ma_x": "d_0"}, cutoff=datetime(2024, 1, 1))
+    ma = {
+        str(r["month"])[:10]: r["log_index"]
+        for r in out.filter(pl.col("district") == "ma_x").rows(named=True)
+    }
+    assert ma["2020-01-01"] == pytest.approx(-0.45)  # historical divergence kept
+    assert ma["2024-01-01"] == pytest.approx(-0.05)  # recent noise -> district level
+    assert ma["2025-01-01"] == pytest.approx(0.0)
+    # district rows are never touched (they have no parent)
+    d0 = {
+        str(r["month"])[:10]: r["log_index"]
+        for r in out.filter(pl.col("district") == "d_0").rows(named=True)
+    }
+    assert d0["2024-01-01"] == pytest.approx(-0.05) and d0["2020-01-01"] == pytest.approx(-0.30)
 
 
 def test_quarter_ix():
