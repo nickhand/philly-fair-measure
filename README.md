@@ -203,9 +203,9 @@ policies, are in [CONTRIBUTING.md](CONTRIBUTING.md).
   full-sample COD reflects that.
 - Predictive intervals undercover in the cheapest quintile (~76–79% realized
   vs. 90% nominal); the site reports interval-based results with that caveat.
-- Condo accuracy: the model beats OPA on error (rmse 0.242 vs 0.278) and now
-  edges ahead on uniformity too (COD 17.5 vs 18.8). Condos are OPA's strongest
-  segment, and the market-area price index closed the last gap.
+- Condo accuracy: the model beats OPA on error (rmse 0.243 vs 0.278) and now
+  edges ahead on uniformity too (COD 17.5 vs 18.8). Condos were long OPA's
+  strongest segment, and the market-area price index closed the last gap.
 - OPA's recorded condition codes cannot be independently verified (the city
   does not inspect interiors), and in a measured ~10–20% tail the distress
   codes are contradicted by later permits or sale prices. The model uses them

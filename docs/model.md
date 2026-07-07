@@ -192,24 +192,27 @@ set and treatment; OPA's own values as the incumbent:
 | **OPA (incumbent)** | **0.449** | **34.0%** | 0.983 | **34.5** | **1.190** | **-0.234** | 0.787 |
 <!-- generated:model-results-table:end -->
 
-The model is **more accurate** (RMSE 0.337 vs 0.449), **more uniform**
-(COD 25.8 vs 34.5), and **markedly less regressive** (PRD 1.07 vs 1.19; PRB
-−0.06 vs −0.23) than OPA on the same homes. The raw-sample median ratio runs
-1.04 (the financed-calibrated booster sits above the cash-heavy raw test
-slice); on the IAAO financed/TASP basis the median is 1.002 with COD 19.9
-(see `fair-measure export-web-stats` / the site's ratio card). IAAO ratio
-statistics (COD, PRD, PRB, MKI) come from assesspy; definitions in
-[ccao-lessons.md](ccao-lessons.md).
+On the same homes the model is **more accurate**, **more uniform**, and
+**markedly less regressive** than OPA on every measure in the table above
+(RMSE, MAPE, COD, and both PRD and PRB). The raw-sample median ratio runs
+~1.04 (the financed-calibrated booster sits above the cash-heavy raw test
+slice); on the IAAO financed/TASP basis the median is 1.00 with COD 18.6,
+inside the vertical-equity bands (the site's ratio card and the
+[vertical-equity report card](vertical-equity-report-card.md) carry the
+current figures). IAAO ratio statistics (COD, PRD, PRB, MKI) come from
+assesspy; definitions in [ccao-lessons.md](ccao-lessons.md).
 
 Honest caveats:
 
-- The full-sample **COD 25.9 is above the IAAO ≤15 target**, it includes the
-  cash/distressed tail. On an IAAO-standard trimmed arm's-length sample the model
-  clears the vertical-equity bands (COD 17.0, PRD 1.03, PRB −0.02) while OPA does
-  not, see the [vertical-equity report card](vertical-equity-report-card.md).
-- **Condos are the exception:** the condo LightGBM roughly *ties* OPA
-  (RMSE 0.280 vs 0.278, COD 22.4 vs 18.8; 2026-07-04). Condos are homogeneous
-  and sell frequently, where OPA's mass appraisal already does well.
+- The full-sample **COD (in the table above) is above the IAAO ≤15 target**,
+  it includes the cash/distressed tail. On the IAAO-standard trimmed
+  arm's-length sample the model clears the vertical-equity bands (COD 18.6,
+  PRD 1.02, PRB +0.01) while OPA does not, see the
+  [vertical-equity report card](vertical-equity-report-card.md).
+- **Condos** were long OPA's strongest segment (homogeneous, frequently sold,
+  where mass appraisal already does well); the market-area price index closed
+  that gap, and the condo LightGBM now edges ahead on both error and
+  uniformity (RMSE 0.243 vs 0.278, COD 17.5 vs 18.8; run 20260707T030251Z).
 - **Interval undercoverage in the cheap tail:** at nominal 90%, realized
   coverage is ~89–91% overall but only **~81–86% in the cheapest quintile**
   across every interval method built (Bayesian 0.81, fixed-offset conformal
