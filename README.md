@@ -13,9 +13,9 @@ comparisons) is published in a per-property report.
 
 <!-- generated:readme-screen-counts:begin -->
 As of the latest run (Tax Year 2027 assessments), the screen covers
-**496,975** residential properties and condos: **1,103** flagged
-as likely over-assessed, **8,412** as likely under-assessed, and
-**47,612** unflagged but at or beyond the edge of the published
+**496,975** residential properties and condos: **1,135** flagged
+as likely over-assessed, **7,267** as likely under-assessed, and
+**44,799** unflagged but at or beyond the edge of the published
 range ("worth a look").
 A residential flag requires two independent uncertainty methods: the
 Bayesian posterior interval and a spatially weighted
@@ -46,7 +46,7 @@ area are reported as insufficient rather than valued.
 ## Results
 
 <!-- generated:readme-results-tables:begin -->
-Out-of-time test set (n = 19,484), run `20260707T020247Z-baseline`. The same
+Out-of-time test set (n = 19,484), run `20260707T030251Z-baseline`. The same
 homes, the same treatment; OPA's assessed values are the incumbent benchmark.
 
 On the IAAO ratio-study basis (financed, arm's-length sales, the standard
@@ -54,14 +54,14 @@ assessment offices are evaluated on):
 
 |  | Median ratio | COD | PRD | PRB | MAPE |
 | --- | --- | --- | --- | --- | --- |
-| This model | 1.005 | 18.7 | 1.022 | +0.007 | 18.9% |
-| OPA | 0.921 | 23.1 | 1.065 | -0.058 | 22.5% |
+| This model | 1.004 | 18.6 | 1.021 | +0.007 | 18.7% |
+| OPA | 0.920 | 23.0 | 1.065 | -0.056 | 22.4% |
 
 On the full untrimmed sample, including cash and distressed sales:
 
 |  | Median ratio | COD | PRD | PRB | MAPE |
 | --- | --- | --- | --- | --- | --- |
-| This model | 1.037 | 25.0 | 1.085 | -0.083 | 26.2% |
+| This model | 1.037 | 24.9 | 1.086 | -0.084 | 26.0% |
 | OPA | 0.983 | 34.5 | 1.190 | -0.234 | 34.0% |
 <!-- generated:readme-results-tables:end -->
 

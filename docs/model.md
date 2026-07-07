@@ -182,13 +182,13 @@ a cross-check, and the bake-off was residential-only).
 ## 6. Results
 
 <!-- generated:model-results-table:begin -->
-Out-of-time test set, n≈19.5k, run `20260707T020247Z-baseline`. Identical test
+Out-of-time test set, n≈19.5k, run `20260707T030251Z-baseline`. Identical test
 set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **LightGBM** | **0.330** | **26.2%** | 1.037 | **25.0** | **1.086** | **-0.083** | 0.911 |
-| Ridge | 0.425 | 37.0% | 1.039 | 35.5 | 1.054 | -0.102 | 0.999 |
+| **LightGBM** | **0.330** | **26.1%** | 1.037 | **24.9** | **1.086** | **-0.084** | 0.911 |
+| Ridge | 0.425 | 37.0% | 1.038 | 35.5 | 1.054 | -0.102 | 0.998 |
 | **OPA (incumbent)** | **0.449** | **34.0%** | 0.983 | **34.5** | **1.190** | **-0.234** | 0.787 |
 <!-- generated:model-results-table:end -->
 
@@ -270,9 +270,9 @@ Guards keep the flags honest where the record, not the value, is the problem:
   beside it.
 
 <!-- generated:model-screen-counts:begin -->
-As of run `20260707T020247Z` (Tax Year 2027 roll): 496,975 properties
-screened: 1,103 over-assessed candidates, 8,412 under-assessed
-candidates, 47,612 in the attention tier, 93 insufficient
+As of run `20260707T030251Z` (Tax Year 2027 roll): 496,975 properties
+screened: 1,135 over-assessed candidates, 7,267 under-assessed
+candidates, 44,799 in the attention tier, 93 insufficient
 records.
 <!-- generated:model-screen-counts:end -->
 (The constant-quality index of 2026-07-06 cut under-assessed candidates
