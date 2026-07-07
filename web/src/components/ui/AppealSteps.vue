@@ -13,7 +13,8 @@ const props = defineProps<{ parcelId?: string | null }>()
 
 const CITY_SEARCH = 'https://property.phila.gov'
 const cityLink = computed(() => (props.parcelId ? cityPropertyUrl(props.parcelId) : CITY_SEARCH))
-const inquiryLink = computed(() => (props.parcelId ? opaInquiryUrl(props.parcelId) : CITY_SEARCH))
+// opaInquiryUrl returns the inquiry landing when there's no account number yet.
+const inquiryLink = computed(() => opaInquiryUrl(props.parcelId))
 </script>
 
 <template>

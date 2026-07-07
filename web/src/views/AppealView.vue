@@ -6,6 +6,8 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { SITE } from '@/config/site'
+import type { SearchHit } from '@/api/types'
+import AddressSearch from '@/components/search/AddressSearch.vue'
 import AppealSteps from '@/components/ui/AppealSteps.vue'
 
 const route = useRoute()
@@ -20,6 +22,17 @@ watch(
     if (typeof v === 'string' && v) acct.value = v
   },
 )
+
+/** Picking an address fills in its OPA account number (the parcel id), so the
+ * city deep-links below point at the visitor's home without leaving the page. */
+function onSelectAddress(hit: SearchHit) {
+  acct.value = hit.parcel_id
+}
+
+/** Clearing the address field (its X) also clears the account it filled in. */
+function onClearAddress() {
+  acct.value = ''
+}
 
 /** OPA account numbers are 9 digits; strip any formatting the visitor pastes.
  * Only feed the links a plausible one so we never build a broken deep-link. */
@@ -36,39 +49,43 @@ const parcelId = computed(() => {
       Appeal your assessment
     </h1>
     <p class="mt-2.5 text-base leading-relaxed text-body">
-      If the city’s value looks too high, you can challenge it, and it costs nothing. For Tax Year
-      {{ SITE.assessmentTaxYear }}, free First Level Reviews are due by
-      <strong>{{ SITE.flrDeadlineText }}</strong>, and formal appeals by
+      If the city’s Tax Year {{ SITE.assessmentTaxYear }} value looks too high, you can challenge it
+      for free, in two stages. First, a First Level Review with the <strong>OPA</strong> (the Office
+      of Property Assessment), due by <strong>{{ SITE.flrDeadlineText }}</strong>. Still disagree
+      after that? A formal appeal to the <strong>BRT</strong> (the Board of Revision of Taxes), due by
       <strong>{{ SITE.appealDeadlineText }}</strong>.
     </p>
 
-    <!-- account number: the two city links below need it -->
+    <!-- point the guide at a home: address search fills the OPA account number,
+         which the two city links inside the steps need -->
     <div class="mt-5 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
-      <label for="acct" class="text-body-sm font-bold text-ink">Your OPA account number</label>
+      <p class="text-body-sm font-bold text-ink">Point the steps at your home</p>
       <p class="mt-1 text-caption text-faint">
-        The 9-digit number on your assessment notice, or search your address at
-        <a href="https://property.phila.gov" rel="noopener" class="font-semibold text-brand-600 underline"
-          >property.phila.gov</a
-        >. Enter it to point the steps below straight at your property.
+        Search your address and we’ll pull your OPA account number, so the city links below open your
+        own property.
       </p>
-      <div class="mt-2 flex flex-wrap items-center gap-2">
+      <div class="mt-2.5">
+        <AddressSearch hide-check @select="onSelectAddress" @clear="onClearAddress" />
+      </div>
+      <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <label for="acct" class="shrink-0 text-caption font-semibold text-muted"
+          >OPA account number</label
+        >
         <input
           id="acct"
           v-model="acct"
           type="text"
           inputmode="numeric"
           autocomplete="off"
-          placeholder="e.g. 883309050"
-          class="min-h-11 w-full max-w-[16rem] rounded-md border border-line bg-white px-3 text-body font-semibold tabular-nums text-ink focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-200"
+          placeholder="9 digits"
+          class="min-h-9 w-40 rounded-md border border-line bg-white px-2.5 text-body-sm font-semibold tabular-nums text-ink focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-200"
         />
-        <span v-if="parcelId" class="text-caption font-semibold text-brand-600">
-          Set for account #{{ parcelId }}
-        </span>
+        <span v-if="parcelId" class="text-caption font-semibold text-brand-600"
+          >✓ set for #{{ parcelId }}</span
+        >
       </div>
-      <p class="mt-2 text-caption text-muted">
-        Don’t know it?
-        <RouterLink to="/" class="font-semibold text-brand-600 underline">Look up your home</RouterLink>
-        and open its report, which fills this in for you and lists your home’s specific facts.
+      <p class="mt-1.5 text-caption text-muted">
+        Filled in when you pick an address, or type the 9-digit number from your assessment notice.
       </p>
     </div>
 

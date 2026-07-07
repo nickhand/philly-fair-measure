@@ -10,8 +10,11 @@ import { track } from '@/lib/analytics'
 import { money } from '@/utils/format'
 import type { SearchHit } from '@/api/types'
 
-const props = withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
-const emit = defineEmits<{ select: [hit: SearchHit] }>()
+const props = withDefaults(defineProps<{ compact?: boolean; hideCheck?: boolean }>(), {
+  compact: false,
+  hideCheck: false,
+})
+const emit = defineEmits<{ select: [hit: SearchHit]; clear: [] }>()
 
 const { hits, loading, error, query, reset } = useSearch()
 const text = ref('')
@@ -84,6 +87,7 @@ function clear() {
 
 function onClear() {
   clear()
+  emit('clear')
   inputEl.value?.focus()
 }
 
@@ -155,7 +159,7 @@ const placeholder = computed(() =>
         </button>
       </div>
       <button
-        v-if="!props.compact"
+        v-if="!props.compact && !props.hideCheck"
         type="button"
         class="h-12 shrink-0 rounded-[9px] bg-brand-600 px-5 text-base font-bold text-white hover:bg-brand-700"
         @click="onCheck"

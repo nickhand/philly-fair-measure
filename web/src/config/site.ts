@@ -22,7 +22,9 @@ export function cityPropertyUrl(parcelId: string): string {
 }
 
 /** The city's own record of what it has on file for a property — the page an
- * owner should check when a recorded fact looks wrong. */
-export function opaInquiryUrl(parcelId: string): string {
-  return `https://opainquiry.phila.gov/opa.apps/help/PropInq.aspx?acct_num=${encodeURIComponent(parcelId)}`
+ * owner should check when a recorded fact looks wrong. With no account number
+ * it opens the inquiry landing, where the owner can search for themselves. */
+export function opaInquiryUrl(parcelId?: string | null): string {
+  const base = 'https://opainquiry.phila.gov/opa.apps/help/PropInq.aspx'
+  return parcelId ? `${base}?acct_num=${encodeURIComponent(parcelId)}` : base
 }
