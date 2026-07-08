@@ -1,52 +1,52 @@
 {
   "meta": {
-    "generated_at": "2026-07-07",
-    "model_run_id": "20260707T224139Z-baseline",
-    "interval_run_id": "20260707T230308Z-bayesian",
-    "n_test": 19484,
+    "generated_at": "2026-07-08",
+    "model_run_id": "20260708T000348Z-baseline",
+    "interval_run_id": "20260708T003248Z-bayesian",
+    "n_test": 19519,
     "interval_nominal_pct": 90,
     "interval_coverage_pct": 91
   },
   "full_card": {
     "opa": {
       "median_ratio": 0.983,
-      "cod": 34.5,
-      "prd": 1.19,
-      "prb": -0.234,
-      "mape_pct": 34.0
+      "cod": 34.7,
+      "prd": 1.192,
+      "prb": -0.235,
+      "mape_pct": 34.2
     },
     "model": {
-      "median_ratio": 1.035,
-      "cod": 25.0,
-      "prd": 1.088,
-      "prb": -0.086,
-      "mape_pct": 26.1
+      "median_ratio": 1.036,
+      "cod": 25.2,
+      "prd": 1.087,
+      "prb": -0.084,
+      "mape_pct": 26.3
     }
   },
   "iaao_card": {
     "opa": {
       "median_ratio": 0.92,
-      "cod": 23.0,
+      "cod": 23.1,
       "prd": 1.065,
-      "prb": -0.056,
-      "mape_pct": 22.4
+      "prb": -0.057,
+      "mape_pct": 22.5
     },
     "model": {
-      "median_ratio": 1.005,
-      "cod": 18.6,
-      "prd": 1.023,
-      "prb": 0.004,
-      "mape_pct": 18.7
+      "median_ratio": 1.003,
+      "cod": 18.7,
+      "prd": 1.021,
+      "prb": 0.007,
+      "mape_pct": 18.8
     }
   },
   "condo_card": {
     "model": {
-      "rmse_log": 0.243,
-      "mape_pct": 19.2,
-      "median_ratio": 1.053,
-      "cod": 17.5,
+      "rmse_log": 0.24,
+      "mape_pct": 18.9,
+      "median_ratio": 1.052,
+      "cod": 17.3,
       "prd": 1.06,
-      "prb": -0.042
+      "prb": -0.041
     },
     "opa": {
       "rmse_log": 0.278,
@@ -60,7 +60,7 @@
   "tiers_financed": {
     "q1": {
       "opa_pct": 124,
-      "model_pct": 111
+      "model_pct": 110
     },
     "q5": {
       "opa_pct": 88,
@@ -69,14 +69,14 @@
   },
   "cash": {
     "share_all_pct": 40,
-    "share_q1_pct": 60,
+    "share_q1_pct": 61,
     "discount_pct": -47
   },
   "redistribution": {
     "years": [
       {
         "year": 2016,
-        "millions": 55,
+        "millions": 56,
         "partial": false
       },
       {
@@ -96,7 +96,7 @@
       },
       {
         "year": 2020,
-        "millions": 15,
+        "millions": 16,
         "partial": false
       },
       {
@@ -121,96 +121,96 @@
       },
       {
         "year": 2025,
-        "millions": 64,
+        "millions": 65,
         "partial": false
       },
       {
         "year": 2026,
-        "millions": 80,
+        "millions": 81,
         "partial": true
       }
     ],
-    "total_financed_musd": 357,
-    "total_raw_musd": 650,
-    "per_resident_usd": 226,
+    "total_financed_musd": 359,
+    "total_raw_musd": 655,
+    "per_resident_usd": 227,
     "year_span": "2016\u20132025"
   },
   "tax_shift": {
     "millage_pct": 1.4,
-    "base_change_pct": 1.1,
-    "new_revenue_musd": 22,
-    "cheapest_home_usd": -167,
-    "priciest_home_usd": 277,
+    "base_change_pct": 1.0,
+    "new_revenue_musd": 21,
+    "cheapest_home_usd": -181,
+    "priciest_home_usd": 302,
     "tiers": [
       {
         "name": "cheapest fifth",
-        "home_usd": -167,
-        "total_musd": -16.6
+        "home_usd": -181,
+        "total_musd": -18.0
       },
       {
         "name": "second fifth",
-        "home_usd": -61,
-        "total_musd": -6.0
+        "home_usd": -78,
+        "total_musd": -7.7
       },
       {
         "name": "middle fifth",
-        "home_usd": 50,
-        "total_musd": 4.9
+        "home_usd": 44,
+        "total_musd": 4.4
       },
       {
         "name": "fourth fifth",
-        "home_usd": 119,
-        "total_musd": 11.8
+        "home_usd": 120,
+        "total_musd": 11.9
       },
       {
         "name": "priciest fifth",
-        "home_usd": 277,
-        "total_musd": 27.5
+        "home_usd": 302,
+        "total_musd": 30.0
       }
     ]
   },
   "screen": {
     "properties": 496975,
-    "over": 1159,
-    "under": 7286,
-    "watch": 44077,
+    "over": 1032,
+    "under": 7124,
+    "watch": 44770,
     "insufficient": 93,
     "by_family_flag": {
-      "condo/over_assessed_candidate": 796,
-      "condo/under_assessed_candidate": 3938,
-      "condo/within_range": 27419,
+      "condo/over_assessed_candidate": 682,
+      "condo/under_assessed_candidate": 3738,
+      "condo/within_range": 27733,
       "residential/insufficient_record": 93,
-      "residential/over_assessed_candidate": 363,
-      "residential/under_assessed_candidate": 3348,
-      "residential/within_range": 461018
+      "residential/over_assessed_candidate": 350,
+      "residential/under_assessed_candidate": 3386,
+      "residential/within_range": 460993
     }
   },
   "results_table": {
     "lightgbm": {
-      "rmse_log": 0.331,
-      "mape_pct": 26.1,
-      "median_ratio": 1.035,
-      "cod": 25.0,
-      "prd": 1.088,
-      "prb": -0.086,
-      "mki": 0.908
+      "rmse_log": 0.333,
+      "mape_pct": 26.3,
+      "median_ratio": 1.036,
+      "cod": 25.2,
+      "prd": 1.087,
+      "prb": -0.084,
+      "mki": 0.911
     },
     "ridge": {
-      "rmse_log": 0.425,
-      "mape_pct": 37.0,
-      "median_ratio": 1.038,
-      "cod": 35.5,
-      "prd": 1.054,
-      "prb": -0.102,
-      "mki": 0.998
+      "rmse_log": 0.424,
+      "mape_pct": 36.6,
+      "median_ratio": 1.026,
+      "cod": 35.6,
+      "prd": 1.068,
+      "prb": -0.113,
+      "mki": 0.978
     },
     "opa_assessment": {
-      "rmse_log": 0.449,
-      "mape_pct": 34.0,
+      "rmse_log": 0.451,
+      "mape_pct": 34.2,
       "median_ratio": 0.983,
-      "cod": 34.5,
-      "prd": 1.19,
-      "prb": -0.234,
+      "cod": 34.7,
+      "prd": 1.192,
+      "prb": -0.235,
       "mki": 0.787
     }
   }

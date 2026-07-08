@@ -224,12 +224,14 @@ def classify_sales(deeds: pl.LazyFrame, opa: pl.LazyFrame) -> pl.LazyFrame:
         .alias("z_log_ppsf"),
     )
 
+    # Outlier detection on price-PER-SQFT only (size-normalized). Total log-price
+    # scales with home size, so a large house in a small-home pool tripped the
+    # old `z_log_price` term even at an ordinary $/sqft, excluding legitimate
+    # high-value sales (e.g. 106 Rochelle Ave: $927.5k in 2022, ppsf normal,
+    # matching OPA's value within 0.3%). A genuine price error still shows up as a
+    # ppsf outlier, so nothing real is lost; z_log_price stays for diagnostics.
     is_price_outlier = (
-        pl.col("in_reference_pool")
-        & (
-            (pl.col("z_log_price").abs() >= Z_THRESHOLD)
-            | (pl.col("z_log_ppsf").abs() >= Z_THRESHOLD)
-        )
+        pl.col("in_reference_pool") & (pl.col("z_log_ppsf").abs() >= Z_THRESHOLD)
     ).fill_null(False)
     lf = lf.with_columns(is_price_outlier.alias("is_price_outlier"))
 
@@ -242,8 +244,8 @@ def classify_sales(deeds: pl.LazyFrame, opa: pl.LazyFrame) -> pl.LazyFrame:
         ("non_market_deed", pl.col("is_non_market_deed")),
         ("nominal_consideration", pl.col("is_nominal")),
         ("low_price", pl.col("is_low_price")),
-        ("price_outlier_high", pl.col("is_price_outlier") & (pl.col("z_log_price") > 0)),
-        ("price_outlier_low", pl.col("is_price_outlier") & (pl.col("z_log_price") <= 0)),
+        ("price_outlier_high", pl.col("is_price_outlier") & (pl.col("z_log_ppsf") > 0)),
+        ("price_outlier_low", pl.col("is_price_outlier") & (pl.col("z_log_ppsf") <= 0)),
         ("rapid_price_swing", pl.col("rapid_price_swing")),
         ("non_person_seller", pl.col("non_person_seller")),
         ("non_person_buyer", pl.col("non_person_buyer")),

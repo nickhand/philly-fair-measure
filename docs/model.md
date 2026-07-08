@@ -182,14 +182,14 @@ a cross-check, and the bake-off was residential-only).
 ## 6. Results
 
 <!-- generated:model-results-table:begin -->
-Out-of-time test set, n≈19.5k, run `20260707T224139Z-baseline`. Identical test
+Out-of-time test set, n≈19.5k, run `20260708T000348Z-baseline`. Identical test
 set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **LightGBM** | **0.331** | **26.1%** | 1.035 | **25.0** | **1.088** | **-0.086** | 0.908 |
-| Ridge | 0.425 | 37.0% | 1.038 | 35.5 | 1.054 | -0.102 | 0.998 |
-| **OPA (incumbent)** | **0.449** | **34.0%** | 0.983 | **34.5** | **1.190** | **-0.234** | 0.787 |
+| **LightGBM** | **0.333** | **26.3%** | 1.036 | **25.2** | **1.087** | **-0.084** | 0.911 |
+| Ridge | 0.424 | 36.6% | 1.026 | 35.6 | 1.068 | -0.113 | 0.978 |
+| **OPA (incumbent)** | **0.451** | **34.2%** | 0.983 | **34.7** | **1.192** | **-0.235** | 0.787 |
 <!-- generated:model-results-table:end -->
 
 On the same homes the model is **more accurate**, **more uniform**, and
@@ -209,8 +209,8 @@ Honest caveats:
   arm's-length sample the model clears the vertical-equity bands while OPA does
   not, see the [vertical-equity report card](vertical-equity-report-card.md).
 <!-- generated:condo-card:begin -->
-- Condo accuracy: the model beats OPA on error (rmse 0.243 vs 0.278) and on
-  uniformity (COD 17.5 vs 18.8). Condos were long OPA's strongest segment; the
+- Condo accuracy: the model beats OPA on error (rmse 0.240 vs 0.278) and on
+  uniformity (COD 17.3 vs 18.8). Condos were long OPA's strongest segment; the
   market-area price index closed the last gap.
 <!-- generated:condo-card:end -->
 - **Interval undercoverage in the cheap tail:** at nominal 90%, realized
@@ -273,9 +273,9 @@ Guards keep the flags honest where the record, not the value, is the problem:
   beside it.
 
 <!-- generated:model-screen-counts:begin -->
-As of run `20260707T224139Z` (Tax Year 2027 roll): 496,975 properties
-screened: 1,159 over-assessed candidates, 7,286 under-assessed
-candidates, 44,077 in the attention tier, 93 insufficient
+As of run `20260708T000348Z` (Tax Year 2027 roll): 496,975 properties
+screened: 1,032 over-assessed candidates, 7,124 under-assessed
+candidates, 44,770 in the attention tier, 93 insufficient
 records.
 <!-- generated:model-screen-counts:end -->
 (The constant-quality index of 2026-07-06 cut under-assessed candidates
