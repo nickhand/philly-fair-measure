@@ -13,6 +13,7 @@ from philly_fair_measure.docs_sync import (
     sync_docs,
     veq_card_full,
     veq_card_iaao,
+    veq_robustness,
 )
 
 STATS = {
@@ -85,6 +86,41 @@ STATS = {
             "mape_pct": 18.9,
         },
     },
+    "equity_robustness": {
+        "all_sales": {
+            "individual": {
+                "opa": {"q1": 1.547, "q5": 0.882},
+                "model": {"q1": 1.268, "q5": 0.994},
+            },
+            "neighborhood": {
+                "opa": {"q1": 1.165, "q5": 0.93},
+                "model": {"q1": 1.022, "q5": 1.048},
+            },
+        },
+        "financed": {
+            "individual": {
+                "opa": {"q1": 1.242, "q5": 0.881},
+                "model": {"q1": 1.102, "q5": 0.992},
+            },
+            "neighborhood": {
+                "opa": {"q1": 0.975, "q5": 0.917},
+                "model": {"q1": 0.933, "q5": 1.042},
+            },
+        },
+        "tract_sensitivity": {
+            "opa": {"q1": 1.127, "q5": 0.931},
+            "model": {"q1": 1.02, "q5": 1.055},
+        },
+        "meta": {
+            "n_areas": 358,
+            "median_area_sales": 485,
+            "min_area_sales": 50,
+            "test_rows": 19_550,
+            "test_rows_without_area": 192,
+            "morans_i_opa": 0.129,
+            "morans_i_model": 0.092,
+        },
+    },
 }
 
 
@@ -110,6 +146,15 @@ def test_veq_and_condo_builders_render_with_pass_marks():
     assert "rmse 0.243 vs 0.278" in condo and "COD 17.5 vs 18.8" in condo
 
 
+def test_veq_robustness_builder_renders_the_2x2():
+    rb = veq_robustness(STATS)
+    assert "| all sales | individual price | 1.55 | 0.88 | 1.27 | 0.99 |" in rb
+    assert "| all sales | **neighborhood level** | 1.17 | 0.93 | 1.02 | 1.05 |" in rb
+    assert "| financed | neighborhood level | 0.97 | 0.92 | 0.93 | 1.04 |" in rb
+    assert "city 0.129, ours 0.092" in rb.replace("\n", " ")
+    assert "358 learned market areas" in rb and "192 of 19,550" in rb
+
+
 def _repo(tmp_path: Path) -> Path:
     (tmp_path / STATS_PATH).parent.mkdir(parents=True)
     (tmp_path / STATS_PATH).write_text(json.dumps(STATS))
@@ -129,7 +174,8 @@ def _repo(tmp_path: Path) -> Path:
         "# card\n\n"
         "<!-- generated:veq-meta:begin -->\n<!-- generated:veq-meta:end -->\n\n"
         "<!-- generated:veq-card-iaao:begin -->\n<!-- generated:veq-card-iaao:end -->\n\n"
-        "<!-- generated:veq-card-full:begin -->\n<!-- generated:veq-card-full:end -->\n"
+        "<!-- generated:veq-card-full:begin -->\n<!-- generated:veq-card-full:end -->\n\n"
+        "<!-- generated:veq-robustness:begin -->\n<!-- generated:veq-robustness:end -->\n"
     )
     return tmp_path
 
@@ -144,6 +190,7 @@ def test_sync_rewrites_then_is_idempotent_and_check_passes(tmp_path):
         "docs/vertical-equity-report-card.md:veq-meta",
         "docs/vertical-equity-report-card.md:veq-card-iaao",
         "docs/vertical-equity-report-card.md:veq-card-full",
+        "docs/vertical-equity-report-card.md:veq-robustness",
     }
     readme = (root / "README.md").read_text()
     assert "**496,975**" in readme and "stale" not in readme

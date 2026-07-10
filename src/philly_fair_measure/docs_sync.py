@@ -212,6 +212,45 @@ def veq_meta(stats: dict[str, Any]) -> str:
     )
 
 
+def veq_robustness(stats: dict[str, Any]) -> str:
+    """The Doucet-robustness table: individual-price vs neighborhood-level
+    binning for OPA and the model, plus the Moran's-I map test."""
+    rb = stats["equity_robustness"]
+
+    def cell(c: dict[str, Any]) -> list[str]:
+        return [
+            f"{c['opa']['q1']:.2f}",
+            f"{c['opa']['q5']:.2f}",
+            f"{c['model']['q1']:.2f}",
+            f"{c['model']['q5']:.2f}",
+        ]
+
+    rows = [
+        ["all sales", "individual price", *cell(rb["all_sales"]["individual"])],
+        ["all sales", "**neighborhood level**", *cell(rb["all_sales"]["neighborhood"])],
+        ["all sales", "tract level (sensitivity)", *cell(rb["tract_sensitivity"])],
+        ["financed", "individual price", *cell(rb["financed"]["individual"])],
+        ["financed", "neighborhood level", *cell(rb["financed"]["neighborhood"])],
+    ]
+    m = rb["meta"]
+    lines = [
+        _row(["Basis", "Binned by", "City q1", "City q5", "Ours q1", "Ours q5"]),
+        _row(["---"] * 6),
+        *[_row(r) for r in rows],
+        "",
+        f"Map test (kNN Moran's I of log ratios, financed sales): city {m['morans_i_opa']:.3f}, "
+        f"ours {m['morans_i_model']:.3f}. Zero means errors sprinkle randomly; higher means they",
+        "cluster geographically, the signature of genuine neighborhood-level bias.",
+        "",
+        f"Neighborhoods are the {m['n_areas']} learned market areas with at least "
+        f"{m['min_area_sales']} arms-length sales",
+        f"(median {m['median_area_sales']} sales behind each area's price level); "
+        f"{m['test_rows_without_area']:,} of {m['test_rows']:,} test sales carry",
+        "no area assignment and are excluded from the neighborhood-binned rows.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def condo_bullet(stats: dict[str, Any]) -> str:
     """The condo accuracy line, shared by README limitations and model.md §6."""
     c, o = stats["condo_card"]["model"], stats["condo_card"]["opa"]
@@ -232,6 +271,7 @@ BLOCKS: dict[str, Any] = {
     "veq-meta": veq_meta,
     "veq-card-iaao": veq_card_iaao,
     "veq-card-full": veq_card_full,
+    "veq-robustness": veq_robustness,
     "condo-card": condo_bullet,
 }
 

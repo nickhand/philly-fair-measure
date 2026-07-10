@@ -62,6 +62,50 @@ On the full sample the model is still mildly regressive and above the uniformity
 target, but carries a **fraction** of OPA's regressivity (its PRB is roughly a
 quarter of OPA's) and much tighter dispersion, as the card shows.
 
+## Card 3, Is the regressivity real, or a binning artifact?
+
+A fair critique of any ratio-by-price-tier chart (Doucet,
+[Vertical Inequity in property assessments: when is it real, when is it an illusion?](https://www.linkedin.com/pulse/vertical-inequity-property-assessments-when-real-illusion-lars-doucet-l2ame/)):
+an individually mis-priced sale, a foreclosure or a family transfer that slipped
+validation, lands in the bottom tier by construction and inflates its ratio,
+even when no neighborhood is systematically over-assessed. The two questions
+"are cheap *homes* over-assessed" and "are cheap *neighborhoods* over-assessed"
+have the same chart but different answers. The artifact-robust version re-bins
+each sale by the price level of its **neighborhood** instead of its own price:
+a mis-validated bargain in a rich neighborhood moves to the top tier where it
+belongs, while a systematically over-assessed poor neighborhood stays at the
+bottom. Median assessment-to-price ratio in the cheapest and priciest fifth,
+each way:
+
+<!-- generated:veq-robustness:begin -->
+| Basis | Binned by | City q1 | City q5 | Ours q1 | Ours q5 |
+| --- | --- | --- | --- | --- | --- |
+| all sales | individual price | 1.55 | 0.88 | 1.27 | 0.99 |
+| all sales | **neighborhood level** | 1.17 | 0.93 | 1.02 | 1.05 |
+| all sales | tract level (sensitivity) | 1.13 | 0.93 | 1.02 | 1.05 |
+| financed | individual price | 1.24 | 0.88 | 1.10 | 0.99 |
+| financed | neighborhood level | 0.97 | 0.92 | 0.93 | 1.04 |
+
+Map test (kNN Moran's I of log ratios, financed sales): city 0.129, ours 0.092. Zero means errors sprinkle randomly; higher means they
+cluster geographically, the signature of genuine neighborhood-level bias.
+
+Neighborhoods are the 358 learned market areas with at least 50 arms-length sales
+(median 485 sales behind each area's price level); 192 of 19,550 test sales carry
+no area assignment and are excluded from the neighborhood-binned rows.
+<!-- generated:veq-robustness:end -->
+
+Reading it: neighborhood-level binning removes most of OPA's apparent
+regressivity, so Doucet's artifact is real and large here. But the
+remaining gap survives his own test, the cheapest fifth of *neighborhoods* is
+still assessed well above what homes there sell for while the priciest fifth
+sits below, and the city's errors cluster on the map. The model passes the same
+test roughly flat. On the financed basis the city's neighborhood-binned gap
+nearly closes, which locates its remaining inequity in how the cash and
+distressed channel is treated at neighborhood level (see
+[report-assessment-equity.md](report-assessment-equity.md)). Reproduce with
+`fair-measure equity-robustness`; the same tests run on any jurisdiction's data
+at [OpenRatioStudy.com](https://www.openratiostudy.com).
+
 ## The honest reading
 
 1. **The gap between the two cards is the whole story.** Going from full to

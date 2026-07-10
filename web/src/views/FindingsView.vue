@@ -16,6 +16,11 @@ const tiers = [
   { group: 'Priciest fifth of homes', city: t.q5.opa_pct, ours: t.q5.model_pct },
 ]
 
+/** The artifact-robust check: the same test re-binned by NEIGHBORHOOD price
+ * level (all sales), so one bad low sale can't fake the pattern. */
+const rbNbhd = stats.equity_robustness.all_sales.neighborhood
+const rbPct = (r: number) => Math.round(r * 100)
+
 const redis = stats.redistribution
 /** Full years only for the chart (the partial current year would mislead). */
 const shifted = redis.years.filter((y) => !y.partial).map((y) => ({ year: y.year, m: y.millions }))
@@ -118,8 +123,18 @@ const taxShiftAria =
         modeling problems can be fixed.
         <RouterLink to="/trust" class="font-semibold text-brand-600 underline">See the proof</RouterLink>.
       </p>
+      <p class="mt-2 text-body-sm leading-relaxed text-body">
+        A fair question: could bad data fake this picture? A foreclosure or a family deal can make
+        one home look cheap when its neighborhood is not. So we reran the test the skeptic’s way,
+        grouping homes by their <em>neighborhood’s</em> price level instead of their own, counting
+        every sale. The pattern holds. The city still values the cheapest fifth of neighborhoods at
+        <strong>{{ rbPct(rbNbhd.opa.q1) }}%</strong> of what homes there sell for, and the priciest
+        fifth at <strong>{{ rbPct(rbNbhd.opa.q5) }}%</strong>. Our model reads
+        {{ rbPct(rbNbhd.model.q1) }}% and {{ rbPct(rbNbhd.model.q5) }}%, close to flat.
+      </p>
       <p class="mt-2 text-caption text-muted">
-        Measured on mortgage-financed sales the model never trained on.
+        Bars measured on mortgage-financed sales the model never trained on; the neighborhood check
+        counts every arms-length sale.
       </p>
     </section>
 

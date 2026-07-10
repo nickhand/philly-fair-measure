@@ -232,6 +232,14 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
 
     tax_shift = _tax_shift(screen_df)
 
+    # Doucet robustness: the regressivity tiers re-binned by neighborhood price
+    # level (artifact-robust) next to the classic individual-price binning, plus
+    # the Moran's-I map test. Feeds the report card and the Findings robustness
+    # line, so those numbers regenerate with every retrain.
+    from philly_fair_measure.diagnostics.equity_robustness import equity_robustness
+
+    robustness = equity_robustness(root)
+
     evaluation = pl.read_parquet(run_dir / "evaluation.parquet")
     overall = evaluation.filter(
         (pl.col("segment_type") == "overall") & (pl.col("convention") == "out_of_time")
@@ -288,6 +296,7 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
         },
         "redistribution": redistribution,
         "tax_shift": tax_shift,
+        "equity_robustness": robustness,
         "screen": screen,
         "results_table": results_table,
     }

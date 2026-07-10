@@ -605,6 +605,44 @@ def _cmd_ratio_study(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_equity_robustness(args: argparse.Namespace) -> int:
+    from philly_fair_measure.diagnostics.equity_robustness import equity_robustness
+
+    result = equity_robustness(args.data_dir)
+    print("vertical-equity robustness: individual-price vs neighborhood-level binning")
+    print("(out-of-time test set, fresh-roll OPA vs model; median ratio in the")
+    print("cheapest/priciest fifth; the artifact-robust view is the neighborhood row)\n")
+    header = (
+        f"{'basis':<11}{'binned by':<22}{'OPA q1':>8}{'OPA q5':>8}{'model q1':>10}{'model q5':>10}"
+    )
+    print(header)
+    print("-" * len(header))
+    rows = [
+        ("all sales", "individual price", result["all_sales"]["individual"]),
+        ("all sales", "market-area level", result["all_sales"]["neighborhood"]),
+        ("all sales", "tract level", result["tract_sensitivity"]),
+        ("financed", "individual price", result["financed"]["individual"]),
+        ("financed", "market-area level", result["financed"]["neighborhood"]),
+    ]
+    for basis, binning, cell in rows:
+        print(
+            f"{basis:<11}{binning:<22}"
+            f"{cell['opa']['q1']:>8.3f}{cell['opa']['q5']:>8.3f}"
+            f"{cell['model']['q1']:>10.3f}{cell['model']['q5']:>10.3f}"
+        )
+    m = result["meta"]
+    print(
+        f"\nmap test (kNN Moran's I of log ratios, financed): "
+        f"OPA {m['morans_i_opa']:.3f} vs model {m['morans_i_model']:.3f}"
+    )
+    print(
+        f"neighborhoods: {m['n_areas']} market areas (>= {m['min_area_sales']} sales each, "
+        f"median {m['median_area_sales']}); {m['test_rows_without_area']:,} of "
+        f"{m['test_rows']:,} test sales carry no area and are excluded from the binned rows"
+    )
+    return 0
+
+
 def _cmd_aerial_pilot(args: argparse.Namespace) -> int:
     from philly_fair_measure.diagnostics.aerial_change import pilot_summary, run_aerial_pilot
 
@@ -1118,6 +1156,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     ratio_study.add_argument("--data-dir", type=Path)
     ratio_study.set_defaults(func=_cmd_ratio_study)
+
+    equity_rb = subparsers.add_parser(
+        "equity-robustness",
+        help="is the regressivity real or a binning artifact? individual-price vs "
+        "neighborhood-level tiers + the Moran's-I map test (Doucet's diagnostics)",
+    )
+    equity_rb.add_argument("--data-dir", type=Path)
+    equity_rb.set_defaults(func=_cmd_equity_robustness)
 
     aerial = subparsers.add_parser(
         "aerial-pilot",
