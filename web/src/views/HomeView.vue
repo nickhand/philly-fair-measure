@@ -30,7 +30,7 @@ function goToProperty(hit: SearchHit) {
 const counters = computed<{ value: string | null; label: string }[]>(() => {
   const s = stats.value
   return [
-    { value: s ? num(s.properties) : null, label: 'homes checked citywide' },
+    { value: s ? num(s.properties) : null, label: 'homes we valued citywide' },
     { value: s ? num(s.over + s.under) : null, label: 'flagged outside our range' },
     { value: s ? num(s.watch) : null, label: 'more worth a closer look' },
     { value: '$0', label: 'to check or appeal' },
