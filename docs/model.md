@@ -64,7 +64,7 @@ Roughly a hundred features (the exact lists live in `NUMERIC_FEATURES` /
 | As-of kNN surface (`mkt_knn_`) | distance-weighted mean of the *k* nearest **strictly earlier** sales, the between-block gradient trees can't interpolate; quarter-blocked against look-ahead |
 | Rolling means (`mkt_*_roll_`) | block/building leave-one-out $/sqft level (the CCAO workhorse) |
 | Parcel geometry (`shp_`) | area, perimeter, vertex/angle SDs, min-rotated-rect ratios from PWD polygons |
-| Distress & tenure (`dist_`, `evt_`, `ten_`) | delinquency, severe violations, vacancy complaints, homestead-derived owner-occupancy (rental-license features were dropped 2026-07-07: stale feed, zero measured accuracy) |
+| Distress & tenure (`dist_`, `evt_`, `ten_`) | delinquency, severe violations, vacancy complaints, homestead-derived owner-occupancy (rental-license features were dropped 2026-07-07: stale feed, no measured accuracy cost) |
 | Mortgage forensics (`fin_`) | prior-mortgage count/recency, hard-money; `fin_cash_sale` is a *diagnostic* attribute, kept out of the model |
 | Proximity (`prox_`) | rapid transit, rail, parks, expressway/arterial, bus density |
 
@@ -217,7 +217,7 @@ Honest caveats:
   market-area price index closed the last gap.
 <!-- generated:condo-card:end -->
 - **Interval undercoverage in the cheap tail:** at nominal 90%, realized
-  coverage is ~90% overall but materially lower in the **cheapest quintile**
+  coverage is ~90% overall but falls short in the **cheapest quintile**
   across every interval method built (measured 2026-07-07: Bayesian 0.80;
   fixed-offset conformal and CQR measured in the mid-0.80s on the same-day
   builds, see §5.7). Q1 dispersion is partly irreducible; the machines report

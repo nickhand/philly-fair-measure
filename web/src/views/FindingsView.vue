@@ -129,7 +129,7 @@ const taxShiftAria =
         <RouterLink to="/trust" class="font-semibold text-brand-600 underline">See the proof</RouterLink>.
       </p>
       <p class="mt-2 text-body-sm leading-relaxed text-body">
-        A fair question: could bad data fake this picture? A foreclosure or a family deal can make
+        Could bad data fake this picture? A foreclosure or a family deal can make
         one home look cheap when its neighborhood is not. So we reran the test the skeptic’s way,
         grouping homes by their <em>neighborhood’s</em> price level instead of their own, counting
         every sale. The pattern holds. The city still values the cheapest fifth of neighborhoods at
@@ -245,8 +245,7 @@ const taxShiftAria =
       <p class="mt-2 text-body-sm leading-relaxed text-body">
         Because the increase at the top outweighs the relief at the bottom, the city comes out ahead:
         an estimated <strong>${{ shift.new_revenue_musd }} million a year</strong> it is not
-        collecting today, at the same rate, with no new tax. Struggling for revenue and struggling
-        for fairness turn out to be the same problem, with the same fix.
+        collecting today, at the same rate, with no new tax.
       </p>
 
       <div class="mt-4" role="img" :aria-label="taxShiftAria">
@@ -283,9 +282,8 @@ const taxShiftAria =
       </div>
 
       <div class="mt-3 rounded-md bg-brand-50 p-3 text-body-sm leading-relaxed text-body">
-        <strong class="text-brand-900">No new tax. No new law. No rate hike.</strong> Just an
-        accurate roll. The wealthiest homeowners are under-assessed right now, so making them pay
-        their fair share is the simplest tax reform on the table, and it pays for itself.
+        <strong class="text-brand-900">No new tax. No new law. No rate hike.</strong> The city only
+        has to get its own numbers right, and that pays for itself.
       </div>
       <p class="mt-2 text-caption text-muted">
         An estimate across every home the model scores; the corrected values run about

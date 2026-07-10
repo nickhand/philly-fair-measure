@@ -84,7 +84,7 @@ evidence column), inspections + **PRECOURT escalation** (6%), granted
 variances/appeals (any board), and rental-license tenure spans:
 **investor-held-at-sale** (17.2%), owner-occupied-landlord flag, licensed
 units. *(Update 2026-07-07: the three rental-license tenure features were
-dropped from the model — the feed is stale and mislabels owner-occupied homes,
+dropped from the model. The feed is stale and mislabels owner-occupied homes,
 and an ablation showed zero accuracy cost. Owner-occupancy is now derived from
 the homestead exemption as `ten_owner_occupied_at_sale`; the rental columns
 are still built in the mart for analysis but are no longer model inputs.)*
