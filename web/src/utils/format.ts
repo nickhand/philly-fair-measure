@@ -11,13 +11,15 @@ export function money(value: number | null | undefined): string {
   return value == null ? NO_DATA : usd.format(value)
 }
 
-/** $442k / $1.2M, compact for axes and small screens. */
+/** $442k / $1.2M, compact for axes and small screens. Negatives carry the
+ * sign in front of the currency symbol (−$1.5M), matching moneySigned. */
 export function moneyCompact(value: number | null | undefined): string {
   if (value == null) return NO_DATA
+  const sign = value < 0 ? '−' : ''
   const abs = Math.abs(value)
-  if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
-  if (abs >= 1_000) return `$${Math.round(value / 1_000)}k`
-  return usd.format(value)
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`
+  return `${sign}${usd.format(abs)}`
 }
 
 /** +$78,000 / −$40,000, signed money for driver effects. */

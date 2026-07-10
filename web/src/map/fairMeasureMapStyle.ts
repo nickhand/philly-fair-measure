@@ -44,8 +44,8 @@ export function applyFairMeasurePaint(map: MLMap): void {
 }
 
 const flagIs = (flag: string) => ['==', ['get', 'flag'], flag] as const
-/** `attention` is absent on flagged features and the citywide payload —
- * coalesce keeps the comparison type-stable for maplibre. */
+/** `attention` can be null or absent on a feature — coalesce keeps the
+ * comparison type-stable for maplibre either way. */
 const attentionIs = (tier: string) =>
   ['==', ['coalesce', ['get', 'attention'], ''], tier] as const
 

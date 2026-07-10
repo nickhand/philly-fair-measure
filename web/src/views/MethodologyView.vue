@@ -12,6 +12,9 @@ const mapeModel = Math.round(stats.full_card.model.mape_pct)
 const mapeOpa = Math.round(stats.full_card.opa.mape_pct)
 const nTest = stats.meta.n_test
 const coveragePct = stats.meta.interval_coverage_pct
+/** Real bound values in place of prose literals that rot on re-export. */
+const millagePct = stats.tax_shift.millage_pct
+const salesPoolFloor = Math.floor(stats.meta.n_sales_pool / 50_000) * 50_000
 
 /** Page provenance date — same source and formatting as the global footer, so
  * it tracks every export automatically instead of being hand-frozen. */
@@ -57,7 +60,7 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
       <h2 class="text-title font-bold text-ink">What a property assessment is</h2>
       <p class="mt-1.5 text-body-sm leading-relaxed text-body">
         Every year, Philadelphia’s Office of Property Assessment (OPA) estimates what your home is
-        worth. Your property tax is about <strong>1.4%</strong> of that number. If the number is
+        worth. Your property tax is about <strong>{{ millagePct }}%</strong> of that number. If the number is
         too high, you pay too much tax. If your neighbor’s is too low, they pay too little, and
         everyone else covers the difference.
       </p>
@@ -67,7 +70,7 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
     <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
       <h2 class="text-title font-bold text-ink">Where our numbers come from</h2>
       <ul class="mt-1.5 list-disc space-y-1.5 pl-5 text-body-sm leading-relaxed text-body">
-        <li><strong>More than 200,000 real home sales</strong> from city deed records (2016 to today).</li>
+        <li><strong>More than {{ salesPoolFloor.toLocaleString('en-US') }} real home sales</strong> from city deed records (2016 to today).</li>
         <li><strong>City property records</strong>: size, age, style, and condition on file.</li>
         <li><strong>City licenses and inspections</strong>: permits, complaints, violations, and vacancy.</li>
         <li><strong>Public maps</strong>: parcel shapes, transit, and parks.</li>

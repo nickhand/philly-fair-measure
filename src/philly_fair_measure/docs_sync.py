@@ -59,7 +59,8 @@ def _card_row(label: str, card: dict[str, Any]) -> str:
 def readme_screen_counts(stats: dict[str, Any]) -> str:
     s = stats["screen"]
     return (
-        f"As of the latest run (Tax Year 2027 assessments), the screen covers\n"
+        f"As of the latest run (Tax Year {stats['meta']['tax_year']} assessments), "
+        f"the screen covers\n"
         f"**{s['properties']:,}** residential properties and condos: **{s['over']:,}** flagged\n"
         f"as likely over-assessed, **{s['under']:,}** as likely under-assessed, and\n"
         f"**{s['watch']:,}** unflagged but at or beyond the edge of the published\n"
@@ -113,7 +114,8 @@ def model_md_results_table(stats: dict[str, Any]) -> str:
         return _row([label, *cells])
 
     return (
-        f"Out-of-time test set, n≈19.5k, run `{meta['model_run_id']}`. Identical test\n"
+        f"Out-of-time test set, n = {meta['n_test']:,}, run `{meta['model_run_id']}`. "
+        f"Identical test\n"
         f"set and treatment; OPA's own values as the incumbent:\n\n"
         f"{header}\n{divider}\n"
         f"{line('LightGBM', 'lightgbm', bold=True)}\n"
@@ -125,7 +127,8 @@ def model_md_results_table(stats: dict[str, Any]) -> str:
 def model_md_screen_counts(stats: dict[str, Any]) -> str:
     s, meta = stats["screen"], stats["meta"]
     return (
-        f"As of run `{meta['model_run_id'].removesuffix('-baseline')}` (Tax Year 2027 roll): "
+        f"As of run `{meta['model_run_id'].removesuffix('-baseline')}` "
+        f"(Tax Year {meta['tax_year']} roll): "
         f"{s['properties']:,} properties\n"
         f"screened: {s['over']:,} over-assessed candidates, {s['under']:,} under-assessed\n"
         f"candidates, {s['watch']:,} in the attention tier, {s['insufficient']} insufficient\n"
@@ -262,8 +265,9 @@ def veq_robustness(stats: dict[str, Any]) -> str:
         f"Neighborhoods are the {m['n_areas']} learned market areas with at least "
         f"{m['min_area_sales']} arms-length sales",
         f"(median {m['median_area_sales']} sales behind each area's price level); "
-        f"{m['test_rows_without_area']:,} of {m['test_rows']:,} test sales carry",
-        "no area assignment and are excluded from the neighborhood-binned rows.",
+        f"{m['test_rows_without_area']:,} of {m['test_rows']:,} test sales sit in",
+        "areas below that threshold (or carry no area assignment) and are excluded",
+        "from the neighborhood-binned rows.",
     ]
     return "\n".join(lines) + "\n"
 

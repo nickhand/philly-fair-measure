@@ -159,7 +159,16 @@ export interface LeaderRow {
 export interface ParcelFeature {
   type: 'Feature'
   geometry: { type: 'Point'; coordinates: [number, number] }
-  properties: { id: string; flag: Flag; opa: number | null; model: number | null }
+  properties: {
+    id: string
+    flag: Flag
+    opa: number | null
+    /** present on /api/parcels; omitted by /api/parcels/flagged */
+    model?: number | null
+    address?: string
+    attention?: Attention
+    family?: string
+  }
 }
 
 export interface ParcelCollection {

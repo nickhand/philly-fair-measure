@@ -282,12 +282,19 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
 
     condo_card = {"model": _condo("condo_lightgbm"), "opa": _condo("opa_assessment")}
 
+    # The roll on display: assessments are certified the year before they take
+    # effect, so the screen's valuation year + 1 is the tax year of the values
+    # shown (valuation 2026 -> Tax Year 2027 roll).
+    tax_year = int(np.max(screen_df["valuation_date"].dt.year().to_numpy())) + 1
+
     stats: dict[str, Any] = {
         "meta": {
             "generated_at": datetime.now(UTC).strftime("%Y-%m-%d"),
             "model_run_id": run_id,
             "interval_run_id": bayes_dir.name.removeprefix("run_id="),
             "n_test": int(ok.sum()),
+            "n_sales_pool": sf.height,
+            "tax_year": tax_year,
             "interval_nominal_pct": 90,
             "interval_coverage_pct": coverage_pct,
         },

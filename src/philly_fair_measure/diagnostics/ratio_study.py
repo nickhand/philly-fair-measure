@@ -166,9 +166,14 @@ def iaao_bridge(data_dir: Path | None = None) -> pl.DataFrame:
         )
         .collect()
     )
+    # join with an explicit row index and restore the original order: opa_fresh
+    # is consumed as a parallel array against price_tasp/style pulled straight
+    # from test_df, and polars left joins do not guarantee row order.
     opa_fresh = (
         test_df.select("parcel_id")
-        .join(fresh, on="parcel_id", how="left")["fresh_value"]
+        .with_row_index("_row")
+        .join(fresh, on="parcel_id", how="left")
+        .sort("_row")["fresh_value"]
         .cast(pl.Float64)
         .to_numpy()
     )

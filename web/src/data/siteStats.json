@@ -4,6 +4,8 @@
     "model_run_id": "20260708T000348Z-baseline",
     "interval_run_id": "20260708T003248Z-bayesian",
     "n_test": 19519,
+    "n_sales_pool": 205182,
+    "tax_year": 2027,
     "interval_nominal_pct": 90,
     "interval_coverage_pct": 91
   },

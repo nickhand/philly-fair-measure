@@ -22,6 +22,9 @@ const rbNbhd = stats.equity_robustness.all_sales.neighborhood
 const rbPct = (r: number) => Math.round(r * 100)
 
 const redis = stats.redistribution
+/** Study span in years, derived from the exported span so it can't rot. */
+const [spanStart = 0, spanEnd = 0] = redis.year_span.split('–').map(Number)
+const spanYears = spanEnd - spanStart + 1
 /** Full years only for the chart (the partial current year would mislead). */
 const shifted = redis.years.filter((y) => !y.partial).map((y) => ({ year: y.year, m: y.millions }))
 const SHIFT_MAX = Math.max(...shifted.map((s) => Math.abs(s.m)), 1) * 1.1
@@ -38,7 +41,9 @@ const cashAllOf10 = Math.round(cash.share_all_pct / 10)
 const cashQ1Of10 = Math.round(cash.share_q1_pct / 10)
 
 function barW(pct: number): number {
-  return (pct / 140) * 100
+  // clamp so a future export above the 140 scale can't push the bar + its
+  // label outside the card (the 100% fair line stays fixed either way)
+  return (Math.min(pct, 138) / 140) * 100
 }
 function colH(m: number): number {
   return (Math.abs(m) / SHIFT_MAX) * 100
@@ -72,8 +77,8 @@ const taxShiftAria =
       What we found
     </h1>
     <p class="mt-2.5 text-base leading-relaxed text-body">
-      We compared ten years of Philadelphia assessments with what homes actually sold for. Five
-      findings matter most, including one in the city’s favor.
+      We compared {{ spanYears }} years of Philadelphia assessments with what homes actually sold
+      for. Five findings matter most, including one in the city’s favor.
     </p>
 
     <!-- Finding 1: regressivity is real — and fixable -->
@@ -142,7 +147,7 @@ const taxShiftAria =
     <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
       <p class="text-caption font-bold text-brand-600">FINDING 2</p>
       <h2 class="mt-1 text-title font-bold text-ink">
-        Over a decade, that shifted roughly a third of a billion dollars.
+        Over {{ spanYears }} years, that shifted roughly ${{ redis.total_financed_musd }} million.
       </h2>
       <p class="mt-1.5 text-body-sm leading-relaxed text-body">
         Property tax is a fixed pie: every dollar the bottom over-pays, the top under-pays.

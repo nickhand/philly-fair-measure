@@ -102,8 +102,16 @@ const deltaPill = computed(() => {
   const { flag, attention, opa_market_value: opa } = core.value
   const low = bandLo.value
   const high = bandHi.value
-  if (flag === 'over_assessed_candidate') return `${money(opa! - high!)} above our highest estimate`
-  if (flag === 'under_assessed_candidate') return `${money(low! - opa!)} below our lowest estimate`
+  // flags anchor on the model band, but the pill measures the band we DISPLAY,
+  // which the screen clamps outward on some rows — never print a negative gap
+  if (flag === 'over_assessed_candidate')
+    return opa! > high!
+      ? `${money(opa! - high!)} above our highest estimate`
+      : 'Near the top of our estimated range'
+  if (flag === 'under_assessed_candidate')
+    return low! > opa!
+      ? `${money(low! - opa!)} below our lowest estimate`
+      : 'Near the bottom of our estimated range'
   if (flag === 'within_range' && attention === 'high')
     return opa! > high! ? 'Above our estimated range' : 'Near the top of our estimated range'
   if (flag === 'within_range' && attention === 'low')
@@ -163,7 +171,7 @@ function printPage() {
   <div
     class="report-root print-compact mx-auto max-w-5xl px-4 py-6 sm:py-8"
     :data-parcel-id="core?.parcel_id"
-    :data-updated="report?.screen_built"
+    :data-updated="report?.screen_built ?? 'see the live report'"
     :data-url="liveUrl"
   >
     <RouterLink to="/" class="no-print text-body-sm font-semibold text-brand-600">← New search</RouterLink>
@@ -415,7 +423,7 @@ function printPage() {
                 <p class="mt-1 text-caption leading-relaxed text-[#4d4633]">
                   City records show <strong>{{ core.twin_n }}</strong> homes identical to this one in
                   every recorded way. This home’s assessment is
-                  <strong>{{ pct(core.twin_ratio - 1, 1) }}</strong>
+                  <strong>{{ pct(Math.abs(core.twin_ratio - 1), 1) }}</strong>
                   {{ core.twin_ratio >= 1 ? 'above' : 'below' }} their middle value.
                 </p>
                 <p class="mt-1.5 text-caption leading-relaxed text-[#6d6242]">

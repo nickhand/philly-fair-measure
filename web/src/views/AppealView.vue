@@ -34,11 +34,12 @@ function onClearAddress() {
   acct.value = ''
 }
 
-/** OPA account numbers are 9 digits; strip any formatting the visitor pastes.
- * Only feed the links a plausible one so we never build a broken deep-link. */
+/** OPA account numbers are exactly 9 digits; strip any formatting the visitor
+ * pastes. Only feed the links a plausible one so we never build a broken
+ * deep-link or affirm a 10-digit paste. */
 const parcelId = computed(() => {
   const digits = acct.value.replace(/\D/g, '')
-  return digits.length >= 9 ? digits : null
+  return digits.length === 9 ? digits : null
 })
 </script>
 

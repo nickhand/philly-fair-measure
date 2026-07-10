@@ -131,10 +131,10 @@ onMounted(() => {
               <td class="px-3 py-2">{{ money(r.opa_market_value) }}</td>
               <td class="px-3 py-2">{{ money(r.model_median) }}</td>
               <td v-if="kind !== 'nonuniform'" class="px-3 py-2">
-                {{ r.ratio?.toFixed(1) }}×
+                {{ r.ratio != null ? `${r.ratio.toFixed(1)}×` : 'N/A' }}
               </td>
               <td v-if="kind !== 'nonuniform'" class="px-3 py-2">
-                {{ r.screen_z?.toFixed(1) }}
+                {{ r.screen_z != null ? r.screen_z.toFixed(1) : 'N/A' }}
               </td>
               <td v-if="kind === 'nonuniform'" class="px-3 py-2">
                 {{ r.twin_ratio ? pct(r.twin_ratio - 1, 1) : 'N/A' }} ({{ r.twin_n }} twins)

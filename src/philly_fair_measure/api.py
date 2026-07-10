@@ -306,19 +306,22 @@ def _peer_histogram(frame: pl.DataFrame, s: dict[str, Any]) -> list[HistBin]:
     (equity_context.peer_predicate — family, ZIP, never the subject or, for
     condos, its own building), so the chart and the sentence below it can
     never describe different populations."""
-    from philly_fair_measure.equity_context import peer_predicate
+    from philly_fair_measure.equity_context import _MIN_PEERS, peer_predicate
 
     zip5, median = s.get("loc_zip5"), _f(s.get("display_median") or s.get("model_median"))
     if not zip5 or not median:
         return []
     family = str(s.get("model_family") or "residential")
     frame = frame.filter(peer_predicate(family, s.get("parcel_id"), zip5, s.get("building_id")))
-    peers = frame.filter(
-        pl.col("display_ratio").is_between(_HIST_LO, _HIST_HI)
-        & pl.col("display_median").is_between(median / _VALUE_BAND, median * _VALUE_BAND)
+    # choose the population exactly the way equity_context does (value band,
+    # falling back to the whole neighborhood below the SAME threshold), then
+    # clip only for the fixed chart axes — so the chart and the sentence can
+    # never describe different peer sets
+    band = frame.filter(
+        pl.col("display_median").is_between(median / _VALUE_BAND, median * _VALUE_BAND)
     )
-    if peers.height < 10:
-        peers = frame.filter(pl.col("display_ratio").is_between(_HIST_LO, _HIST_HI))
+    pool = band if band.height >= _MIN_PEERS else frame
+    peers = pool.filter(pl.col("display_ratio").is_between(_HIST_LO, _HIST_HI))
     if not peers.height:
         return []
     ratios = peers["display_ratio"].to_numpy()

@@ -101,7 +101,7 @@ Three rules shape the modeling (details in [docs/model.md](docs/model.md)):
 
 ## Reproducing it
 
-Requires [uv](https://docs.astral.sh/uv/) (Python 3.13) and Node 20+ for the
+Requires [uv](https://docs.astral.sh/uv/) (Python 3.13) and Node 22+ for the
 dashboard. All data comes from public APIs; no credentials are needed.
 
 ```bash
@@ -201,8 +201,9 @@ policies, are in [CONTRIBUTING.md](CONTRIBUTING.md).
   record, not proof of an error.
 - Cash-market price dispersion is partly irreducible from public data; the
   full-sample COD reflects that.
-- Predictive intervals undercover in the cheapest quintile (~76–79% realized
-  vs. 90% nominal); the site reports interval-based results with that caveat.
+- Predictive intervals undercover in the cheapest quintile relative to the 90%
+  nominal level; [docs/model.md](docs/model.md) measures the per-method
+  shortfall, and the site reports interval results with that caveat.
 <!-- generated:condo-card:begin -->
 - Condo accuracy: the model beats OPA on error (rmse 0.240 vs 0.278) and on
   uniformity (COD 17.3 vs 18.8). Condos were long OPA's strongest segment; the

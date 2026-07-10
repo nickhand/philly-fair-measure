@@ -5,7 +5,8 @@ open an issue first so the approach can be discussed before you invest time.
 
 ## Setup
 
-Requires [uv](https://docs.astral.sh/uv/) (Python 3.13) and Node 20+.
+Requires [uv](https://docs.astral.sh/uv/) (Python 3.13) and Node 22+ (see
+`web/package.json` engines).
 
 ```bash
 uv sync
@@ -25,10 +26,12 @@ Everything that CI enforces, in one command:
 just gates
 ```
 
-That runs `ruff format --check`, `ruff check`, `mypy` (strict mode) on the
-Python side, then the Vitest suite and a production build on the web side.
-Please run it before opening a pull request. Lint or type errors are fixed,
-not suppressed, including pre-existing ones in files you touch.
+That runs `ruff format --check`, `ruff check`, `mypy` (strict mode),
+`fair-measure sync-docs --check` (generated doc blocks must match the committed
+stats), and `pytest` on the Python side, then the Vitest suite and a production
+build on the web side. Please run it before opening a pull request. Lint or
+type errors are fixed, not suppressed, including pre-existing ones in files
+you touch.
 
 ## Project conventions
 

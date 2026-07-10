@@ -16,7 +16,8 @@ web/                    Vue 3 + TypeScript + Vite + Tailwind v4 (mobile-first)
   src/utils/verdict.ts  THE single source of plain-language verdict copy/colors
   src/components/viz/   custom SVG viz (d3-scale only): IntervalStrip,
                         DriverBars, PeerHistogram, HistorySpark, IntervalExplainer
-  src/views/            Home (search), Property (report), Map, Methodology,
+  src/views/            Home (search), Property (report), Map, Findings,
+                        Methodology, Trust (The Proof), Appeal,
                         Admin (staff, unlinked), NotFound
 
 src/philly_fair_measure/api.py   FastAPI over the marts
@@ -25,7 +26,9 @@ src/philly_fair_measure/api.py   FastAPI over the marts
   /api/property/{id}     fast core: verdict, values, interval, signals
   /api/property/{id}/report   drivers (TreeSHAP), equity + peer histogram,
                               assessment/sale history (~1s; booster loaded per call)
+  /api/property/{id}/comps    leaf-similarity comparable sales
   /api/parcels?bbox      GeoJSON points for the map viewport
+  /api/parcels/flagged   citywide flagged parcels (map overview layer)
   /api/stats             home-page counters
   /api/admin/leaderboard staff worklists (see Security)
 ```
@@ -111,8 +114,7 @@ deliberately kept:
   behind a real paywall/admin login when the product tier ships; the current
   passphrase is a placeholder only.
 - Site-wide links (creator credit → nickhand.dev, GitHub repo, technical model
-  docs) live in `web/src/config/site.ts`; the GitHub URLs are placeholders
-  until the repository is published.
+  docs) live in `web/src/config/site.ts`.
 
 ## Headline stats pipeline
 
@@ -124,13 +126,14 @@ structure, the historical redistribution series). Regenerate after every
 retrain or screen rebuild, the views interpolate the JSON and must never be
 hand-edited. Provenance (run id + generation date) renders on both pages.
 
-## Security, MUST fix before public deploy
+## Security
 
-- `/api/admin/*` endpoints are **unauthenticated**, and the `/admin` view's
-  passphrase is a **placeholder gate, not auth** (it's in the client bundle).
-  Put real auth in front (or strip the admin router) before exposure.
-- CORS is not configured (dev uses the Vite proxy); add an allowlist when the
-  API gets its own origin.
+- `/api/admin/*` requires the `PHILLY_ADMIN_TOKEN` bearer token
+  (`_require_admin` in api.py; `just fly-secrets` sets it in production). The
+  `/admin` view's client-side passphrase remains a convenience gate only, the
+  server-side token is the real access control.
+- CORS uses an allowlist from `PHILLY_CORS_ORIGINS` (api.py); dev uses the
+  Vite proxy.
 
 ## Known limitations
 
@@ -138,5 +141,7 @@ hand-edited. Provenance (run id + generation date) renders on both pages.
   condo model has no explain arm yet).
 - The peer histogram uses same-ZIP + similar-value peers (mirrors
   `equity_context`'s rule), thin ZIPs fall back to ZIP-wide.
-- Copy hardcodes the fairness table numbers on the methodology page from the
-  2026-07 measured run; regenerate when the model is retrained.
+- The methodology page's fairness numbers interpolate `siteStats.json` like
+  every other measured figure (see "Headline stats pipeline" above); the
+  vitest guard `no-hardcoded-stats.spec.ts` fails the suite when a stat is
+  typed as a literal instead.

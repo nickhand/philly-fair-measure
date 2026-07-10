@@ -17,7 +17,12 @@ from philly_fair_measure.docs_sync import (
 )
 
 STATS = {
-    "meta": {"model_run_id": "20990101T000000Z-baseline", "n_test": 19_484},
+    "meta": {
+        "model_run_id": "20990101T000000Z-baseline",
+        "n_test": 19_484,
+        "n_sales_pool": 204_818,
+        "tax_year": 2031,
+    },
     "iaao_card": {
         "model": {
             "median_ratio": 1.001,
@@ -153,6 +158,7 @@ STATS = {
 def test_builders_render_the_numbers():
     counts = readme_screen_counts(STATS)
     assert "**496,975**" in counts and "**1,643**" in counts and "93 records" in counts
+    assert "Tax Year 2031" in counts  # derived from the screen, not hand-frozen
     tables = readme_results_tables(STATS)
     assert "`20990101T000000Z-baseline`" in tables
     assert "| This model | 1.001 | 19.3 | 1.024 | +0.010 | 19.3% |" in tables

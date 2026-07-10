@@ -67,8 +67,8 @@ homeowner actually experiences, and nobody passes it.
 <!-- generated:veq-card-full:end -->
 
 On the full sample the model is still mildly regressive and above the uniformity
-target, but carries a **fraction** of OPA's regressivity (its PRB is roughly a
-quarter of OPA's) and much tighter dispersion, as the card shows.
+target, but carries a **fraction** of OPA's regressivity and much tighter
+dispersion; compare the PRB and COD rows above.
 
 ## Card 3, Is the regressivity real, or a binning artifact?
 
@@ -98,8 +98,9 @@ Map test (kNN Moran's I of log ratios, financed sales): city 0.129, ours 0.092. 
 cluster geographically, the signature of genuine neighborhood-level bias.
 
 Neighborhoods are the 358 learned market areas with at least 50 arms-length sales
-(median 485 sales behind each area's price level); 192 of 19,550 test sales carry
-no area assignment and are excluded from the neighborhood-binned rows.
+(median 485 sales behind each area's price level); 192 of 19,550 test sales sit in
+areas below that threshold (or carry no area assignment) and are excluded
+from the neighborhood-binned rows.
 <!-- generated:veq-robustness:end -->
 
 Reading it: neighborhood-level binning removes most of OPA's apparent

@@ -1,4 +1,4 @@
-"""Command-line interface: the `philly` entry point."""
+"""Command-line interface: the `fair-measure` (alias `fm`) entry point."""
 
 from __future__ import annotations
 
@@ -610,8 +610,9 @@ def _cmd_equity_robustness(args: argparse.Namespace) -> int:
 
     result = equity_robustness(args.data_dir)
     print("vertical-equity robustness: individual-price vs neighborhood-level binning")
-    print("(out-of-time test set, fresh-roll OPA vs model; median ratio in the")
-    print("cheapest/priciest fifth; the artifact-robust view is the neighborhood row)\n")
+    print("(out-of-time test set; OPA = each sale's own-year roll, vs the model; median")
+    print("ratio in the cheapest/priciest fifth; the artifact-robust view is the")
+    print("neighborhood row)\n")
     header = (
         f"{'basis':<11}{'binned by':<22}{'OPA q1':>8}{'OPA q5':>8}{'model q1':>10}{'model q5':>10}"
     )
@@ -638,7 +639,8 @@ def _cmd_equity_robustness(args: argparse.Namespace) -> int:
     print(
         f"neighborhoods: {m['n_areas']} market areas (>= {m['min_area_sales']} sales each, "
         f"median {m['median_area_sales']}); {m['test_rows_without_area']:,} of "
-        f"{m['test_rows']:,} test sales carry no area and are excluded from the binned rows"
+        f"{m['test_rows']:,} test sales sit in areas below that threshold (or carry no "
+        f"assignment) and are excluded from the binned rows"
     )
     return 0
 
@@ -940,7 +942,7 @@ def _cmd_sql(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="philly",
+        prog="fair-measure",
         description="Philadelphia property assessment data package",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)

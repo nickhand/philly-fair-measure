@@ -83,15 +83,20 @@ renovations permits miss; the founding use case's signal, also a screen
 evidence column), inspections + **PRECOURT escalation** (6%), granted
 variances/appeals (any board), and rental-license tenure spans:
 **investor-held-at-sale** (17.2%), owner-occupied-landlord flag, licensed
-units. **Result: best model to date overall, RMSE(log) 0.3377, COD 26.00
+units. *(Update 2026-07-07: the three rental-license tenure features were
+dropped from the model — the feed is stale and mislabels owner-occupied homes,
+and an ablation showed zero accuracy cost. Owner-occupancy is now derived from
+the homestead exemption as `ten_owner_occupied_at_sale`; the rental columns
+are still built in the mart for analysis but are no longer model inputs.)*
+**Result at the time: best model to date overall, RMSE(log) 0.3377, COD 26.00
 (from 26.18), but the q1 median ratio stays 1.200 and q1 COD 39.0. The
 interior-condition wall does not move.** This closes the public-data attack
 on the q1 tail: resident-reported distress is now IN the model and the
 residual q1 bias persists, which makes the earlier diagnosis airtight,
 what's unobservable is *positive* interior condition (renovation), not
 distress. Remaining paths are listings/imagery (see research notes). The
-vacancy, unpermitted-work, and tenure columns also feed the screen as
-evidence and the equity diagnostics.
+vacancy, unpermitted-work, and owner-occupancy columns also feed the screen
+as evidence and the equity diagnostics.
 
 **Mortgage forensics + repeat-sales carry-forward (`fin_`,
 `mkt_parcel_prev_log_price_ref`, 2026-07-03), THE q1 WALL DECOMPOSED.**

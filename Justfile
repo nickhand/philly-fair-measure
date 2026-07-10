@@ -45,11 +45,14 @@ test:
 
 # ---------------------------------------------------------------- pipeline
 
-# Full coherent retrain: features -> every model -> screen -> site stats.
-# Any feature/mart rebuild REQUIRES retraining every model (the screen
-# refuses stale runs) — this is the one command that keeps it all coherent.
+# Full coherent retrain: sale validity -> features -> every model -> screen ->
+# site stats -> docs. Any feature/mart rebuild REQUIRES retraining every model
+# (the screen refuses stale runs) — this is the one command that keeps it all
+# coherent, including the validity mart upstream and the generated docs
+# downstream (a retrain without sync-docs leaves `just gates` failing).
 [group: "pipeline"]
 retrain-all:
+	uv run fair-measure validate-sales
 	uv run fair-measure build-features
 	uv run fair-measure build-condo-features
 	uv run fair-measure train-baseline
@@ -58,6 +61,7 @@ retrain-all:
 	uv run fair-measure train-condo
 	uv run fair-measure screen-assessments
 	uv run fair-measure export-web-stats
+	uv run fair-measure sync-docs
 
 # Rebuild the screen + regenerate the site's stats (models unchanged)
 [group: "pipeline"]

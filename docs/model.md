@@ -49,9 +49,11 @@ residual calibration (§5.6). The split is deterministic (sort by `sale_date`,
 `sale_id`, then head/tail), so every artifact is reproducible from the mart plus
 the persisted split fractions.
 
-## 4. Feature set (92 features)
+## 4. Feature set
 
-73 numeric + 19 categorical, no `asmt_*`. The full column-by-column registry is
+Roughly a hundred features (the exact lists live in `NUMERIC_FEATURES` /
+`CATEGORICAL_FEATURES` in `models/baseline.py` and are persisted per run in
+`params.json`), no `asmt_*`. The full column-by-column registry is
 [features.md](features.md); the families and their rationale:
 
 | Family | Carries |
@@ -62,14 +64,14 @@ the persisted split fractions.
 | As-of kNN surface (`mkt_knn_`) | distance-weighted mean of the *k* nearest **strictly earlier** sales, the between-block gradient trees can't interpolate; quarter-blocked against look-ahead |
 | Rolling means (`mkt_*_roll_`) | block/building leave-one-out $/sqft level (the CCAO workhorse) |
 | Parcel geometry (`shp_`) | area, perimeter, vertex/angle SDs, min-rotated-rect ratios from PWD polygons |
-| Distress & tenure (`dist_`, `evt_`, `ten_`) | delinquency, severe violations, vacancy complaints, rental licenses (the q1 tail signal) |
+| Distress & tenure (`dist_`, `evt_`, `ten_`) | delinquency, severe violations, vacancy complaints, homestead-derived owner-occupancy (rental-license features were dropped 2026-07-07: stale feed, zero measured accuracy) |
 | Mortgage forensics (`fin_`) | prior-mortgage count/recency, hard-money; `fin_cash_sale` is a *diagnostic* attribute, kept out of the model |
 | Proximity (`prox_`) | rapid transit, rail, parks, expressway/arterial, bus density |
 
 ## 5. Models
 
 ### 5.1 LightGBM: primary point estimate
-Gradient-boosted trees on the 92-feature encoding. `learning_rate=0.05`,
+Gradient-boosted trees on the full feature encoding. `learning_rate=0.05`,
 `num_leaves=255`, `min_data_in_leaf=40`, `feature_fraction=0.8`,
 `bagging_fraction=0.8`, `lambda_l1=0.1`, `lambda_l2=1.0`, ≤5000 rounds with
 100-round early stopping on the validation slice; categoricals passed natively.
@@ -89,7 +91,8 @@ centering gain that keeps the full training set (cash sales carry location signa
 see [research-notes.md](research-notes.md)). It falls back to the whole slice when
 the financed subset is thin. Consequence: ratios against *cash* sale prices then
 sit above 1.0 by design (cash homes transact below market value, the channel gap
-the retail convention prices explicitly, §7). The §6 table predates this default.
+the retail convention prices explicitly, §7); the §6 table reflects it, which is
+why the full-sample median ratio sits near 1.04 rather than 1.00.
 
 ### 5.3 Ridge: benchmark
 A regularized linear pipeline (median-impute → standardize → one-hot) as a
@@ -182,7 +185,7 @@ a cross-check, and the bake-off was residential-only).
 ## 6. Results
 
 <!-- generated:model-results-table:begin -->
-Out-of-time test set, n≈19.5k, run `20260708T000348Z-baseline`. Identical test
+Out-of-time test set, n = 19,519, run `20260708T000348Z-baseline`. Identical test
 set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
@@ -214,14 +217,15 @@ Honest caveats:
   market-area price index closed the last gap.
 <!-- generated:condo-card:end -->
 - **Interval undercoverage in the cheap tail:** at nominal 90%, realized
-  coverage is ~89–91% overall but only **~81–86% in the cheapest quintile**
-  across every interval method built (Bayesian 0.81, fixed-offset conformal
-  0.86, CQR 0.85, see §5.7). Q1 dispersion is partly irreducible; the
-  machines report the shortfall rather than hide it.
+  coverage is ~90% overall but materially lower in the **cheapest quintile**
+  across every interval method built (measured 2026-07-07: Bayesian 0.80;
+  fixed-offset conformal and CQR measured in the mid-0.80s on the same-day
+  builds, see §5.7). Q1 dispersion is partly irreducible; the machines report
+  the shortfall rather than hide it.
 
 Stability is checked by temporal cross-validation (rolling out-of-time folds)
-and spatial cross-validation (leave-one-district-out); see the `fair-measure
-temporal-cv` / `spatial-cv` commands and [equity-diagnostics.md](equity-diagnostics.md).
+and spatial cross-validation (leave-one-district-out); both run inside
+`fair-measure stability-audit` (see [equity-diagnostics.md](equity-diagnostics.md)).
 
 ## 7. Application: the assessment screen
 
@@ -308,9 +312,8 @@ pipeline · a full model-vs-OPA benchmark on every run.
 
 ## 9. Known limitations
 
-Cash-market dispersion is partly irreducible; condos remain OPA's best
-segment (we beat their rmse, trail their COD by ~0.5); interval
-undercoverage in q1; OPA's condition codes cannot be independently verified
+Cash-market dispersion is partly irreducible; interval
+undercoverage in q1 (§6); OPA's condition codes cannot be independently verified
 (no interior inspections) and are stale in a measured ~10–20% tail, the
 model uses them, sale-price-confirmed, alongside independent distress/permit
 signals; single metro, no cross-city validation.

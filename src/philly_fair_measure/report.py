@@ -174,6 +174,7 @@ _FLAG_LABELS = {
     "under_assessed_candidate": ("Under-assessment candidate", "#1d4ed8"),
     "within_range": ("Within the model's range", "#15803d"),
     "no_assessment": ("No assessment on record", "#6b7280"),
+    "insufficient_record": ("Insufficient record to value", "#6b7280"),
 }
 
 _CSS = """
@@ -420,19 +421,35 @@ def render_html(data: ReportData) -> str:
         f"<p class='note'>OPA parcel {data.parcel_id} · {_fmt(s.get('char_category'))}"
         f" · report generated {data.provenance.get('generated', '')}</p>",
         f"<p><span class='flag' style='background:{color}'>{label}</span></p>",
-        "<h2>Assessment vs model</h2><div class='kv'>",
-        f"<div><b>OPA market value</b>{_fmt_money(s.get('opa_market_value'))}</div>",
-        "<div><b>Model estimate</b>"
-        f"{_fmt_money(s.get('display_median') or s.get('model_median'))}</div>",
-        f"<div><b>Estimated range</b>{_fmt_money(display_lo)} – {_fmt_money(display_hi)}</div>",
-        "<div><b>OPA / model</b>"
-        f"{_fmt(s.get('display_ratio') or s.get('opa_vs_model_ratio'))}</div>",
-        f"<div><b>Disagreement z</b>{_fmt(s.get('screen_z'))}</div>",
-        "</div>",
-        f"<p class='note'>{band_note} The estimate comes from a "
-        "public-data model trained on validated arms-length sales; it inherits "
-        "the city roll's characteristic errors and cannot see interior condition.</p>",
     ]
+    if s.get("assessment_flag") == "insufficient_record":
+        # the screen refuses to value these records (e.g. no recorded livable
+        # area) — printing a model estimate here would stand behind a number
+        # the screen itself does not
+        parts += [
+            "<h2>Assessment vs model</h2>",
+            f"<div class='kv'><div><b>OPA market value</b>"
+            f"{_fmt_money(s.get('opa_market_value'))}</div></div>",
+            "<p class='note'>The city's record for this property is missing the "
+            "basics a value estimate needs (such as livable area), so this report "
+            "shows no model estimate. Correcting the record is the first step; "
+            "see the checklist below.</p>",
+        ]
+    else:
+        parts += [
+            "<h2>Assessment vs model</h2><div class='kv'>",
+            f"<div><b>OPA market value</b>{_fmt_money(s.get('opa_market_value'))}</div>",
+            "<div><b>Model estimate</b>"
+            f"{_fmt_money(s.get('display_median') or s.get('model_median'))}</div>",
+            f"<div><b>Estimated range</b>{_fmt_money(display_lo)} – {_fmt_money(display_hi)}</div>",
+            "<div><b>OPA / model</b>"
+            f"{_fmt(s.get('display_ratio') or s.get('opa_vs_model_ratio'))}</div>",
+            f"<div><b>Disagreement z</b>{_fmt(s.get('screen_z'))}</div>",
+            "</div>",
+            f"<p class='note'>{band_note} The estimate comes from a "
+            "public-data model trained on validated arms-length sales; it inherits "
+            "the city roll's characteristic errors and cannot see interior condition.</p>",
+        ]
     if data.explanation is not None:
         parts += _render_explanation(data.explanation)
     if data.equity is not None:

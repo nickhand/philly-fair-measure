@@ -69,6 +69,12 @@ const officialCard = [
   },
 ]
 
+/** Bottom-line pass counts, derived from the same booleans as the check marks
+ * above so the sentence can never contradict its own scorecard. */
+const oursPassCount = officialCard.filter((r) => r.oursPass).length
+const cityPassCount = officialCard.filter((r) => r.cityPass).length
+const countWord = (n: number) => ['none', 'one', 'two', 'three', 'all four'][n] ?? String(n)
+
 /** Full-sample basis (every arms-length sale, no trim). */
 const fullCard = [
   { stat: 'Median ratio', target: '0.90 to 1.10', city: fmt(full.opa.median_ratio), ours: fmt(full.model.median_ratio) },
@@ -175,9 +181,9 @@ const fullCard = [
         </div>
       </div>
       <p class="mt-3 text-body-sm text-body">
-        <strong>The bottom line:</strong> our model passes the level test and both
-        fairness-across-price tests; the city’s roll fails every one. Both were scored on the
-        same homes and the same sales.
+        <strong>The bottom line:</strong> our model passes {{ countWord(oursPassCount) }} of the
+        four official tests; the city’s roll passes {{ countWord(cityPassCount) }}. Both were
+        scored on the same homes and the same sales.
       </p>
       <InfoTip label="What these tests mean, in plain words">
         “Median ratio” asks whether values are centered on real prices. “COD” asks whether similar
@@ -338,7 +344,8 @@ const fullCard = [
             <dt class="font-bold text-ink">PRB: price-related bias</dt>
             <dd>
               The preferred regressivity test: % change in ratio as value doubles. Negative =
-              regressive; {{ fmt(full.opa.prb) }} means ratios fall ~{{
+              regressive; {{ fmt(full.opa.prb) }} means ratios
+              {{ full.opa.prb < 0 ? 'fall' : 'rise' }} ~{{
                 Math.round(Math.abs(full.opa.prb) * 100)
               }}% per doubling of value.
             </dd>
