@@ -38,7 +38,6 @@ logger = logging.getLogger(__name__)
 
 MILLAGE = 0.013998  # flat total real-estate tax rate, 2016-2027 (phila.gov schedule)
 PHILADELPHIA_POP = 1_580_000  # ~US Census, roughly flat 2016-2025
-_PARTIAL_YEARS = frozenset({2026})  # sales still accruing — not a full year
 
 
 def _tier_redistribution(
@@ -97,6 +96,15 @@ def historical_redistribution(data_dir: Path | None = None) -> pl.DataFrame:
     )
     base = _residential_assessed_by_year(data_dir)
 
+    # the latest sale year is partial while its December has not yet been
+    # recorded — derive it from the data instead of a hardcoded year, which
+    # went stale every January
+    last_y, last_m = sf.select(
+        pl.col("sale_date").max().dt.year().alias("last_year"),
+        pl.col("sale_date").max().dt.month().alias("last_month"),
+    ).row(0)
+    partial_year = int(last_y) if last_y is not None and int(last_m) < 12 else None
+
     rows = []
     for year in sorted(sf["year"].unique().to_list()):
         year_df = sf.filter(pl.col("year") == year)
@@ -115,7 +123,7 @@ def historical_redistribution(data_dir: Path | None = None) -> pl.DataFrame:
                 {
                     "year": year,
                     "benchmark": benchmark,
-                    "partial_year": year in _PARTIAL_YEARS,
+                    "partial_year": year == partial_year,
                     "n_sales": sub.height,
                     "median_ratio": round(med, 3),
                     "q1_q5_ratio": round(q1q5, 3),

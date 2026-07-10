@@ -60,12 +60,15 @@ from philly_fair_measure.models.baseline import RESIDENTIAL_CATEGORIES
 
 
 def _arms_length_sales(sales: pl.LazyFrame, valuation_date: datetime) -> pl.DataFrame:
+    # strictly BEFORE the valuation date, matching every other scoring path and
+    # the training frame (a same-day sale is not "prior" evidence — the old <=
+    # let a parcel's own just-closed price enter as its previous sale)
     return (
         sales.filter(
             (pl.col("validity_status") == "arms_length")
             & pl.col("sale_date").is_not_null()
             & (pl.col("sale_price") > 0)
-            & (pl.col("sale_date") <= valuation_date)
+            & (pl.col("sale_date") < valuation_date)
         )
         .select("parcel_id", "sale_date", "sale_price")
         .collect()
@@ -420,7 +423,12 @@ def assemble_assessment_features(
                     pl.lit(valuation_date).alias("sale_date"),
                 ),
                 mortgages,
-                pool.select("parcel_id", "sale_date"),
+                # every dated deed anchors purchase mortgages (mirrors the sale
+                # mart): distressed transfers count too, or their acquisition
+                # mortgages read as refis
+                sales.filter(pl.col("parcel_id").is_not_null() & pl.col("sale_date").is_not_null())
+                .select("parcel_id", "sale_date")
+                .collect(),
             ).rename({"sale_id": "parcel_id"}),
             on="parcel_id",
             how="left",

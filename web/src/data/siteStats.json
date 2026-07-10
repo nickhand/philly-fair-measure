@@ -1,13 +1,13 @@
 {
   "meta": {
     "generated_at": "2026-07-10",
-    "model_run_id": "20260708T000348Z-baseline",
-    "interval_run_id": "20260708T003248Z-bayesian",
+    "model_run_id": "20260710T014946Z-baseline",
+    "interval_run_id": "20260710T021153Z-bayesian",
     "n_test": 19519,
     "n_sales_pool": 205182,
     "tax_year": 2027,
     "interval_nominal_pct": 90,
-    "interval_coverage_pct": 91
+    "interval_coverage_pct": 92
   },
   "full_card": {
     "opa": {
@@ -21,9 +21,9 @@
     },
     "model": {
       "median_ratio": 1.036,
-      "cod": 25.2,
+      "cod": 25.1,
       "prd": 1.087,
-      "prb": -0.084,
+      "prb": -0.085,
       "mape_pct": 26.3,
       "vei": -16.2,
       "vei_verdict": "unacceptable"
@@ -40,12 +40,12 @@
       "vei_verdict": "unacceptable"
     },
     "model": {
-      "median_ratio": 1.003,
-      "cod": 18.7,
-      "prd": 1.021,
-      "prb": 0.007,
-      "mape_pct": 18.8,
-      "vei": 2.2,
+      "median_ratio": 1.004,
+      "cod": 18.8,
+      "prd": 1.022,
+      "prb": 0.005,
+      "mape_pct": 18.9,
+      "vei": 2.0,
       "vei_verdict": "acceptable"
     }
   },
@@ -53,10 +53,10 @@
     "model": {
       "rmse_log": 0.24,
       "mape_pct": 18.9,
-      "median_ratio": 1.052,
+      "median_ratio": 1.054,
       "cod": 17.3,
       "prd": 1.06,
-      "prb": -0.041
+      "prb": -0.042
     },
     "opa": {
       "rmse_log": 0.278,
@@ -148,34 +148,34 @@
   "tax_shift": {
     "millage_pct": 1.4,
     "base_change_pct": 1.0,
-    "new_revenue_musd": 21,
-    "cheapest_home_usd": -181,
-    "priciest_home_usd": 302,
+    "new_revenue_musd": 19,
+    "cheapest_home_usd": -186,
+    "priciest_home_usd": 298,
     "tiers": [
       {
         "name": "cheapest fifth",
-        "home_usd": -181,
-        "total_musd": -18.0
+        "home_usd": -186,
+        "total_musd": -18.5
       },
       {
         "name": "second fifth",
-        "home_usd": -78,
-        "total_musd": -7.7
+        "home_usd": -76,
+        "total_musd": -7.5
       },
       {
         "name": "middle fifth",
-        "home_usd": 44,
-        "total_musd": 4.4
+        "home_usd": 32,
+        "total_musd": 3.2
       },
       {
         "name": "fourth fifth",
-        "home_usd": 120,
-        "total_musd": 11.9
+        "home_usd": 121,
+        "total_musd": 12.0
       },
       {
         "name": "priciest fifth",
-        "home_usd": 302,
-        "total_musd": 30.0
+        "home_usd": 298,
+        "total_musd": 29.6
       }
     ]
   },
@@ -189,8 +189,8 @@
           "n_q5": 3909
         },
         "model": {
-          "q1": 1.268,
-          "q5": 0.994,
+          "q1": 1.271,
+          "q5": 0.991,
           "n_q1": 3910,
           "n_q5": 3929
         }
@@ -203,8 +203,8 @@
           "n_q5": 3963
         },
         "model": {
-          "q1": 1.022,
-          "q5": 1.048,
+          "q1": 1.023,
+          "q5": 1.05,
           "n_q1": 3923,
           "n_q5": 3977
         }
@@ -220,7 +220,7 @@
         },
         "model": {
           "q1": 1.102,
-          "q5": 0.992,
+          "q5": 0.988,
           "n_q1": 2807,
           "n_q5": 2829
         }
@@ -233,8 +233,8 @@
           "n_q5": 2753
         },
         "model": {
-          "q1": 0.933,
-          "q5": 1.042,
+          "q1": 0.934,
+          "q5": 1.043,
           "n_q1": 2765,
           "n_q5": 2763
         }
@@ -248,8 +248,8 @@
         "n_q5": 3945
       },
       "model": {
-        "q1": 1.02,
-        "q5": 1.055,
+        "q1": 1.023,
+        "q5": 1.056,
         "n_q1": 3912,
         "n_q5": 3956
       }
@@ -260,24 +260,24 @@
       "min_area_sales": 50,
       "test_rows": 19550,
       "test_rows_without_area": 192,
-      "morans_i_opa": 0.129,
-      "morans_i_model": 0.092
+      "morans_i_opa": 0.128,
+      "morans_i_model": 0.088
     }
   },
   "screen": {
     "properties": 496975,
-    "over": 1032,
-    "under": 7124,
-    "watch": 44770,
+    "over": 1091,
+    "under": 6789,
+    "watch": 42794,
     "insufficient": 93,
     "by_family_flag": {
-      "condo/over_assessed_candidate": 682,
-      "condo/under_assessed_candidate": 3738,
-      "condo/within_range": 27733,
+      "condo/over_assessed_candidate": 728,
+      "condo/under_assessed_candidate": 3587,
+      "condo/within_range": 27838,
       "residential/insufficient_record": 93,
-      "residential/over_assessed_candidate": 350,
-      "residential/under_assessed_candidate": 3386,
-      "residential/within_range": 460993
+      "residential/over_assessed_candidate": 363,
+      "residential/under_assessed_candidate": 3202,
+      "residential/within_range": 461164
     }
   },
   "results_table": {
@@ -287,8 +287,8 @@
       "median_ratio": 1.036,
       "cod": 25.2,
       "prd": 1.087,
-      "prb": -0.084,
-      "mki": 0.911
+      "prb": -0.085,
+      "mki": 0.91
     },
     "ridge": {
       "rmse_log": 0.424,

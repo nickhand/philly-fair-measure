@@ -30,7 +30,9 @@ logger = logging.getLogger(__name__)
 KNN_K = 15
 DIST_SOFTENING_M = 100.0
 SCORE_WINDOW_DAYS = 1825
-_EXTRA = 4  # over-query to survive same-parcel exclusion
+# over-query to survive same-parcel exclusion: repeat-sale-heavy parcels carry
+# up to 14 own-parcel entries among their nearest neighbors, so 4 starved them
+_EXTRA = 16
 
 # New-construction comp surface: a home is "new at sale" when built within a
 # year of selling. New-build sales are ~4% of the pool, so their k is smaller

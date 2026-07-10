@@ -7,7 +7,7 @@ happens to every home, including the cash/distressed tail the standard excludes)
 
 <!-- generated:veq-meta:begin -->
 Numbers are the out-of-time test slice of baseline run
-`20260708T000348Z-baseline` (n ≈ 19.5k residential arms-length sales).
+`20260710T014946Z-baseline` (n ≈ 19.5k residential arms-length sales).
 Reproduce with `fair-measure train-baseline` then `fair-measure ratio-study`. This
 report card is deliberately not a "we made it fair" claim, see the honest reading below.
 <!-- generated:veq-meta:end -->
@@ -36,11 +36,11 @@ The convention on which an assessor's performance is officially measured.
 <!-- generated:veq-card-iaao:begin -->
 | Statistic | Target | OPA | Our model |
 | --- | --- | --- | --- |
-| Median ratio | 0.90–1.10 | 0.920 ✓ | 1.003 ✓ |
-| COD | ≤ 15 | 23.1 ✗ | 18.7 ⚠︎ |
-| PRD | 0.98–1.03 | 1.065 ✗ | 1.021 ✓ |
-| PRB | ±0.05 | -0.057 ✗ | +0.007 ✓ |
-| VEI (2025 draft) | −10% to +10% | -16.3% ✗ | +2.2% ✓ |
+| Median ratio | 0.90–1.10 | 0.920 ✓ | 1.004 ✓ |
+| COD | ≤ 15 | 23.1 ✗ | 18.8 ⚠︎ |
+| PRD | 0.98–1.03 | 1.065 ✗ | 1.022 ✓ |
+| PRB | ±0.05 | -0.057 ✗ | +0.005 ✓ |
+| VEI (2025 draft) | −10% to +10% | -16.3% ✗ | +2.0% ✓ |
 <!-- generated:veq-card-iaao:end -->
 
 **Our model passes both vertical-equity tests (PRD and PRB) and sits just above
@@ -59,9 +59,9 @@ homeowner actually experiences, and nobody passes it.
 | Statistic | Target | OPA | Our model |
 | --- | --- | --- | --- |
 | Median ratio | 0.90–1.10 | 0.983 ✓ | 1.036 ✓ |
-| COD | ≤ 15 | 34.7 ✗ | 25.2 ✗ |
+| COD | ≤ 15 | 34.7 ✗ | 25.1 ✗ |
 | PRD | 0.98–1.03 | 1.192 ✗ | 1.087 ✗ |
-| PRB | ±0.05 | -0.235 ✗ | -0.084 ✗ |
+| PRB | ±0.05 | -0.235 ✗ | -0.085 ✗ |
 | VEI (2025 draft) | −10% to +10% | -56.0% ✗ | -16.2% ✗ |
 | MAPE | n/a | 34.2% | 26.3% |
 <!-- generated:veq-card-full:end -->
@@ -90,11 +90,11 @@ each way:
 | --- | --- | --- | --- | --- | --- |
 | all sales | individual price | 1.55 | 0.88 | 1.27 | 0.99 |
 | all sales | **neighborhood level** | 1.17 | 0.93 | 1.02 | 1.05 |
-| all sales | tract level (sensitivity) | 1.13 | 0.93 | 1.02 | 1.05 |
+| all sales | tract level (sensitivity) | 1.13 | 0.93 | 1.02 | 1.06 |
 | financed | individual price | 1.24 | 0.88 | 1.10 | 0.99 |
 | financed | neighborhood level | 0.97 | 0.92 | 0.93 | 1.04 |
 
-Map test (kNN Moran's I of log ratios, financed sales): city 0.129, ours 0.092. Zero means errors sprinkle randomly; higher means they
+Map test (kNN Moran's I of log ratios, financed sales): city 0.128, ours 0.088. Zero means errors sprinkle randomly; higher means they
 cluster geographically, the signature of genuine neighborhood-level bias.
 
 Neighborhoods are the 358 learned market areas with at least 50 arms-length sales

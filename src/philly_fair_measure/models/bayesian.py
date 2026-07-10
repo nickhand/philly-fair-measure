@@ -291,9 +291,13 @@ class GeoIndex:
         coarse = sorted(df[coarse_col].cast(pl.String).fill_null("__none__").unique().to_list())
         coarse_ix = {value: i for i, value in enumerate(coarse)}
         fine, fine_coarse = [], []
+        # one null encoding everywhere: str(None) produces "None", which misses
+        # the "__none__" key and silently pooled null-geography rows into
+        # whichever district happened to sort first
         for row in pairs.sort(fine_col).to_dicts():
-            fine.append(str(row[fine_col]))
-            fine_coarse.append(coarse_ix.get(str(row[coarse_col]), 0))
+            fine.append("__none__" if row[fine_col] is None else str(row[fine_col]))
+            coarse_key = "__none__" if row[coarse_col] is None else str(row[coarse_col])
+            fine_coarse.append(coarse_ix.get(coarse_key, 0))
         return cls(coarse=coarse, fine=fine, fine_to_coarse_ix=np.array(fine_coarse))
 
     def indices(
@@ -305,8 +309,12 @@ class GeoIndex:
         """(fine index or -1 if unseen, coarse index or -1 if unseen) per row."""
         fine_ix = {value: i for i, value in enumerate(self.fine)}
         coarse_ix = {value: i for i, value in enumerate(self.coarse)}
-        fine = np.array([fine_ix.get(str(v), -1) for v in df[fine_col].to_list()])
-        coarse = np.array([coarse_ix.get(str(v), -1) for v in df[coarse_col].to_list()])
+
+        def key(v: object) -> str:
+            return "__none__" if v is None else str(v)
+
+        fine = np.array([fine_ix.get(key(v), -1) for v in df[fine_col].to_list()])
+        coarse = np.array([coarse_ix.get(key(v), -1) for v in df[coarse_col].to_list()])
         return fine, coarse
 
 

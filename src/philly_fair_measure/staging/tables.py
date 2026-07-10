@@ -129,11 +129,11 @@ def stg_delinquencies(raw: pl.LazyFrame) -> pl.LazyFrame:
     lf = with_parsed_timestamp(raw, "most_recent_payment_date")
     return lf.select(
         # opa_number is NUMERIC at the source, destroying the leading zeros of
-        # 9-digit OPA accounts; restore them for the string join
-        pl.col("opa_number")
-        .cast(pl.Int64, strict=False)
-        .cast(pl.String)
-        .str.zfill(9)
+        # 9-digit OPA accounts; restore them for the string join. A source 0
+        # means "no account", not account 000000000 — null it so the key can
+        # never fan out a join
+        pl.when(pl.col("opa_number").cast(pl.Int64, strict=False) > 0)
+        .then(pl.col("opa_number").cast(pl.Int64, strict=False).cast(pl.String).str.zfill(9))
         .alias("opa_account_num"),
         "total_due",
         "principal_due",

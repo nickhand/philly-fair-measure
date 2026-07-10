@@ -418,7 +418,7 @@ def assemble_condo_assessment_features(
             (pl.col("validity_status") == "arms_length")
             & pl.col("sale_date").is_not_null()
             & (pl.col("sale_price") >= 25_000)
-            & (pl.col("sale_date") <= valuation_date)
+            & (pl.col("sale_date") < valuation_date)
             & pl.col("parcel_id").str.starts_with(CONDO_ACCOUNT_PREFIX)
         )
         .select("parcel_id", "sale_date", "sale_price")
@@ -492,7 +492,7 @@ def assemble_condo_assessment_features(
     )
 
     # repeat-sales carry-forward at the valuation date (pool is already
-    # restricted to sales <= valuation_date, so this is leakage-safe)
+    # restricted to sales strictly before valuation_date, so this is leakage-safe)
     prior_sales = (
         pool.sort("parcel_id", "sale_date")
         .group_by("parcel_id")

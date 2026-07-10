@@ -65,12 +65,20 @@ def _project_geoms(geojson: np.ndarray) -> npt.NDArray[np.object_]:
     import shapely
     from shapely import from_geojson
 
-    from philly_fair_measure.features.market_areas import _LAT0, _LON0
+    from philly_fair_measure.features.market_areas import (
+        _LAT0,
+        _LON0,
+        _M_PER_DEG_LAT,
+        _M_PER_DEG_LON,
+    )
 
     geoms = from_geojson(geojson, on_invalid="ignore")
     valid = np.array([g is not None and not g.is_empty for g in geoms])
-    m_per_deg_lat = 111_132.0
-    m_per_deg_lon = m_per_deg_lat * np.cos(np.deg2rad(_LAT0))
+    # the SAME constants project_xy uses for parcel points — a different
+    # meters-per-degree here put targets and parcels on different planes,
+    # biasing every prox_dist_* by up to ~110 m at the city's edges
+    m_per_deg_lat = _M_PER_DEG_LAT
+    m_per_deg_lon = _M_PER_DEG_LON
 
     def to_meters(coords: np.ndarray) -> np.ndarray:
         out = np.empty_like(coords)

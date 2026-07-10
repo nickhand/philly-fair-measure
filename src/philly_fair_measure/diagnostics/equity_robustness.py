@@ -78,11 +78,24 @@ def morans_i(lon: np.ndarray, lat: np.ndarray, z: np.ndarray, *, k: int = MORANS
 
     ok = np.isfinite(lon) & np.isfinite(lat) & np.isfinite(z)
     lon, lat, z = lon[ok], lat[ok], z[ok]
-    xy = np.column_stack([lon * np.cos(np.deg2rad(float(lat.mean()))), lat])
-    _, ix = cKDTree(xy).query(xy, k=k + 1)
+    n = len(z)
+    if n < 3:
+        return 0.0
     zc = z - z.mean()
-    lag = zc[ix[:, 1:]].mean(axis=1)  # mean over the k nearest, self excluded
-    return float((zc * lag).mean() / zc.var())
+    var = float(zc.var())
+    if var == 0.0:
+        return 0.0
+    xy = np.column_stack([lon * np.cos(np.deg2rad(float(lat.mean()))), lat])
+    # drop each row's own index explicitly rather than assuming it arrives
+    # first: with exact duplicate coordinates (condo stacks, shared parcels)
+    # a tie can precede self, and leaving z_i inside its own lag biases I up
+    _, ix = cKDTree(xy).query(xy, k=min(k + 1, n))
+    lag = np.zeros(n)
+    for i in range(n):
+        neighbors = ix[i][ix[i] != i][:k]
+        if len(neighbors):
+            lag[i] = zc[neighbors].mean()
+    return float((zc * lag).mean() / var)
 
 
 def _ratio(value: np.ndarray, price: np.ndarray) -> np.ndarray:

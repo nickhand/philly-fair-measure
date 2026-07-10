@@ -212,10 +212,15 @@ def homestead_history(assessments: pl.LazyFrame) -> pl.DataFrame:
     """(parcel_id, hs_year, is_homestead) from the assessment-roll history.
 
     A parcel had the owner-occupant homestead exemption in a given year when its
-    building exemption equals that year's most common exemption amount — the
-    citywide homestead value ($100k for 2027; $80k/$40k/$30k in earlier cycles).
-    The homestead is granted only to owner-occupants, so it is a clean tenure
-    signal where the rental-license feed is noisy and frequently stale.
+    building exemption is positive and no larger than that year's most common
+    exemption amount — the citywide homestead value ($100k for 2027; $80k/$40k/
+    $30k in earlier cycles). Matching the modal amount exactly would miss the
+    ~11% of holders with PRORATED exemptions (capped by a low building value),
+    exactly the cheap homes the signal matters for, and would disagree with the
+    scoring-side definition (`homestead_now`, the roll's own homestead field).
+    Exemptions ABOVE the homestead amount are abatements/institutional and stay
+    excluded. The homestead is granted only to owner-occupants, so it is a
+    clean tenure signal where the rental-license feed is noisy and stale.
     """
     empty = pl.DataFrame(
         schema={"parcel_id": pl.String, "hs_year": pl.Int32, "is_homestead": pl.Boolean}
@@ -242,7 +247,9 @@ def homestead_history(assessments: pl.LazyFrame) -> pl.DataFrame:
     return rows.join(modal, on="hs_year", how="left").select(
         "parcel_id",
         "hs_year",
-        (pl.col("exempt_building") == pl.col("hs_amount")).alias("is_homestead"),
+        (
+            (pl.col("exempt_building") > 0) & (pl.col("exempt_building") <= pl.col("hs_amount"))
+        ).alias("is_homestead"),
     )
 
 
@@ -1014,7 +1021,13 @@ def assemble_sale_features(
             financing_features(
                 base.select("sale_id", "parcel_id", "sale_date"),
                 mortgages,
-                pool.select("parcel_id", "sale_date"),
+                # purchase anchors = EVERY dated deed, not just the arms-length
+                # pool: a sheriff-sale or nominal transfer still anchors its
+                # acquisition mortgage, otherwise that mortgage is miscounted
+                # as a refi on exactly the distressed-history parcels
+                sales.filter(pl.col("parcel_id").is_not_null() & pl.col("sale_date").is_not_null())
+                .select("parcel_id", "sale_date")
+                .collect(),
                 sale_flags=True,
             ),
             on="sale_id",
