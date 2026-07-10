@@ -13,14 +13,18 @@
       "cod": 34.7,
       "prd": 1.192,
       "prb": -0.235,
-      "mape_pct": 34.2
+      "mape_pct": 34.2,
+      "vei": -56.0,
+      "vei_verdict": "unacceptable"
     },
     "model": {
       "median_ratio": 1.036,
       "cod": 25.2,
       "prd": 1.087,
       "prb": -0.084,
-      "mape_pct": 26.3
+      "mape_pct": 26.3,
+      "vei": -16.2,
+      "vei_verdict": "unacceptable"
     }
   },
   "iaao_card": {
@@ -29,14 +33,18 @@
       "cod": 23.1,
       "prd": 1.065,
       "prb": -0.057,
-      "mape_pct": 22.5
+      "mape_pct": 22.5,
+      "vei": -16.3,
+      "vei_verdict": "unacceptable"
     },
     "model": {
       "median_ratio": 1.003,
       "cod": 18.7,
       "prd": 1.021,
       "prb": 0.007,
-      "mape_pct": 18.8
+      "mape_pct": 18.8,
+      "vei": 2.2,
+      "vei_verdict": "acceptable"
     }
   },
   "condo_card": {

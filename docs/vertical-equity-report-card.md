@@ -20,8 +20,14 @@ report card is deliberately not a "we made it fair" claim, see the honest readin
 | COD | uniformity (horizontal equity) | ≤ 15 single-family (higher tolerated for older/heterogeneous stock) |
 | PRD | vertical equity | 0.98 – 1.03 |
 | PRB | vertical equity (preferred) | within ±0.05; \|PRB\| > 0.10 unacceptable |
+| VEI | vertical equity (primary test in the September 2025 exposure draft, §8.2.1) | −10% to +10%; beyond that a CI-gap significance test must stay ≤ 10% |
 
-PRD > 1 / PRB < 0 = **regressive** (cheap homes over-assessed relative to expensive).
+PRD > 1 / PRB < 0 / VEI < 0 = **regressive** (cheap homes over-assessed relative
+to expensive). The VEI bins sales into percentile groups of a de-biased value
+proxy (half sale price, half level-adjusted assessment) and compares the first
+and last groups' median ratios to the sample median; our implementation
+reproduces the draft's worked example exactly and is validated against it in
+the test suite.
 
 ## Card 1, IAAO-standard basis (time-adjusted, 3×IQR-trimmed)
 
@@ -34,6 +40,7 @@ The convention on which an assessor's performance is officially measured.
 | COD | ≤ 15 | 23.1 ✗ | 18.7 ⚠︎ |
 | PRD | 0.98–1.03 | 1.065 ✗ | 1.021 ✓ |
 | PRB | ±0.05 | -0.057 ✗ | +0.007 ✓ |
+| VEI (2025 draft) | −10% to +10% | -16.3% ✗ | +2.2% ✓ |
 <!-- generated:veq-card-iaao:end -->
 
 **Our model passes both vertical-equity tests (PRD and PRB) and sits just above
@@ -55,6 +62,7 @@ homeowner actually experiences, and nobody passes it.
 | COD | ≤ 15 | 34.7 ✗ | 25.2 ✗ |
 | PRD | 0.98–1.03 | 1.192 ✗ | 1.087 ✗ |
 | PRB | ±0.05 | -0.235 ✗ | -0.084 ✗ |
+| VEI (2025 draft) | −10% to +10% | -56.0% ✗ | -16.2% ✗ |
 | MAPE | n/a | 34.2% | 26.3% |
 <!-- generated:veq-card-full:end -->
 
@@ -104,7 +112,9 @@ nearly closes, which locates its remaining inequity in how the cash and
 distressed channel is treated at neighborhood level (see
 [report-assessment-equity.md](report-assessment-equity.md)). Reproduce with
 `fair-measure equity-robustness`; the same tests run on any jurisdiction's data
-at [OpenRatioStudy.com](https://www.openratiostudy.com).
+at [OpenRatioStudy.com](https://www.openratiostudy.com), and
+`fair-measure export-ratio-csv` writes our exact test set (sale, valuation,
+coordinates, market area) in its input format for an independent cross-check.
 
 ## The honest reading
 

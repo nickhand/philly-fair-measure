@@ -149,6 +149,12 @@ def _mark_prb(v: float) -> str:
     return "✓" if abs(v) <= 0.05 else "✗"
 
 
+def _mark_vei(verdict: str) -> str:
+    # the VEI verdict already encodes the standard's two-stage rule (±10% band,
+    # then the CI-gap significance test), so the mark follows it directly
+    return "✓" if verdict == "acceptable" else "✗"
+
+
 def _veq_card(card: dict[str, Any], *, mape: bool) -> str:
     """A vertical-equity report-card table (OPA vs model) with IAAO pass marks."""
     opa, model = card["opa"], card["model"]
@@ -188,6 +194,17 @@ def _veq_card(card: dict[str, Any], *, mape: bool) -> str:
             ]
         ),
     ]
+    if "vei" in opa:
+        rows.append(
+            _row(
+                [
+                    "VEI (2025 draft)",
+                    "−10% to +10%",
+                    f"{opa['vei']:+.1f}% {_mark_vei(str(opa['vei_verdict']))}",
+                    f"{model['vei']:+.1f}% {_mark_vei(str(model['vei_verdict']))}",
+                ]
+            )
+        )
     if mape:
         rows.append(_row(["MAPE", "n/a", f"{opa['mape_pct']:.1f}%", f"{model['mape_pct']:.1f}%"]))
     return "\n".join(rows) + "\n"

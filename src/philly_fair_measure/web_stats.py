@@ -34,14 +34,20 @@ def _req(value: float | None, name: str) -> float:
     return value
 
 
-def _card(estimate: np.ndarray, price: np.ndarray) -> dict[str, float]:
+def _card(estimate: np.ndarray, price: np.ndarray) -> dict[str, float | str]:
+    from philly_fair_measure.models.metrics import vertical_equity_indicator
+
     m = evaluate_estimates(estimate, price)
+    vei = vertical_equity_indicator(estimate, price)
     return {
         "median_ratio": round(_req(m.median_ratio, "median_ratio"), 3),
         "cod": round(_req(m.cod, "cod"), 1),
         "prd": round(_req(m.prd, "prd"), 3),
         "prb": round(_req(m.prb, "prb"), 3),
         "mape_pct": round(_req(m.mape, "mape") * 100, 1),
+        # IAAO 2025 exposure-draft primary vertical-equity test (§8.2.1)
+        "vei": round(_req(vei.vei, "vei"), 1),
+        "vei_verdict": vei.verdict,
     }
 
 

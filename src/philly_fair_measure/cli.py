@@ -643,6 +643,50 @@ def _cmd_equity_robustness(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_export_ratio_csv(args: argparse.Namespace) -> int:
+    """The out-of-time test set as a CSV for OpenRatioStudy.com — an external
+    cross-check of our ratio-study numbers on Doucet's independent, in-browser
+    implementation (sale + valuation fields, lat/lon for the map test, region
+    for the neighborhood-level tests). All public city data."""
+    import polars as pl
+
+    from philly_fair_measure import config
+    from philly_fair_measure.models.scoring import latest_run_dir
+
+    root = args.data_dir if args.data_dir is not None else config.data_dir()
+    run_dir = latest_run_dir("baseline", root)
+    sf = pl.read_parquet(
+        root / "marts" / "sale_features.parquet",
+        columns=["sale_id", "loc_lon", "loc_lat", "loc_market_area"],
+    )
+    out = (
+        pl.read_parquet(run_dir / "predictions.parquet")
+        .join(sf, on="sale_id", how="left")
+        .filter(
+            (pl.col("sale_price") > 0)
+            & pl.col("opa_assessment").is_finite()
+            & (pl.col("opa_assessment") > 0)
+        )
+        .select(
+            pl.col("sale_price").round(0),
+            pl.col("opa_assessment").round(0),
+            pl.col("pred_lightgbm").round(0).alias("model_estimate"),
+            pl.col("loc_lat").alias("latitude"),
+            pl.col("loc_lon").alias("longitude"),
+            pl.col("loc_market_area").alias("region"),
+        )
+    )
+    path = root / "exports" / "openratiostudy.csv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    out.write_csv(path)
+    print(f"{out.height:,} test-set sales -> {path}")
+    print(
+        "drop into https://www.openratiostudy.com (runs in-browser; nothing uploads): "
+        "sale field = sale_price, valuation field = opa_assessment or model_estimate"
+    )
+    return 0
+
+
 def _cmd_aerial_pilot(args: argparse.Namespace) -> int:
     from philly_fair_measure.diagnostics.aerial_change import pilot_summary, run_aerial_pilot
 
@@ -1164,6 +1208,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     equity_rb.add_argument("--data-dir", type=Path)
     equity_rb.set_defaults(func=_cmd_equity_robustness)
+
+    ratio_csv = subparsers.add_parser(
+        "export-ratio-csv",
+        help="export the out-of-time test set as a CSV for OpenRatioStudy.com "
+        "(independent in-browser cross-check of the ratio-study numbers)",
+    )
+    ratio_csv.add_argument("--data-dir", type=Path)
+    ratio_csv.set_defaults(func=_cmd_export_ratio_csv)
 
     aerial = subparsers.add_parser(
         "aerial-pilot",

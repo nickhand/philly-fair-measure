@@ -112,3 +112,101 @@ def evaluate_estimates(estimate: npt.ArrayLike, sale_price: npt.ArrayLike) -> Me
     fit = fit_metrics(estimate, sale_price)
     ratio = ratio_metrics(estimate, sale_price)
     return Metrics(**asdict(fit), **asdict(ratio))
+
+
+@dataclass(frozen=True)
+class VEIGroup:
+    """One percentile group of the VEI test."""
+
+    n: int
+    median_proxy: float
+    median_ratio: float
+    ci_low: float
+    ci_high: float
+
+
+@dataclass(frozen=True)
+class VEIResult:
+    """IAAO Vertical Equity Indicator (2025 Standard on Ratio Studies exposure
+    draft, §8.2.1). Negative VEI = regressive tendency, positive = progressive;
+    |VEI| ≤ 10% is acceptable outright, and beyond that the verdict rests on
+    whether the first/last group medians differ provably by more than 10%."""
+
+    vei: float | None  # 100 * (median last PG - median first PG) / sample median
+    significance: float | None  # the CI-gap statistic; only set when |VEI| > 10
+    verdict: str  # "acceptable" | "unacceptable" | "insufficient_sample"
+    n: int
+    n_groups: int
+    groups: tuple[VEIGroup, ...]
+
+
+def _median_ci(ratios: np.ndarray, z: float) -> tuple[float, float]:
+    """Distribution-free median confidence interval (§7.5.3): rank offset
+    ceil(z*sqrt(n)/2 [+0.5 if n even]) counted out from the median."""
+    r = np.sort(ratios)
+    n = len(r)
+    offset = z * math.sqrt(n) / 2.0
+    if n % 2 == 0:
+        offset += 0.5
+    o = math.ceil(offset)
+    if n % 2 == 1:
+        mid = (n - 1) // 2
+        lo_i, hi_i = mid - o, mid + o
+    else:
+        lo_i, hi_i = n // 2 - o, n // 2 - 1 + o
+    return float(r[max(0, lo_i)]), float(r[min(n - 1, hi_i)])
+
+
+def vertical_equity_indicator(
+    estimate: npt.ArrayLike, sale_price: npt.ArrayLike, *, z: float = 1.64
+) -> VEIResult:
+    """The VEI test exactly as specified in the IAAO 2025 exposure draft:
+
+    1. ratio = AV / SP; 2. market-value proxy = 0.5*SP + 0.5*(AV / median
+    ratio), which de-biases the proxy toward neither regressivity (pure SP)
+    nor progressivity (pure AV); 3. sort by proxy and split into percentile
+    groups — halves for n 20–50, quartiles 51–500, deciles 501+; 4. per-group
+    median ratio and 90% median CI (z=1.64 per the standard's own arithmetic);
+    5. VEI = 100 * (last-group median − first-group median) / sample median;
+    6. if |VEI| > 10 and the first/last CIs do not overlap, the significance
+    statistic is the gap between the closest CI bounds scaled the same way —
+    above 10 the inequity is provably outside acceptable limits.
+    """
+    av, sp = _clean(estimate, sale_price)
+    n = len(av)
+    if n < 20:  # §9: below two groups of 10 the comparison is not meaningful
+        return VEIResult(None, None, "insufficient_sample", n, 0, ())
+    n_groups = 2 if n <= 50 else 4 if n <= 500 else 10
+
+    ratio = av / sp
+    sample_median = float(np.median(ratio))
+    proxy = 0.5 * sp + 0.5 * (av / sample_median)
+    order = np.argsort(proxy, kind="stable")
+    # percentile-rank grouping: rank r (0-based) -> floor(r * G / n), which
+    # reproduces the standard's worked example (54 sales -> 14/13/14/13)
+    assignment = (np.arange(n) * n_groups) // n
+
+    groups: list[VEIGroup] = []
+    for g in range(n_groups):
+        members = order[assignment == g]
+        lo, hi = _median_ci(ratio[members], z)
+        groups.append(
+            VEIGroup(
+                n=len(members),
+                median_proxy=float(np.median(proxy[members])),
+                median_ratio=float(np.median(ratio[members])),
+                ci_low=lo,
+                ci_high=hi,
+            )
+        )
+
+    first, last = groups[0], groups[-1]
+    vei = 100.0 * (last.median_ratio - first.median_ratio) / sample_median
+    if abs(vei) <= 10.0:
+        return VEIResult(vei, None, "acceptable", n, n_groups, tuple(groups))
+    high, low = (last, first) if last.median_ratio >= first.median_ratio else (first, last)
+    if high.ci_low <= low.ci_high:  # intervals overlap: not provably unacceptable
+        return VEIResult(vei, None, "acceptable", n, n_groups, tuple(groups))
+    significance = 100.0 * (high.ci_low - low.ci_high) / sample_median
+    verdict = "unacceptable" if significance > 10.0 else "acceptable"
+    return VEIResult(vei, significance, verdict, n, n_groups, tuple(groups))

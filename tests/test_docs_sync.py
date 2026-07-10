@@ -19,8 +19,24 @@ from philly_fair_measure.docs_sync import (
 STATS = {
     "meta": {"model_run_id": "20990101T000000Z-baseline", "n_test": 19_484},
     "iaao_card": {
-        "model": {"median_ratio": 1.001, "cod": 19.3, "prd": 1.024, "prb": 0.01, "mape_pct": 19.3},
-        "opa": {"median_ratio": 0.848, "cod": 24.7, "prd": 1.07, "prb": -0.058, "mape_pct": 24.9},
+        "model": {
+            "median_ratio": 1.001,
+            "cod": 19.3,
+            "prd": 1.024,
+            "prb": 0.01,
+            "mape_pct": 19.3,
+            "vei": 2.4,
+            "vei_verdict": "acceptable",
+        },
+        "opa": {
+            "median_ratio": 0.848,
+            "cod": 24.7,
+            "prd": 1.07,
+            "prb": -0.058,
+            "mape_pct": 24.9,
+            "vei": -20.9,
+            "vei_verdict": "unacceptable",
+        },
     },
     "full_card": {
         "model": {
@@ -29,8 +45,18 @@ STATS = {
             "prd": 1.087,
             "prb": -0.073,
             "mape_pct": 26.4,
+            "vei": -15.4,
+            "vei_verdict": "unacceptable",
         },
-        "opa": {"median_ratio": 0.983, "cod": 34.5, "prd": 1.19, "prb": -0.234, "mape_pct": 34.0},
+        "opa": {
+            "median_ratio": 0.983,
+            "cod": 34.5,
+            "prd": 1.19,
+            "prb": -0.234,
+            "mape_pct": 34.0,
+            "vei": -43.9,
+            "vei_verdict": "unacceptable",
+        },
     },
     "screen": {
         "properties": 496_975,
@@ -140,8 +166,10 @@ def test_veq_and_condo_builders_render_with_pass_marks():
     # model passes both vertical-equity tests, sits marginal on COD; OPA fails
     assert "| PRB | ±0.05 | -0.058 ✗ | +0.010 ✓ |" in iaao
     assert "| COD | ≤ 15 | 24.7 ✗ | 19.3 ⚠︎ |" in iaao
+    assert "| VEI (2025 draft) | −10% to +10% | -20.9% ✗ | +2.4% ✓ |" in iaao
     full = veq_card_full(STATS)
     assert "| MAPE | n/a | 34.0% | 26.4% |" in full  # full card carries a MAPE row
+    assert "| VEI (2025 draft) | −10% to +10% | -43.9% ✗ | -15.4% ✗ |" in full
     condo = condo_bullet(STATS)
     assert "rmse 0.243 vs 0.278" in condo and "COD 17.5 vs 18.8" in condo
 
