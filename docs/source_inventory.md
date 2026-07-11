@@ -6,7 +6,10 @@ on 2026-07-02** (schema via `SELECT * ... LIMIT 0`, row counts via `count(*)`,
 ArcGIS layers via service metadata + `returnCountOnly` queries). Nothing here is
 assumed from memory or documentation alone. Row counts drift as sources update;
 treat them as of the verification date. Update cadence is mostly *unobserved* so
-far, establishing it empirically is what the snapshot program is for.
+far, establishing it empirically is what the snapshot program is for: the
+current-only tables are re-captured monthly by a scheduled workflow that
+archives raw parquet to S3 and commits a change summary to `docs/snapshots/`
+(see [docs/snapshots/README.md](snapshots/README.md)).
 
 Two API families serve this project:
 

@@ -1,0 +1,91 @@
+# Monthly snapshots of the current-only CARTO tables (the city overwrites
+# these in place, so our snapshots are the only history that exists).
+#
+# Each run: pull last month's snapshot from S3 -> fetch fresh copies ->
+# upload to S3 -> commit a small diff summary to docs/snapshots/. That commit
+# doubles as a keepalive: GitHub disables cron workflows in public repos after
+# 60 days without repository activity, and a monthly bot commit resets the
+# clock. One-time AWS setup lives in docs/snapshots/README.md.
+name: monthly-snapshot
+
+on:
+  schedule:
+    - cron: "23 4 2 * *" # 04:23 UTC on the 2nd; odd minute dodges the top-of-hour rush
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC token for assuming the AWS role
+  contents: write # push the diff summary commit
+
+concurrency:
+  group: monthly-snapshot
+  cancel-in-progress: false
+
+env:
+  TABLES: opa_properties_public assessments real_estate_tax_delinquencies
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Assume AWS role (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.SNAPSHOT_ROLE_ARN }}
+          aws-region: ${{ vars.SNAPSHOT_AWS_REGION }}
+
+      - name: Pull previous snapshots from S3 (latest per dataset)
+        run: |
+          for ds in $TABLES; do
+            prefix="raw/source=carto/dataset=$ds/"
+            latest=$(aws s3 ls "s3://${{ vars.SNAPSHOT_BUCKET }}/$prefix" \
+              | awk '{print $2}' | grep '^fetched_at=' | sort | tail -1)
+            if [ -n "$latest" ]; then
+              echo "previous $ds: $latest"
+              aws s3 sync --no-progress \
+                "s3://${{ vars.SNAPSHOT_BUCKET }}/$prefix$latest" \
+                "data/$prefix$latest"
+            else
+              echo "no previous snapshot for $ds (first run?)"
+            fi
+          done
+
+      - name: Fetch fresh snapshots
+        run: uv run fair-measure snapshot-all --tables $TABLES
+
+      - name: Upload to S3
+        run: |
+          aws s3 sync --no-progress --size-only data/raw \
+            "s3://${{ vars.SNAPSHOT_BUCKET }}/raw"
+
+      - name: Diff against the previous snapshots
+        run: |
+          uv run fair-measure snapshot-diff \
+            --out "docs/snapshots/$(date -u +%F).md"
+
+      - name: Commit the summary (self-keepalive)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/snapshots
+          if git diff --cached --quiet; then
+            echo "no summary to commit (first run without a previous snapshot)"
+          else
+            git commit -m "snapshot: monthly diff summary $(date -u +%F)"
+            git pull --rebase origin main
+            git push origin main
+          fi

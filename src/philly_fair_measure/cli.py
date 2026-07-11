@@ -6,7 +6,8 @@ import argparse
 import logging
 from pathlib import Path
 
-from philly_fair_measure import catalog
+from philly_fair_measure import catalog, config
+from philly_fair_measure.ingest.diff import SNAPSHOT_DIFF_SPECS
 from philly_fair_measure.ingest.snapshots import snapshot_carto_table
 from philly_fair_measure.sources.carto import DEFAULT_PAGE_SIZE
 from philly_fair_measure.vocab import Market
@@ -894,10 +895,13 @@ def _cmd_comps(args: argparse.Namespace) -> int:
 
 
 def _cmd_snapshot_all(args: argparse.Namespace) -> int:
-    from philly_fair_measure import config
-
+    tables = {
+        table: page_size
+        for table, page_size in config.CORE_CARTO_TABLES.items()
+        if args.tables is None or table in args.tables
+    }
     failures = []
-    for table, page_size in config.CORE_CARTO_TABLES.items():
+    for table, page_size in tables.items():
         try:
             result = snapshot_carto_table(table, data_dir=args.data_dir, page_size=page_size)
             print(f"{result.manifest.row_count:,} rows -> {result.directory}")
@@ -907,6 +911,59 @@ def _cmd_snapshot_all(args: argparse.Namespace) -> int:
     if failures:
         print(f"FAILED: {', '.join(table for table, _ in failures)}")
         return 1
+    return 0
+
+
+def _cmd_snapshot_diff(args: argparse.Namespace) -> int:
+    import json
+    from datetime import UTC, datetime
+
+    from philly_fair_measure.ingest.diff import diff_dataset, render_markdown
+
+    datasets = args.datasets or sorted(SNAPSHOT_DIFF_SPECS)
+    by_dataset: dict[str, list[catalog.SnapshotRef]] = {ds: [] for ds in datasets}
+    for ref in catalog.list_snapshots(args.data_dir):
+        if ref.dataset in by_dataset:
+            by_dataset[ref.dataset].append(ref)  # list_snapshots sorts by fetched_at
+
+    diffs = []
+    for ds in datasets:
+        refs = by_dataset[ds]
+        if len(refs) < 2:
+            have = refs[-1].fetched_at if refs else "none"
+            print(f"{ds}: need two snapshots to diff (have: {have}); skipping")
+            continue
+        prev, new = refs[-2], refs[-1]
+        diffs.append(
+            diff_dataset(
+                prev.data_path,
+                new.data_path,
+                SNAPSHOT_DIFF_SPECS[ds],
+                dataset=ds,
+                prev_stamp=prev.fetched_at,
+                new_stamp=new.fetched_at,
+            )
+        )
+    if not diffs:
+        print("nothing to diff")
+        return 0
+
+    generated_at = datetime.now(UTC).strftime("%Y-%m-%d")
+    markdown = render_markdown(diffs, generated_at=generated_at)
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(markdown)
+        print(f"wrote {args.out}")
+    else:
+        print(markdown, end="")
+    if args.json_out is not None:
+        args.json_out.parent.mkdir(parents=True, exist_ok=True)
+        args.json_out.write_text(
+            json.dumps(
+                {"generated_at": generated_at, "datasets": [d.to_dict() for d in diffs]},
+                indent=2,
+            )
+        )
     return 0
 
 
@@ -1310,8 +1367,32 @@ def main(argv: list[str] | None = None) -> int:
     snapshot_all = subparsers.add_parser(
         "snapshot-all", help="snapshot every core table (the recurring snapshot job)"
     )
+    snapshot_all.add_argument(
+        "--tables",
+        nargs="+",
+        choices=sorted(config.CORE_CARTO_TABLES),
+        help="snapshot only these core tables (default: all)",
+    )
     snapshot_all.add_argument("--data-dir", type=Path)
     snapshot_all.set_defaults(func=_cmd_snapshot_all)
+
+    snapshot_diff = subparsers.add_parser(
+        "snapshot-diff",
+        help="summarize what changed between the two latest snapshots of the "
+        "current-only tables (the monthly snapshot program)",
+    )
+    snapshot_diff.add_argument(
+        "--datasets",
+        nargs="+",
+        choices=sorted(SNAPSHOT_DIFF_SPECS),
+        help="datasets to diff (default: all current-only tables)",
+    )
+    snapshot_diff.add_argument(
+        "--out", type=Path, help="write the markdown summary here (default: stdout)"
+    )
+    snapshot_diff.add_argument("--json-out", type=Path, help="also write the diff as JSON")
+    snapshot_diff.add_argument("--data-dir", type=Path)
+    snapshot_diff.set_defaults(func=_cmd_snapshot_diff)
 
     freshness = subparsers.add_parser(
         "freshness",

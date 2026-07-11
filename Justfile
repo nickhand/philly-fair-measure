@@ -45,6 +45,14 @@ test:
 
 # ---------------------------------------------------------------- pipeline
 
+# Snapshot the current-only tables and summarize what the city changed since
+# the previous snapshot (the local flavor of .github/workflows/snapshot.yml;
+# see docs/snapshots/README.md).
+[group: "pipeline"]
+snapshot-current:
+	uv run fair-measure snapshot-all --tables assessments opa_properties_public real_estate_tax_delinquencies
+	uv run fair-measure snapshot-diff
+
 # Full coherent retrain: sale validity -> features -> every model -> screen ->
 # site stats -> docs. Any feature/mart rebuild REQUIRES retraining every model
 # (the screen refuses stale runs) — this is the one command that keeps it all
