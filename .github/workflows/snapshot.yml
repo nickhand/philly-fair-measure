@@ -1,16 +1,16 @@
-# Monthly snapshots of the current-only CARTO tables (the city overwrites
+# Weekly snapshots of the current-only CARTO tables (the city overwrites
 # these in place, so our snapshots are the only history that exists).
 #
-# Each run: pull last month's snapshot from S3 -> fetch fresh copies ->
+# Each run: pull the previous snapshot from S3 -> fetch fresh copies ->
 # upload to S3 -> commit a small diff summary to docs/snapshots/. That commit
 # doubles as a keepalive: GitHub disables cron workflows in public repos after
-# 60 days without repository activity, and a monthly bot commit resets the
+# 60 days without repository activity, and a weekly bot commit resets the
 # clock. One-time AWS setup lives in docs/snapshots/README.md.
-name: monthly-snapshot
+name: snapshot
 
 on:
   schedule:
-    - cron: "23 4 2 * *" # 04:23 UTC on the 2nd; odd minute dodges the top-of-hour rush
+    - cron: "23 4 * * 1" # Mondays 04:23 UTC; odd minute dodges the top-of-hour rush
   workflow_dispatch:
 
 permissions:
@@ -18,7 +18,7 @@ permissions:
   contents: write # push the diff summary commit
 
 concurrency:
-  group: monthly-snapshot
+  group: snapshot
   cancel-in-progress: false
 
 env:
@@ -85,7 +85,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "no summary to commit (first run without a previous snapshot)"
           else
-            git commit -m "snapshot: monthly diff summary $(date -u +%F)"
+            git commit -m "snapshot: diff summary $(date -u +%F)"
             git pull --rebase origin main
             git push origin main
           fi

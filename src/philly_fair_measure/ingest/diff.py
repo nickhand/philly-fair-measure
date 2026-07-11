@@ -22,31 +22,69 @@ from typing import Final
 
 import polars as pl
 
-# Columns that identify a row and columns worth tracking per dataset. Watched
-# lists deliberately exclude unstable plumbing (cartodb_id, objectid, the_geom)
-# and free-text mailing fields that churn without meaning.
+# Internal column-name sentinels. CARTO column names are lowercase
+# alphanumerics/underscores, so "::" cannot collide with a real column
+# (a plain "_new" suffix does: `building_code_new` is a real column).
+_NEW: Final = "::new"
+_CHG: Final = "chg::"
+
+# Columns that identify a row and columns worth tracking per dataset. The raw
+# parquet keeps EVERY column; watched lists only scope the report. Deliberately
+# excluded: plumbing (cartodb_id, objectid, the_geom, pin, registry_number),
+# address components and mailing_* fields (churn without meaning), owner_2
+# (name-order flapping), and metadata stamps that mass-update on every roll
+# republish (assessment_date, market_value_date) and would swamp the counts.
 _WATCHED_PROPERTIES: Final = (
+    # value + exemptions
     "market_value",
     "taxable_building",
     "taxable_land",
     "exempt_building",
     "exempt_land",
     "homestead_exemption",
+    # size + shape
     "total_livable_area",
     "total_area",
+    "depth",
+    "frontage",
+    "parcel_shape",
+    # condition + quality + classification
     "interior_condition",
     "exterior_condition",
     "quality_grade",
     "building_code",
+    "building_code_new",
     "category_code",
+    "zoning",
+    # structure characteristics
     "year_built",
+    "year_built_estimate",
     "number_of_bedrooms",
     "number_of_bathrooms",
+    "number_of_rooms",
     "number_stories",
+    "basements",
+    "central_air",
+    "fireplaces",
+    "garage_spaces",
+    "garage_type",
+    "fuel",
+    "type_heater",
+    "sewer",
+    "utility",
+    "general_construction",
+    "view_type",
+    "topography",
+    "separate_utilities",
+    "unfinished",
+    "off_street_open",
+    "house_extension",
+    "site_type",
+    # deed + ownership
     "owner_1",
     "sale_date",
     "sale_price",
-    "zoning",
+    "recording_date",
 )
 _WATCHED_ASSESSMENTS: Final = (
     "market_value",
@@ -56,14 +94,21 @@ _WATCHED_ASSESSMENTS: Final = (
     "exempt_land",
 )
 _WATCHED_DELINQUENCIES: Final = (
+    "year_month",  # the vintage stamp: flips for every row when the city refreshes
     "total_due",
     "principal_due",
     "num_years_owed",
     "most_recent_year_owed",
+    "oldest_year_owed",
+    "most_recent_payment_date",
     "sheriff_sale",
     "payment_agreement",
+    "agreement_agency",
+    "bankruptcy",
     "is_actionable",
     "coll_agency_total_owed",
+    "homestead_value",
+    "total_assessment",
 )
 
 
@@ -149,24 +194,22 @@ def diff_dataset(
     n_added = new.join(prev, on=keys, how="anti").height
     n_removed = prev.join(new, on=keys, how="anti").height
 
-    joined = prev.join(new, on=keys, how="inner", suffix="_new")
+    joined = prev.join(new, on=keys, how="inner", suffix=_NEW)
     flags = joined.with_columns(
-        [pl.col(c).ne_missing(pl.col(f"{c}_new")).alias(f"chg_{c}") for c in watched]
+        [pl.col(c).ne_missing(pl.col(c + _NEW)).alias(_CHG + c) for c in watched]
     )
     changed_any = (
-        int(flags.select(pl.any_horizontal([pl.col(f"chg_{c}") for c in watched]).sum()).item())
+        int(flags.select(pl.any_horizontal([pl.col(_CHG + c) for c in watched]).sum()).item())
         if watched
         else 0
     )
 
     columns: list[ColumnChange] = []
     for c in watched:
-        n_changed = int(flags.select(pl.col(f"chg_{c}").sum()).item())
+        n_changed = int(flags.select(pl.col(_CHG + c).sum()).item())
         median_delta: float | None = None
         if n_changed and flags.schema[c].is_numeric():
-            delta = flags.filter(pl.col(f"chg_{c}")).select(
-                (pl.col(f"{c}_new") - pl.col(c)).median()
-            )
+            delta = flags.filter(pl.col(_CHG + c)).select((pl.col(c + _NEW) - pl.col(c)).median())
             value = delta.item()
             median_delta = float(value) if value is not None else None
         columns.append(ColumnChange(column=c, n_changed=n_changed, median_delta=median_delta))
@@ -189,16 +232,16 @@ def diff_dataset(
 def _dataset_notes(dataset: str, flags: pl.DataFrame) -> list[str]:
     """Derived facts worth calling out per dataset."""
     notes: list[str] = []
-    if dataset == "opa_properties_public" and "chg_homestead_exemption" in flags.columns:
+    if dataset == "opa_properties_public" and _CHG + "homestead_exemption" in flags.columns:
         hs_prev = pl.col("homestead_exemption").fill_null(0)
-        hs_new = pl.col("homestead_exemption_new").fill_null(0)
+        hs_new = pl.col("homestead_exemption" + _NEW).fill_null(0)
         adds = int(flags.select(((hs_prev == 0) & (hs_new > 0)).sum()).item())
         drops = int(flags.select(((hs_prev > 0) & (hs_new == 0)).sum()).item())
         if adds or drops:
             notes.append(f"homestead exemption: {adds:,} added, {drops:,} removed")
-    if dataset == "assessments" and "chg_market_value" in flags.columns:
+    if dataset == "assessments" and _CHG + "market_value" in flags.columns:
         restated = (
-            flags.filter(pl.col("chg_market_value"))
+            flags.filter(pl.col(_CHG + "market_value"))
             .group_by("year")
             .len()
             .sort("year", descending=True)
@@ -206,12 +249,12 @@ def _dataset_notes(dataset: str, flags: pl.DataFrame) -> list[str]:
         if restated.height:
             parts = ", ".join(f"{r['year']}: {r['len']:,}" for r in restated.to_dicts()[:6])
             notes.append(f"market_value changed by assessment year ({parts})")
-    if dataset == "real_estate_tax_delinquencies" and "chg_sheriff_sale" in flags.columns:
+    if dataset == "real_estate_tax_delinquencies" and _CHG + "sheriff_sale" in flags.columns:
         to_yes = int(
             flags.select(
                 (
                     pl.col("sheriff_sale").fill_null("N").ne("Y")
-                    & pl.col("sheriff_sale_new").fill_null("N").eq("Y")
+                    & pl.col("sheriff_sale" + _NEW).fill_null("N").eq("Y")
                 ).sum()
             ).item()
         )

@@ -7,7 +7,7 @@ ArcGIS layers via service metadata + `returnCountOnly` queries). Nothing here is
 assumed from memory or documentation alone. Row counts drift as sources update;
 treat them as of the verification date. Update cadence is mostly *unobserved* so
 far, establishing it empirically is what the snapshot program is for: the
-current-only tables are re-captured monthly by a scheduled workflow that
+current-only tables are re-captured weekly by a scheduled workflow that
 archives raw parquet to S3 and commits a change summary to `docs/snapshots/`
 (see [docs/snapshots/README.md](snapshots/README.md)).
 
@@ -89,8 +89,10 @@ so bulk geometry pulls need `resultOffset` paging or envelope tiling.
   waiting for our own snapshots to accrue. Coverage observed: 2013–2027,
   including the future-year roll (2027 values are published in advance).
 - **Limitations:** Values only; no historical *characteristics*. `year` is
-  varchar. Whether past years are ever restated is unknown, snapshots will
-  answer this.
+  varchar. Past years ARE restated: the first snapshot diff (2026-07-02 ->
+  07-11) caught edits to 2018-2026 values (~120 rows each in 2025/2026), so
+  this table cannot be treated as append-only; our snapshots are the only
+  record of pre-edit values.
 
 ### 3. Real estate transfers (`rtt_summary`)
 

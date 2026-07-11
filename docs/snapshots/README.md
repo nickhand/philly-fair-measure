@@ -1,10 +1,10 @@
-# The monthly snapshot program
+# The snapshot program
 
 Three of our sources are current-state tables the city overwrites in place:
 `opa_properties_public` (every characteristic: livable area, condition,
 exemptions), `assessments` (whether past years get restated is unknowable
 without history), and `real_estate_tax_delinquencies`. Once the city edits a
-record, the old value is gone. The monthly snapshot program is the only
+record, the old value is gone. The weekly snapshot program is the only
 mechanism by which "what did the city change?" stays answerable: enrollment
 growth in the homestead exemption, characteristic corrections during appeal
 season (FLR by Sept 1, BRT by Oct 5), past-year restatements, sheriff-sale
@@ -13,8 +13,8 @@ flags.
 ## How it works
 
 [`.github/workflows/snapshot.yml`](../../.github/workflows/snapshot.yml) runs
-at 04:23 UTC on the 2nd of each month (plus on demand via
-`gh workflow run monthly-snapshot`):
+at 04:23 UTC every Monday (plus on demand via
+`gh workflow run snapshot`):
 
 1. pull the latest previous snapshot per dataset from S3,
 2. fetch fresh copies via `fair-measure snapshot-all --tables ...`,
@@ -26,11 +26,11 @@ at 04:23 UTC on the 2nd of each month (plus on demand via
 The committed summary is the point of the program: a small, greppable record
 of what changed, reviewed like any other diff. It also keeps the schedule
 alive: GitHub disables cron workflows in public repos after 60 days without
-repository activity, and the monthly bot commit resets that clock. Failure
+repository activity, and the weekly bot commit resets that clock. Failure
 emails go to the workflow author (GitHub's default for scheduled runs).
 
-Raw parquet is never committed; it lives in S3 (~165 MB/month, ~$0.05/month
-at standard rates).
+Raw parquet is never committed; it lives in S3 (~165 MB/run, ~8.5 GB/year,
+pennies per month at standard rates).
 
 ## One-time AWS setup
 
@@ -132,7 +132,7 @@ Setup, once, with `<ACCOUNT_ID>` and a bucket name of your choosing:
    done
    ```
 
-6. **Test it**: `gh workflow run monthly-snapshot`, then `gh run watch`. The
+6. **Test it**: `gh workflow run snapshot`, then `gh run watch`. The
    run should end by pushing a `docs/snapshots/<date>.md` commit.
 
 ## Local use

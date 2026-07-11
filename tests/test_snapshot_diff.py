@@ -172,3 +172,18 @@ def test_specs_cover_the_current_only_tables() -> None:
         "assessments",
         "real_estate_tax_delinquencies",
     }
+
+
+def test_watched_column_named_like_the_join_suffix(tmp_path: Path) -> None:
+    """`building_code_new` is a real column; the join suffix must not collide."""
+    spec = DiffSpec(keys=("parcel_number",), watched=("building_code", "building_code_new"))
+    prev = pl.DataFrame(
+        {"parcel_number": ["1", "2"], "building_code": ["A", "B"], "building_code_new": ["X", "Y"]}
+    )
+    new = pl.DataFrame(
+        {"parcel_number": ["1", "2"], "building_code": ["A", "B"], "building_code_new": ["X", "Z"]}
+    )
+    d = _diff(tmp_path, prev, new, spec, "opa_properties_public")
+    by_col = {c.column: c for c in d.columns}
+    assert by_col["building_code"].n_changed == 0
+    assert by_col["building_code_new"].n_changed == 1
