@@ -35,8 +35,16 @@ at standard rates).
 ## One-time AWS setup
 
 The workflow authenticates with OIDC role assumption; no long-lived keys are
-stored in GitHub. Setup, once, with `<ACCOUNT_ID>` and a bucket name of your
-choosing:
+stored in GitHub. Run the setup below as a named profile, not the root
+account: create an IAM Identity Center user (`aws configure sso --profile
+philly-fair-measure`) or an IAM user with an access key (`aws configure
+--profile philly-fair-measure`), then `export
+AWS_PROFILE=philly-fair-measure` so these commands pick it up.
+`aws sts get-caller-identity` confirms the profile and prints the
+`<ACCOUNT_ID>` used below. The profile is only for this one-time setup and
+optional local pulls; the workflow itself assumes the role keylessly.
+
+Setup, once, with `<ACCOUNT_ID>` and a bucket name of your choosing:
 
 1. **Bucket** (dedicated to this program):
 
