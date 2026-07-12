@@ -43,7 +43,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, TypedDict
+from typing import TYPE_CHECKING, Final, TypedDict
 
 import lightgbm as lgb
 import numpy as np
@@ -261,13 +261,20 @@ def feature_lists(time_adjusted: bool) -> tuple[list[str], list[str]]:
     return numeric, list(CATEGORICAL_FEATURES)
 
 
-def catboost_frame(df: pl.DataFrame, numeric: list[str], categorical: list[str]) -> Any:
-    """CatBoost input: numerics as floats (NaN handled natively), categoricals
-    as strings with an explicit missing token (CatBoost rejects null cats)."""
-    return df.select(
-        *[pl.col(c).cast(pl.Float64) for c in numeric],
-        *[pl.col(c).cast(pl.String).fill_null("__missing__") for c in categorical],
-    ).to_pandas()
+def catboost_frame(
+    df: pl.DataFrame, numeric: list[str], categorical: list[str]
+) -> npt.NDArray[np.object_]:
+    """CatBoost input as an object ndarray, numerics first then categoricals
+    (the fitted column order): floats with NaN handled natively, categoricals
+    as strings with an explicit missing token (CatBoost rejects null cats).
+    Verified bit-identical to the pandas input path on the shipped model —
+    and keeps our code polars-only."""
+    out = np.empty((df.height, len(numeric) + len(categorical)), dtype=object)
+    out[:, : len(numeric)] = df.select([pl.col(c).cast(pl.Float64) for c in numeric]).to_numpy()
+    out[:, len(numeric) :] = df.select(
+        [pl.col(c).cast(pl.String).fill_null("__missing__") for c in categorical]
+    ).to_numpy()
+    return out
 
 
 def _load_frame(mart_path: Path) -> pl.DataFrame:

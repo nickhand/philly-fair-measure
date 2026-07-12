@@ -151,7 +151,7 @@ of *then-new* homes only (`mkt_newbuild_knn_*`, k=10, same leakage discipline
 as §4's surface), an explicit `char_new_build` dummy plus the local
 new-vs-old premium as features, and a `newbuild_thin` term in the Bayesian σ
 design so a new build with <3 new-build comps nearby gets a wider, honest
-interval. Measured on the 370 out-of-time new-build test sales: LightGBM
+interval. Measured 2026-07-04 on the 370 out-of-time new-build test sales: LightGBM
 median ratio 0.90 → 0.98 (bias gone), Bayesian coverage 0.93 → 0.95 at width
 1.81; citywide metrics unchanged. Screen policy on top: homes built within
 two years of the valuation date never flag "over" (they demote to the

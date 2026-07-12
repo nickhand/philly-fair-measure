@@ -1,6 +1,6 @@
 """Conformalized stacking: one point from both arms, honest intervals around it.
 
-The screen's two machines disagree in character: LightGBM is sharp but drifts
+The diagnostic's two arms disagree in character: the LightGBM arm is sharp but drifts
 hot in segments (measured 2026-07-06: median est/sale 1.10-1.13 on d_10
 pre-war rows vs 1.04 citywide), while the Bayesian median is spatially
 disciplined but smoother. The textbook remedy is a convex log-space stack —

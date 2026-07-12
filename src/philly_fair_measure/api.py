@@ -257,7 +257,7 @@ def _core(s: dict[str, Any]) -> PropertyCore:
         interval_method=s.get("interval_method"),
         opa_market_value=_f(s.get("opa_market_value")),
         # the headline estimate is display_median (Stage 5: the calibrated
-        # LightGBM point, the machine the drivers/comps explain); model_*
+        # stacked point — drivers explain it via blended SHAP); model_*
         # stays the Bayesian gate machine, served for the methods footnote
         model_median=_f(
             s.get("display_median")

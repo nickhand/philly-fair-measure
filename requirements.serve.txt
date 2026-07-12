@@ -8,4 +8,8 @@ uvicorn[standard]>=0.30
 polars>=1.0
 numpy>=2.0
 lightgbm>=4.0
+# the point estimate is a LightGBM+CatBoost stack: score_point and the report's
+# blended-SHAP drivers load model_catboost.cbm per run (models/scoring.py,
+# models/explain.py)
+catboost>=1.2
 pydantic>=2.7

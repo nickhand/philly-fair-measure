@@ -2,7 +2,9 @@
 
 The "what goes into your assessment" layer for the public dashboard. LightGBM's
 ``pred_contrib=True`` is exact TreeSHAP (Lundberg et al.) and comes free with the
-booster — no ``shap`` dependency. It decomposes the prediction additively into a
+booster — no ``shap`` dependency; for stack runs, CatBoost's native ShapValues
+blend in with the persisted stack weight, so the drivers explain the stacked
+point exactly. It decomposes the prediction additively into a
 base value plus one signed contribution per feature; this module ranks those,
 attaches plain-language labels and category groups, and converts them to
 approximate signed dollar effects for a lay audience.

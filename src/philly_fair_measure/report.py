@@ -460,8 +460,8 @@ def render_html(data: ReportData) -> str:
         points = appeal_points(data.explanation, c)
         if points:
             parts += _render_appeal(points)
-    # the retail/cash panel is LightGBM-derived; since Stage 5 the headline
-    # estimate is too, so the old suppress-on-disagreement gate (which
+    # the retail/cash panel comes from the same stacked point (score_point)
+    # as the headline estimate, so the old suppress-on-disagreement gate (which
     # compared the point to the Bayesian median) no longer applies
     if s.get("retail_value") is not None:
         parts += [

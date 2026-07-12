@@ -263,7 +263,7 @@ def test_finalize_screen_attention_tier():
 
 def test_finalize_screen_agreement_gate_and_display_band():
     # Interval 150k-600k around a 300k Bayesian median everywhere; the
-    # conformal band around the LightGBM point is the second machine.
+    # conformal band around the stacked point is the second machine.
     df = pl.DataFrame(
         {
             "parcel_id": ["agreed_over", "disputed_over", "disputed_under", "med_outside", "gap"],
@@ -300,7 +300,7 @@ def test_finalize_screen_agreement_gate_and_display_band():
     assert abs(out["disputed_over"]["screen_z"]) > 1.64
     assert out["disputed_under"]["assessment_flag"] == "within_range"
     assert out["disputed_under"]["attention"] == "low"
-    # Stage 5 role separation: the display pair is the calibrated LightGBM
+    # Stage 5 role separation: the display pair is the calibrated stacked
     # point + its own CQR band (no intersection); the headroom clamp keeps
     # the shown estimate >=10% inside the shown range on both sides
     assert all(r["display_median"] == pytest.approx(300_000.0) for r in out.values())

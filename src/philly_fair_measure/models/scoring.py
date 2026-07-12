@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
+import numpy.typing as npt
 import polars as pl
 
 from philly_fair_measure import config
@@ -39,7 +40,7 @@ def run_params(run_dir: Path) -> dict[str, Any]:
     return cast(dict[str, Any], json.loads((run_dir / "params.json").read_text()))
 
 
-def _lightgbm_arm_log(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
+def _lightgbm_arm_log(run_dir: Path, df: pl.DataFrame) -> npt.NDArray[np.float64]:
     import lightgbm as lgb
 
     booster = lgb.Booster(model_file=str(run_dir / "model_lightgbm.txt"))
@@ -49,7 +50,7 @@ def _lightgbm_arm_log(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
     return np.asarray(booster.predict(x), dtype=np.float64)
 
 
-def score_point(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
+def score_point(run_dir: Path, df: pl.DataFrame) -> npt.NDArray[np.float64]:
     """THE run's point estimate: the GBM stack (LightGBM + CatBoost, persisted
     convex weight) when the run has one, the LightGBM model alone for runs
     that predate the stack — in both cases with the run's isotonic vertical
@@ -89,7 +90,7 @@ def score_point(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
     return np.asarray(np.exp(pred_log), dtype=np.float64)
 
 
-def score_lightgbm(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
+def score_lightgbm(run_dir: Path, df: pl.DataFrame) -> npt.NDArray[np.float64]:
     """The LightGBM ARM of a run (see `score_point` for the headline point).
 
     For stack runs the arm is returned raw — the persisted isotonic belongs to
@@ -106,7 +107,7 @@ def score_lightgbm(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
     return np.asarray(np.exp(pred_log), dtype=np.float64)
 
 
-def lightgbm_median_ratio(run_dir: Path, model: str = "point") -> float:
+def point_median_ratio(run_dir: Path, model: str = "point") -> float:
     """Out-of-time median estimate/price ratio of the run's point estimate — a
     transparent global calibration factor (the point undershoots recent
     appreciation slightly). model="point" falls back to the "lightgbm" row for
@@ -126,7 +127,9 @@ def lightgbm_median_ratio(run_dir: Path, model: str = "point") -> float:
     return float(row["median_ratio"][0])
 
 
-def score_quantile_heads(run_dir: Path, df: pl.DataFrame) -> tuple[np.ndarray, np.ndarray] | None:
+def score_quantile_heads(
+    run_dir: Path, df: pl.DataFrame
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]] | None:
     """(q05, q95) REFERENCE-FRAME log-price predictions from a run's persisted
     CQR quantile heads, crossing-ordered; None when the run predates them."""
     import lightgbm as lgb
@@ -147,8 +150,8 @@ def score_quantile_heads(run_dir: Path, df: pl.DataFrame) -> tuple[np.ndarray, n
 
 def bayesian_median_ratio(run_dir: Path) -> float:
     """Out-of-time median estimate/price ratio of a Bayesian run — the same
-    transparent global calibration convention the LightGBM point uses
-    (`lightgbm_median_ratio`). The area-time slope model trades level against
+    transparent global calibration convention the stacked point uses
+    (`point_median_ratio`). The area-time slope model trades level against
     time-correlated covariates, leaving a flat few-percent bias at every
     horizon (measured 2026-07-06: 0.95 at all t_c); dividing it out once,
     from a published number, keeps screen z-scores centered."""
@@ -165,7 +168,7 @@ def score_bayesian_intervals(
     pi_high: float = 0.95,
     chunk_size: int = 50_000,
     seed: int = 42,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """(median, pi_low, pi_high) price arrays at the frame's dates; chunked to
     bound draw-matrix memory. Handles the run's time adjustment internally."""
     from datetime import date

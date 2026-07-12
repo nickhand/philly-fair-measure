@@ -15,7 +15,7 @@ Modern-practice choices and why (docs/research-notes.md):
 - **Student-t likelihood** (nu learned): sale-price tails inflated the v1
   Normal sigma to 0.45, making honest intervals very wide; a robust likelihood
   narrows intervals without sacrificing coverage.
-- **Time-adjusted target** (OPA practice, shared with the v2 LightGBM): kills
+- **Time-adjusted target** (OPA practice, shared with the GBM baseline): kills
   the linear-time-trend extrapolation bias (v1 median ratio 1.12).
 - **Learned geography** for pooling: district (18) → market area (350) from
   features/market_areas.py replaces ward → tract; boundaries follow price

@@ -109,6 +109,8 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
     run_id = run_dir.name.removeprefix("run_id=")
 
     preds = pl.read_parquet(run_dir / "predictions.parquet")
+    if "pred_point" not in preds.columns:  # pre-stack runs name the point pred_lightgbm
+        preds = preds.rename({"pred_lightgbm": "pred_point"})
     sf = pl.read_parquet(root / "marts" / "sale_features.parquet")
     joined = preds.join(
         sf.select("sale_id", "time_adj_log", "fin_cash_sale"), on="sale_id", how="left"

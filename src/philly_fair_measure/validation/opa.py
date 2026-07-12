@@ -22,7 +22,7 @@ Two model families share the mart, distinguished by `model_family` +
 `interval_method`:
 
     residential  non-condo SINGLE FAMILY / MULTI FAMILY parcels; point
-                 estimate from the latest LightGBM baseline run, interval from
+                 estimate from the latest baseline run's GBM stack (score_point), interval from
                  the latest Bayesian run's posterior predictive
                  (interval_method="bayesian_posterior")
     condo        88-prefix residential condo units (250-12,000 sqft); point
@@ -74,7 +74,7 @@ from philly_fair_measure.ingest.manifests import DerivedManifest, InputRef, read
 from philly_fair_measure.models.scoring import (
     bayesian_median_ratio,
     latest_run_dir,
-    lightgbm_median_ratio,
+    point_median_ratio,
     run_params,
     score_bayesian_intervals,
     score_point,
@@ -190,7 +190,7 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
         else pl.lit(False)
     )
     # Agreement gate: where a second uncertainty machine exists (residential
-    # rows carry a conformal band around the LightGBM point), a flag requires
+    # rows carry a conformal band around the stacked point), a flag requires
     # BOTH machines to put OPA outside on the same side. Measured 2026-07-06:
     # the conformal band disputed 30% of Bayesian-only flags (253 over /
     # 1,070 under), concentrated on gentrification-edge blocks where the two
@@ -246,7 +246,7 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     # dominates — the posterior's parametric sigma blows up on rare covariate
     # combos (115x on 3416 Sansom St), while expanding the conformal band
     # Display = ROLE SEPARATION (Stage 5, measured 2026-07-06): the shown
-    # estimate is the calibrated LightGBM point — the machine the drivers and
+    # estimate is the calibrated stacked point — the machine the drivers and
     # comps panels explain — and the shown band is its own CQR band. One
     # self-consistent pair, no intersection: intersecting two 90% bands only
     # guarantees 80% (union bound), and the shipped intersection measured
@@ -474,9 +474,9 @@ def build_assessment_screen(
     if run_params(baseline_run).get("time_adjusted"):
         # ref-month estimates -> valuation-date estimates
         pred_point = pred_point * np.exp(-features["time_adj_log"].to_numpy())
-    calibration = lightgbm_median_ratio(baseline_run)
+    calibration = point_median_ratio(baseline_run)
     median, lo, hi = score_bayesian_intervals(bayesian_run, features, chunk_size=chunk_size)
-    # same published-global-calibration convention as the LightGBM point: the
+    # same published-global-calibration convention as the stacked point: the
     # run's out-of-time median ratio divides the whole predictive band (a log
     # shift — width and coverage are untouched, z-scores become centered)
     bayes_calibration = bayesian_median_ratio(bayesian_run)
@@ -618,7 +618,7 @@ def build_assessment_screen(
         inputs,
         notes=(
             f"valuation_date={valuation_date:%Y-%m-%d}; "
-            f"lightgbm calibration={calibration:.4f}; "
+            f"point calibration={calibration:.4f}; "
             f"bayesian calibration={bayes_calibration:.4f}; "
             f"second machine={second_machine}"
         ),
@@ -693,7 +693,7 @@ def _condo_screen_frame(
     pred = score_point(condo_run, features)
     if run_params(condo_run).get("time_adjusted"):
         pred = pred * np.exp(-features["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy())
-    condo_calibration = lightgbm_median_ratio(condo_run, model="condo_lightgbm")
+    condo_calibration = point_median_ratio(condo_run, model="condo_lightgbm")
 
     from philly_fair_measure.models.conformal import (
         calibration_from_run,

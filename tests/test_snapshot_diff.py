@@ -187,3 +187,17 @@ def test_watched_column_named_like_the_join_suffix(tmp_path: Path) -> None:
     by_col = {c.column: c for c in d.columns}
     assert by_col["building_code"].n_changed == 0
     assert by_col["building_code_new"].n_changed == 1
+
+
+def test_dedup_drop_count_is_reported(tmp_path: Path) -> None:
+    prev = pl.DataFrame(
+        {
+            "parcel_number": ["1", "1", None],  # one dup + one null key
+            "market_value": [100, 150, 900],
+            "quality_grade": ["C", "C", "C"],
+        }
+    )
+    new = pl.DataFrame({"parcel_number": ["1"], "market_value": [150], "quality_grade": ["C"]})
+    d = _diff(tmp_path, prev, new, SPEC, "opa_properties_public")
+    assert d.n_prev == 1
+    assert any("dropped before comparing" in n and "2 prev, 0 new" in n for n in d.notes)

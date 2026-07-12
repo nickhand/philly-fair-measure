@@ -1,7 +1,8 @@
 """Spatially weighted conformal intervals: a frequentist cross-check on the
 Bayesian screen.
 
-Split-conformal prediction wraps the LightGBM point model with intervals that
+Split-conformal prediction wraps the point estimate (the GBM stack; the
+condo model's single booster) with intervals that
 need only exchangeability of calibration residuals — no likelihood, no
 hierarchy, no sampler. The Bayesian screen and this check therefore share
 *nothing* except the feature mart: different model, different uncertainty
@@ -261,8 +262,13 @@ def _screen_flag_agreement(
     xy, district = xy_district(df)
     lo, hi = conformal_offsets(cal, xy, district, alpha=alpha, method="knn", k=k)
     # pred_point carries the isotonic calibration the residuals were
-    # measured against (NOT the screen's extra median-ratio division)
-    pred = df["pred_point"].to_numpy()
+    # measured against (NOT the screen's extra median-ratio division);
+    # pre-stack screens name it pred_lightgbm
+    pred = df.with_columns(
+        pl.coalesce([pl.col(c) for c in ("pred_point", "pred_lightgbm") if c in df.columns]).alias(
+            "pred_point"
+        )
+    )["pred_point"].to_numpy()
     opa = df["opa_market_value"].fill_null(0.0).to_numpy()
     conformal_flag = np.where(
         opa <= 0,

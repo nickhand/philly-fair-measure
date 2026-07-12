@@ -339,7 +339,7 @@ Two modest wins did land:
   isotonic on the financed val slice → financed median 0.947 → **1.00**, COD/PRD/PRB
   unchanged, no retrain, no data lost. Market-value-centered assessments for free
   (model.md §5.2; propagate to the screen/reports on next full retrain+rescore).
-- **CatBoost ensemble, DECIDED, not built**: 0.5·LGBM + 0.5·CatBoost gives a
+- **CatBoost ensemble — BUILT 2026-07-11 as the shipped GBM stack (model.md §5.1); the original decision note follows**: 0.5·LGBM + 0.5·CatBoost gives a
   consistent **−2.5–3% COD** everywhere incl. q1 (financed 21.6 → 21.1; financed-q1
   32.2 → 31.2, PRB 0.146 → 0.127). Notably **CatBoost alone beats the hand-tuned
   LightGBM** (val RMSE 0.319 vs 0.327; val-optimal blend 75% CatBoost), its ordered

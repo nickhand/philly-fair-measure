@@ -1,7 +1,7 @@
 """Diff two raw snapshots of a current-only table.
 
 The city overwrites `opa_properties_public`, `assessments`, and
-`real_estate_tax_delinquencies` in place, so the monthly snapshot program
+`real_estate_tax_delinquencies` in place, so the weekly snapshot program
 (docs/snapshots/README.md) is the only record of what changed. This module
 answers "what did the city change between two snapshots" per dataset: keys
 added and removed, per-column change counts over a watched-column list, and a
@@ -153,22 +153,21 @@ class SnapshotDiff:
         return asdict(self)
 
 
-def _load(path: Path, spec: DiffSpec) -> pl.DataFrame:
-    """Key + watched columns only, keys stringified, duplicate keys keep-last."""
+def _load(path: Path, spec: DiffSpec) -> tuple[pl.DataFrame, int]:
+    """(frame, n_dropped): key + watched columns only, keys stringified;
+    duplicate-key rows deduplicate keep-last and null-key rows drop, with the
+    dropped count returned so the report can say so instead of hiding it."""
     lf = pl.scan_parquet(path)
     present = set(lf.collect_schema().names())
     watched = [c for c in spec.watched if c in present]
     missing = [k for k in spec.keys if k not in present]
     if missing:
         raise ValueError(f"{path}: missing key column(s) {missing}")
-    return (
-        lf.select(
-            [pl.col(k).cast(pl.String).alias(k) for k in spec.keys] + [pl.col(c) for c in watched]
-        )
-        .drop_nulls(list(spec.keys))
-        .unique(subset=list(spec.keys), keep="last")
-        .collect()
-    )
+    raw = lf.select(
+        [pl.col(k).cast(pl.String).alias(k) for k in spec.keys] + [pl.col(c) for c in watched]
+    ).collect()
+    deduped = raw.drop_nulls(list(spec.keys)).unique(subset=list(spec.keys), keep="last")
+    return deduped, raw.height - deduped.height
 
 
 def diff_dataset(
@@ -180,8 +179,8 @@ def diff_dataset(
     prev_stamp: str,
     new_stamp: str,
 ) -> SnapshotDiff:
-    prev = _load(prev_path, spec)
-    new = _load(new_path, spec)
+    prev, prev_dropped = _load(prev_path, spec)
+    new, new_dropped = _load(new_path, spec)
     keys = list(spec.keys)
     # only columns present in BOTH snapshots are comparable (schema drift is a note)
     watched = [c for c in spec.watched if c in prev.columns and c in new.columns]
@@ -190,6 +189,11 @@ def diff_dataset(
         for c in spec.watched
         if (c in prev.columns) != (c in new.columns)
     ]
+    if prev_dropped or new_dropped:
+        notes.append(
+            f"duplicate/null-key rows dropped before comparing (keep-last): "
+            f"{prev_dropped:,} prev, {new_dropped:,} new"
+        )
 
     n_added = new.join(prev, on=keys, how="anti").height
     n_removed = prev.join(new, on=keys, how="anti").height

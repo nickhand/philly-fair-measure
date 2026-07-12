@@ -131,6 +131,10 @@ def equity_robustness(
     run_dir = latest_run_dir("baseline", root)
     preds = (
         pl.read_parquet(run_dir / "predictions.parquet")
+        # pre-stack runs name the point pred_lightgbm
+        .pipe(
+            lambda f: f if "pred_point" in f.columns else f.rename({"pred_lightgbm": "pred_point"})
+        )
         .join(
             sf.select(
                 "sale_id",

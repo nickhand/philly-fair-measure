@@ -664,6 +664,10 @@ def _cmd_export_ratio_csv(args: argparse.Namespace) -> int:
     )
     out = (
         pl.read_parquet(run_dir / "predictions.parquet")
+        # pre-stack runs name the point pred_lightgbm
+        .pipe(
+            lambda f: f if "pred_point" in f.columns else f.rename({"pred_lightgbm": "pred_point"})
+        )
         .join(sf, on="sale_id", how="left")
         .filter(
             (pl.col("sale_price") > 0)
@@ -1064,7 +1068,8 @@ def main(argv: list[str] | None = None) -> int:
     train_condo_cmd.set_defaults(func=_cmd_train_condo)
 
     train = subparsers.add_parser(
-        "train-baseline", help="train LightGBM + Ridge baselines and benchmark against OPA"
+        "train-baseline",
+        help="train the GBM stack (LightGBM + CatBoost) + Ridge benchmark against OPA",
     )
     train.add_argument("--test-fraction", type=float, default=0.1)
     train.add_argument(
@@ -1129,8 +1134,8 @@ def main(argv: list[str] | None = None) -> int:
 
     screen = subparsers.add_parser(
         "screen-assessments",
-        help="score every residential property and flag OPA values outside the "
-        "Bayesian predictive interval",
+        help="score every residential property and flag OPA values that both "
+        "uncertainty machines place outside their 90% intervals",
     )
     screen.add_argument("--chunk-size", type=int, default=50_000)
     screen.add_argument(
@@ -1167,8 +1172,8 @@ def main(argv: list[str] | None = None) -> int:
 
     conformal = subparsers.add_parser(
         "conformal-check",
-        help="frequentist conformal intervals around LightGBM as an independent "
-        "cross-check of the Bayesian screen",
+        help="frequentist conformal intervals around the stacked point as an "
+        "independent cross-check of the Bayesian screen",
     )
     conformal.add_argument("--alpha", type=float, default=0.10)
     conformal.add_argument("--k", type=int, default=500, help="calibration neighbors (knn method)")
@@ -1188,7 +1193,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ensemble = subparsers.add_parser(
         "ensemble-check",
-        help="conformalized stack of the LightGBM point and Bayesian median: "
+        help="conformalized stack of the LightGBM arm and the Bayesian median: "
         "point accuracy and interval sharpness vs each arm, on the held-out "
         "half of the out-of-time slice",
     )
@@ -1379,7 +1384,7 @@ def main(argv: list[str] | None = None) -> int:
     snapshot_diff = subparsers.add_parser(
         "snapshot-diff",
         help="summarize what changed between the two latest snapshots of the "
-        "current-only tables (the monthly snapshot program)",
+        "current-only tables (the weekly snapshot program)",
     )
     snapshot_diff.add_argument(
         "--datasets",

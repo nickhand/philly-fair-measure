@@ -69,6 +69,8 @@ def char_leakage_bound(data_dir: Path | None = None) -> pl.DataFrame:
     )
 
     price = pred["sale_price"].to_numpy()
+    if "pred_point" not in pred.columns:  # pre-stack runs name the point pred_lightgbm
+        pred = pred.rename({"pred_lightgbm": "pred_point"})
     model = pred["pred_point"].to_numpy()
     opa = pred["opa_assessment"].to_numpy()
     safe = ~pred["has_post_permit"].to_numpy()
