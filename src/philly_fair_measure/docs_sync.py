@@ -118,7 +118,9 @@ def model_md_results_table(stats: dict[str, Any]) -> str:
         f"Identical test\n"
         f"set and treatment; OPA's own values as the incumbent:\n\n"
         f"{header}\n{divider}\n"
-        f"{line('LightGBM', 'lightgbm', bold=True)}\n"
+        f"{line('GBM stack (ours)', 'point', bold=True)}\n"
+        f"{line('LightGBM arm', 'lightgbm')}\n"
+        f"{line('CatBoost arm', 'catboost')}\n"
         f"{line('Ridge', 'ridge')}\n"
         f"{line('OPA (incumbent)', 'opa_assessment', bold=True)}\n"
     )

@@ -77,7 +77,7 @@ from philly_fair_measure.models.scoring import (
     lightgbm_median_ratio,
     run_params,
     score_bayesian_intervals,
-    score_lightgbm,
+    score_point,
 )
 from philly_fair_measure.vocab import (
     ATTENTION_BAND_FRACTION,
@@ -255,8 +255,8 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     # two jobs untouched: the agreement gate and the watch tier (model_*,
     # screen_z, flags are all still Bayesian-anchored). Condo rows and
     # fixtures have one machine, whose native band already IS this pairing.
-    if "pred_lightgbm_calibrated" in df.columns:
-        display_median = pl.coalesce("pred_lightgbm_calibrated", "model_median")
+    if "pred_point_calibrated" in df.columns:
+        display_median = pl.coalesce("pred_point_calibrated", "model_median")
     else:
         display_median = pl.col("model_median")
     band_lo = (
@@ -290,8 +290,8 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
                 "display_ratio"
             ),
             unpriceable_null.otherwise(
-                pl.col("opa_market_value") / pl.col("pred_lightgbm_calibrated")
-            ).alias("opa_vs_lightgbm_ratio"),
+                pl.col("opa_market_value") / pl.col("pred_point_calibrated")
+            ).alias("opa_vs_point_ratio"),
         )
         .with_columns(pl.col("screen_z").abs().alias("screen_abs_z"))
         .with_columns(
@@ -470,10 +470,10 @@ def build_assessment_screen(
     )
     logger.info("assessment features persisted -> %s", features_path)
 
-    pred_lgb = score_lightgbm(baseline_run, features)
+    pred_point = score_point(baseline_run, features)
     if run_params(baseline_run).get("time_adjusted"):
         # ref-month estimates -> valuation-date estimates
-        pred_lgb = pred_lgb * np.exp(-features["time_adj_log"].to_numpy())
+        pred_point = pred_point * np.exp(-features["time_adj_log"].to_numpy())
     calibration = lightgbm_median_ratio(baseline_run)
     median, lo, hi = score_bayesian_intervals(bayesian_run, features, chunk_size=chunk_size)
     # same published-global-calibration convention as the LightGBM point: the
@@ -509,7 +509,7 @@ def build_assessment_screen(
         cal = calibration_from_run(baseline_run, data_dir)
         xy, district = xy_district(features)
         conf_lo_off, conf_hi_off = conformal_offsets(cal, xy, district, method="knn")
-        log_pred = np.log(pred_lgb)
+        log_pred = np.log(pred_point)
         conformal_lo = np.exp(log_pred + conf_lo_off)
         conformal_hi = np.exp(log_pred + conf_hi_off)
 
@@ -535,8 +535,8 @@ def build_assessment_screen(
         "ten_owner_occupied_at_sale",
         "opa_market_value",
     ).with_columns(
-        pl.Series("pred_lightgbm", pred_lgb),
-        pl.Series("pred_lightgbm_calibrated", pred_lgb / calibration),
+        pl.Series("pred_point", pred_point),
+        pl.Series("pred_point_calibrated", pred_point / calibration),
         pl.Series("model_median", median),
         pl.Series("model_pi_low_90", lo),
         pl.Series("model_pi_high_90", hi),
@@ -558,7 +558,7 @@ def build_assessment_screen(
             sale_price_quintile_edges,
         )
 
-        retail = score_lightgbm(retail_run, features)
+        retail = score_point(retail_run, features)
         if run_params(retail_run).get("time_adjusted"):
             retail = retail * np.exp(-features["time_adj_log"].to_numpy())
         edges = sale_price_quintile_edges(data_dir)
@@ -690,7 +690,7 @@ def _condo_screen_frame(
     )
     logger.info("condo assessment features persisted -> %s", features_path)
 
-    pred = score_lightgbm(condo_run, features)
+    pred = score_point(condo_run, features)
     if run_params(condo_run).get("time_adjusted"):
         pred = pred * np.exp(-features["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy())
     condo_calibration = lightgbm_median_ratio(condo_run, model="condo_lightgbm")
@@ -728,8 +728,8 @@ def _condo_screen_frame(
         "building_id",
         "opa_market_value",
     ).with_columns(
-        pl.Series("pred_lightgbm", pred),
-        pl.Series("pred_lightgbm_calibrated", pred / condo_calibration),
+        pl.Series("pred_point", pred),
+        pl.Series("pred_point_calibrated", pred / condo_calibration),
         pl.Series("model_median", median),
         pl.Series("model_pi_low_90", pi_low),
         pl.Series("model_pi_high_90", pi_high),

@@ -46,7 +46,7 @@ import polars as pl
 
 from philly_fair_measure import config
 from philly_fair_measure.ingest.manifests import read_derived_manifest
-from philly_fair_measure.models.scoring import latest_run_dir, run_params, score_lightgbm
+from philly_fair_measure.models.scoring import latest_run_dir, run_params, score_point
 
 logger = logging.getLogger(__name__)
 
@@ -106,10 +106,10 @@ def split_frames(
 
 def frame_residuals(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
     """Signed log residuals y − ŷ (frame-invariant; see module docstring)."""
-    pred_log = np.log(score_lightgbm(run_dir, df))
+    pred_log = np.log(score_point(run_dir, df))
     y = np.log(df["sale_price"].to_numpy())
     if run_params(run_dir).get("time_adjusted"):
-        # score_lightgbm already returns reference-frame estimates
+        # score_point already returns reference-frame estimates
         y = y + df["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy()
     return np.asarray(y - pred_log, dtype=np.float64)
 
@@ -260,9 +260,9 @@ def _screen_flag_agreement(
     df = screen.join(coords, on="parcel_id", how="left")
     xy, district = xy_district(df)
     lo, hi = conformal_offsets(cal, xy, district, alpha=alpha, method="knn", k=k)
-    # pred_lightgbm carries the isotonic calibration the residuals were
+    # pred_point carries the isotonic calibration the residuals were
     # measured against (NOT the screen's extra median-ratio division)
-    pred = df["pred_lightgbm"].to_numpy()
+    pred = df["pred_point"].to_numpy()
     opa = df["opa_market_value"].fill_null(0.0).to_numpy()
     conformal_flag = np.where(
         opa <= 0,

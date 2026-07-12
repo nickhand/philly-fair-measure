@@ -120,7 +120,7 @@ def _cmd_train_baseline(args: argparse.Namespace) -> int:
     print(f"run {result.run_id} -> {result.run_dir}\n")
     columns = ("n", "rmse_log", "mape", "r2_log", "median_ratio", "cod", "prd", "prb")
     print(f"{'model':<16}" + "".join(f"{c:>13}" for c in columns))
-    for model in ("lightgbm", "ridge", "opa_assessment"):
+    for model in ("point", "lightgbm", "catboost", "ridge", "opa_assessment"):
         row = result.overall[model]
         cells = []
         for column in columns:
@@ -673,7 +673,7 @@ def _cmd_export_ratio_csv(args: argparse.Namespace) -> int:
         .select(
             pl.col("sale_price").round(0),
             pl.col("opa_assessment").round(0),
-            pl.col("pred_lightgbm").round(0).alias("model_estimate"),
+            pl.col("pred_point").round(0).alias("model_estimate"),
             pl.col("loc_lat").alias("latitude"),
             pl.col("loc_lon").alias("longitude"),
             pl.col("loc_market_area").alias("region"),

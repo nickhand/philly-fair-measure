@@ -7,7 +7,7 @@ happens to every home, including the cash/distressed tail the standard excludes)
 
 <!-- generated:veq-meta:begin -->
 Numbers are the out-of-time test slice of baseline run
-`20260710T014946Z-baseline` (n ≈ 19.5k residential arms-length sales).
+`20260712T050600Z-baseline` (n ≈ 19.5k residential arms-length sales).
 Reproduce with `fair-measure train-baseline` then `fair-measure ratio-study`. This
 report card is deliberately not a "we made it fair" claim, see the honest reading below.
 <!-- generated:veq-meta:end -->
@@ -36,11 +36,11 @@ The convention on which an assessor's performance is officially measured.
 <!-- generated:veq-card-iaao:begin -->
 | Statistic | Target | OPA | Our model |
 | --- | --- | --- | --- |
-| Median ratio | 0.90–1.10 | 0.920 ✓ | 1.004 ✓ |
-| COD | ≤ 15 | 23.1 ✗ | 18.8 ⚠︎ |
-| PRD | 0.98–1.03 | 1.065 ✗ | 1.022 ✓ |
-| PRB | ±0.05 | -0.057 ✗ | +0.005 ✓ |
-| VEI (2025 draft) | −10% to +10% | -16.3% ✗ | +2.0% ✓ |
+| Median ratio | 0.90–1.10 | 0.920 ✓ | 0.996 ✓ |
+| COD | ≤ 15 | 23.1 ✗ | 17.9 ⚠︎ |
+| PRD | 0.98–1.03 | 1.065 ✗ | 1.021 ✓ |
+| PRB | ±0.05 | -0.057 ✗ | +0.003 ✓ |
+| VEI (2025 draft) | −10% to +10% | -16.3% ✗ | +0.4% ✓ |
 <!-- generated:veq-card-iaao:end -->
 
 **Our model passes both vertical-equity tests (PRD and PRB) and sits just above
@@ -58,12 +58,12 @@ homeowner actually experiences, and nobody passes it.
 <!-- generated:veq-card-full:begin -->
 | Statistic | Target | OPA | Our model |
 | --- | --- | --- | --- |
-| Median ratio | 0.90–1.10 | 0.983 ✓ | 1.036 ✓ |
-| COD | ≤ 15 | 34.7 ✗ | 25.1 ✗ |
-| PRD | 0.98–1.03 | 1.192 ✗ | 1.087 ✗ |
-| PRB | ±0.05 | -0.235 ✗ | -0.085 ✗ |
-| VEI (2025 draft) | −10% to +10% | -56.0% ✗ | -16.2% ✗ |
-| MAPE | n/a | 34.2% | 26.3% |
+| Median ratio | 0.90–1.10 | 0.983 ✓ | 1.026 ✓ |
+| COD | ≤ 15 | 34.7 ✗ | 24.2 ✗ |
+| PRD | 0.98–1.03 | 1.192 ✗ | 1.086 ✗ |
+| PRB | ±0.05 | -0.235 ✗ | -0.088 ✗ |
+| VEI (2025 draft) | −10% to +10% | -56.0% ✗ | -18.2% ✗ |
+| MAPE | n/a | 34.2% | 25.0% |
 <!-- generated:veq-card-full:end -->
 
 On the full sample the model is still mildly regressive and above the uniformity
@@ -88,13 +88,13 @@ each way:
 <!-- generated:veq-robustness:begin -->
 | Basis | Binned by | City q1 | City q5 | Ours q1 | Ours q5 |
 | --- | --- | --- | --- | --- | --- |
-| all sales | individual price | 1.55 | 0.88 | 1.27 | 0.99 |
-| all sales | **neighborhood level** | 1.17 | 0.93 | 1.02 | 1.05 |
-| all sales | tract level (sensitivity) | 1.13 | 0.93 | 1.02 | 1.06 |
-| financed | individual price | 1.24 | 0.88 | 1.10 | 0.99 |
-| financed | neighborhood level | 0.97 | 0.92 | 0.93 | 1.04 |
+| all sales | individual price | 1.55 | 0.88 | 1.26 | 0.98 |
+| all sales | **neighborhood level** | 1.17 | 0.93 | 1.02 | 1.04 |
+| all sales | tract level (sensitivity) | 1.13 | 0.93 | 1.02 | 1.05 |
+| financed | individual price | 1.24 | 0.88 | 1.10 | 0.98 |
+| financed | neighborhood level | 0.97 | 0.92 | 0.93 | 1.03 |
 
-Map test (kNN Moran's I of log ratios, financed sales): city 0.128, ours 0.088. Zero means errors sprinkle randomly; higher means they
+Map test (kNN Moran's I of log ratios, financed sales): city 0.128, ours 0.082. Zero means errors sprinkle randomly; higher means they
 cluster geographically, the signature of genuine neighborhood-level bias.
 
 Neighborhoods are the 358 learned market areas with at least 50 arms-length sales

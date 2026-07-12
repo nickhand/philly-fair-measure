@@ -1,5 +1,12 @@
-"""Baseline valuation models (Milestone 6 + plan v2): LightGBM plus a Ridge
-benchmark, evaluated against sale prices and against OPA's own assessments.
+"""Baseline valuation models (Milestone 6 + plan v2): a two-arm GBM stack
+(LightGBM + CatBoost, convex log-space blend) plus a Ridge benchmark,
+evaluated against sale prices and against OPA's own assessments.
+
+The POINT estimate is the stack: arms train on the recency-weighted fit
+slice, the blend weight and the isotonic vertical calibration are fit on the
+validation slice, and `vertical_calibration.json` always belongs to the
+point. Measured 2026-07-11 (financed out-of-time, IQR-trimmed): COD
+18.85 -> 17.90, PRB +0.005 -> +0.003, VEI +1.9 -> +0.3, median/PRD held.
 
 Design decisions:
 
@@ -36,7 +43,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, TypedDict
+from typing import TYPE_CHECKING, Any, Final, TypedDict
 
 import lightgbm as lgb
 import numpy as np
@@ -53,7 +60,7 @@ from philly_fair_measure.ingest.manifests import (
     read_derived_manifest,
     write_derived_manifest,
 )
-from philly_fair_measure.models.metrics import evaluate_estimates
+from philly_fair_measure.models.metrics import evaluate_estimates, stack_weight
 from philly_fair_measure.vocab import Market
 
 logger = logging.getLogger(__name__)
@@ -202,6 +209,29 @@ DEFAULT_LGB_PARAMS: Final = {
     "seed": 42,
 }
 
+# Second GBM arm (measured 2026-07-11): CatBoost's ordered-target categorical
+# encoding is genuinely different from LightGBM's split-based handling, so the
+# two disagree in character and a convex log-space stack beats either alone —
+# financed out-of-time COD 18.85 -> 18.16 (paired bootstrap -0.69 [-0.85,
+# -0.52]), PRB +0.005 -> +0.003, VEI +1.9 -> +0.5, median/PRD unchanged.
+# depth=10 beat depth=8 (18.23 vs 18.32 alone) and lossguide (18.45). The
+# stack weight is fit on the validation slice (metrics.stack_weight), the
+# same slice the isotonic calibration already uses.
+DEFAULT_CATBOOST_PARAMS: Final = {
+    "loss_function": "RMSE",
+    "iterations": 5000,
+    "learning_rate": 0.05,
+    "depth": 10,
+    "l2_leaf_reg": 3.0,
+    "random_seed": 42,
+    "od_type": "Iter",
+    "od_wait": 100,
+}
+CATBOOST_MODEL_FILE: Final = "model_catboost.cbm"
+STACK_FILE: Final = "stack.json"
+# Exponential sale-recency weight half-life for the fit slice, both arms.
+RECENCY_HALF_LIFE_YEARS: Final = 3.0
+
 # CQR quantile heads (Stage 3b): trained by every baseline/retail run on the
 # fit slice, persisted next to the point model, consumed by models/cqr.py as
 # the screen's second uncertainty machine. Fixed rounds (no early stopping):
@@ -229,6 +259,15 @@ RIDGE_ONEHOT: Final = ("char_category", "loc_zip5")
 def feature_lists(time_adjusted: bool) -> tuple[list[str], list[str]]:
     numeric = list(NUMERIC_FEATURES) + ([] if time_adjusted else list(TIME_FEATURES))
     return numeric, list(CATEGORICAL_FEATURES)
+
+
+def catboost_frame(df: pl.DataFrame, numeric: list[str], categorical: list[str]) -> Any:
+    """CatBoost input: numerics as floats (NaN handled natively), categoricals
+    as strings with an explicit missing token (CatBoost rejects null cats)."""
+    return df.select(
+        *[pl.col(c).cast(pl.Float64) for c in numeric],
+        *[pl.col(c).cast(pl.String).fill_null("__missing__") for c in categorical],
+    ).to_pandas()
 
 
 def _load_frame(mart_path: Path) -> pl.DataFrame:
@@ -445,9 +484,24 @@ def train_baseline(
         for name, frame in (("fit", fit_df), ("val", val_df), ("test", test_df))
     }
 
+    # Recency weights on the fit slice for BOTH arms (measured 2026-07-11:
+    # financed COD 18.16 -> 17.90 on top of the stack; alone on LightGBM it
+    # was -0.30). The market's pricing surface drifts; a 3-year half-life
+    # keeps a decade of comparables while letting the recent regime dominate.
+    # Validation stays unweighted — it is the early-stopping, stack-weight,
+    # and calibration referee, and its job is the out-of-time future.
+    fit_age_days = fit_df.select(
+        (pl.col("sale_date").max() - pl.col("sale_date")).dt.total_days().alias("age")
+    )["age"].to_numpy()
+    fit_weight = np.power(0.5, fit_age_days / (RECENCY_HALF_LIFE_YEARS * 365.25))
+
     params = {**DEFAULT_LGB_PARAMS, **(lgb_params or {})}
     train_set = lgb.Dataset(
-        x["fit"], label=y["fit"], feature_name=features, categorical_feature=categorical
+        x["fit"],
+        label=y["fit"],
+        weight=fit_weight,
+        feature_name=features,
+        categorical_feature=categorical,
     )
     val_set = train_set.create_valid(x["val"], label=y["val"])
     booster = lgb.train(
@@ -458,11 +512,53 @@ def train_baseline(
         callbacks=[lgb.early_stopping(early_stopping_rounds, verbose=False)],
     )
 
+    # Second arm: CatBoost on the same slices; native categorical treatment,
+    # early-stopped on the same validation set. See DEFAULT_CATBOOST_PARAMS
+    # for the measured case.
+    from catboost import CatBoostRegressor, Pool
+
+    cat_index = list(range(len(numeric), len(numeric) + len(categorical)))
+    cat_model = CatBoostRegressor(
+        **DEFAULT_CATBOOST_PARAMS, verbose=False, allow_writing_files=False
+    )
+    cat_model.fit(
+        Pool(
+            catboost_frame(fit_df, numeric, categorical),
+            label=y["fit"],
+            weight=fit_weight,
+            cat_features=cat_index,
+        ),
+        eval_set=Pool(
+            catboost_frame(val_df, numeric, categorical), label=y["val"], cat_features=cat_index
+        ),
+        use_best_model=True,
+    )
+
     test_adj = test_df["time_adj_log"].to_numpy() if time_adjusted else np.zeros(test_df.height)
-    pred_lgb_ref = booster.predict(x["test"], num_iteration=booster.best_iteration)
+    lgb_val_ref = np.asarray(
+        booster.predict(x["val"], num_iteration=booster.best_iteration), dtype=np.float64
+    )
+    lgb_test_ref = np.asarray(
+        booster.predict(x["test"], num_iteration=booster.best_iteration), dtype=np.float64
+    )
+    cat_val_ref = np.asarray(
+        cat_model.predict(catboost_frame(val_df, numeric, categorical)), dtype=np.float64
+    )
+    cat_test_ref = np.asarray(
+        cat_model.predict(catboost_frame(test_df, numeric, categorical)), dtype=np.float64
+    )
+
+    # The point estimate is the convex log-space stack of the two arms, with
+    # the weight fit on the validation slice — the same slice the isotonic
+    # calibration below already uses (models/conformal.py accepts this
+    # precedent: post-hoc transforms fit on val, conformal residuals on val).
+    weight_lightgbm = stack_weight(lgb_val_ref, cat_val_ref, y["val"])
+    point_val_ref = weight_lightgbm * lgb_val_ref + (1 - weight_lightgbm) * cat_val_ref
+    point_test_ref = weight_lightgbm * lgb_test_ref + (1 - weight_lightgbm) * cat_test_ref
+    logger.info("stack weight on lightgbm: %.3f", weight_lightgbm)
+
     calibration = None
     if vertical_calibration:
-        val_pred_ref = booster.predict(x["val"], num_iteration=booster.best_iteration)
         # Center the isotonic on the market-value (typical-financing) standard by
         # fitting it on financed val only: predictions land at market value, not
         # the cash-blended sale level. Measured 2026-07-05 — financed median ratio
@@ -473,14 +569,20 @@ def train_baseline(
             fin_rows = (val_df["fin_cash_sale"].fill_null(1.0) == 0.0).to_numpy()
             if int(fin_rows.sum()) >= _MIN_CALIBRATION_ROWS:
                 cal_mask = fin_rows
-        calibration = fit_vertical_calibration(val_pred_ref[cal_mask], y["val"][cal_mask])
-        pred_lgb_ref = apply_vertical_calibration(pred_lgb_ref, calibration)
-    pred_lgb = np.exp(pred_lgb_ref - test_adj)
+        calibration = fit_vertical_calibration(point_val_ref[cal_mask], y["val"][cal_mask])
+        point_test_ref = apply_vertical_calibration(point_test_ref, calibration)
+    pred_point = np.exp(point_test_ref - test_adj)
+    # raw arms in sale-date dollars, for arm-level diagnostics and the
+    # evaluation table (vertical_calibration.json belongs to the POINT)
+    pred_lgb = np.exp(lgb_test_ref - test_adj)
+    pred_cat = np.exp(cat_test_ref - test_adj)
 
     # CQR quantile heads (Stage 3b): q05/q95 boosters on the SAME fit slice —
     # the validation slice must stay unseen by them, because it is the CQR
-    # calibration set at screen time (models/cqr.py). Persisted with the run
-    # so the coherence gate covers them and scoring needs no retraining.
+    # calibration set at screen time (models/cqr.py). They inherit the recency
+    # weights through train_set (sharper recent quantiles; the conformal step
+    # restores coverage regardless). Persisted with the run so the coherence
+    # gate covers them and scoring needs no retraining.
     quantile_heads = {}
     for q in QUANTILE_HEAD_LEVELS:
         head = lgb.train(
@@ -497,7 +599,15 @@ def train_baseline(
 
     sale_price = test_df["sale_price"].to_numpy()
     opa_value = test_df["asmt_market_value_sale_year"].to_numpy()
-    estimates = {"lightgbm": pred_lgb, "ridge": pred_ridge, "opa_assessment": opa_value}
+    # "point" is the headline (the stacked, calibrated estimate every consumer
+    # scores with); the arms are evaluated raw for diagnostics.
+    estimates = {
+        "point": pred_point,
+        "lightgbm": pred_lgb,
+        "catboost": pred_cat,
+        "ridge": pred_ridge,
+        "opa_assessment": opa_value,
+    }
 
     rows = []
     for segment_type, segment, mask in _segments(test_df):
@@ -515,7 +625,8 @@ def train_baseline(
     # IAAO/Keene convention: estimates vs time-adjusted sale prices, overall only
     price_tasp = sale_price * np.exp(test_adj)
     tasp_estimates = {
-        "lightgbm": np.exp(pred_lgb_ref),
+        "point": np.exp(point_test_ref),
+        "lightgbm": np.exp(lgb_test_ref),
         "ridge": np.exp(pred_ridge_ref),
         "opa_assessment": opa_value,
     }
@@ -542,6 +653,10 @@ def train_baseline(
     run_dir = root / "models" / f"run_id={run_id}"
     run_dir.mkdir(parents=True, exist_ok=False)
     booster.save_model(run_dir / "model_lightgbm.txt")
+    cat_model.save_model(str(run_dir / CATBOOST_MODEL_FILE))
+    (run_dir / STACK_FILE).write_text(
+        json.dumps({"weight_lightgbm": weight_lightgbm}, indent=2) + "\n"
+    )
     for q, head in quantile_heads.items():
         head.save_model(run_dir / QUANTILE_HEAD_FILES[q])
     (run_dir / "params.json").write_text(
@@ -549,6 +664,10 @@ def train_baseline(
             {
                 "lgb_params": params,
                 "best_iteration": booster.best_iteration,
+                "catboost_params": DEFAULT_CATBOOST_PARAMS,
+                "catboost_best_iteration": cat_model.get_best_iteration(),
+                "stack_weight_lightgbm": weight_lightgbm,
+                "recency_half_life_years": RECENCY_HALF_LIFE_YEARS,
                 "num_boost_round": num_boost_round,
                 "test_fraction": test_fraction,
                 "validation_fraction": validation_fraction,
@@ -578,7 +697,9 @@ def train_baseline(
         }
     ).sort("gain", descending=True).write_parquet(run_dir / "feature_importance.parquet")
     test_df.select("sale_id", "parcel_id", "sale_date", "sale_price").with_columns(
+        pl.Series("pred_point", pred_point),
         pl.Series("pred_lightgbm", pred_lgb),
+        pl.Series("pred_catboost", pred_cat),
         pl.Series("pred_ridge", pred_ridge),
         pl.Series("opa_assessment", opa_value),
     ).write_parquet(run_dir / "predictions.parquet")

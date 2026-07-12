@@ -71,6 +71,24 @@ STATS = {
         "insufficient": 93,
     },
     "results_table": {
+        "point": {
+            "rmse_log": 0.333,
+            "mape_pct": 26.4,
+            "median_ratio": 1.031,
+            "cod": 25.5,
+            "prd": 1.087,
+            "prb": -0.073,
+            "mki": 0.905,
+        },
+        "catboost": {
+            "rmse_log": 0.333,
+            "mape_pct": 26.4,
+            "median_ratio": 1.031,
+            "cod": 25.5,
+            "prd": 1.087,
+            "prb": -0.073,
+            "mki": 0.905,
+        },
         "lightgbm": {
             "rmse_log": 0.333,
             "mape_pct": 26.4,
@@ -163,7 +181,9 @@ def test_builders_render_the_numbers():
     assert "`20990101T000000Z-baseline`" in tables
     assert "| This model | 1.001 | 19.3 | 1.024 | +0.010 | 19.3% |" in tables
     model_table = model_md_results_table(STATS)
-    assert "| **LightGBM** | **0.333** | **26.4%** | 1.031" in model_table
+    assert "| **GBM stack (ours)** | **0.333** | **26.4%** | 1.031" in model_table
+    assert "| LightGBM arm | 0.333 |" in model_table
+    assert "| CatBoost arm | 0.333 |" in model_table
     assert "| Ridge | 0.427 |" in model_table
 
 

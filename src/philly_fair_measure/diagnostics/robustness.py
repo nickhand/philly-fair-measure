@@ -69,7 +69,7 @@ def char_leakage_bound(data_dir: Path | None = None) -> pl.DataFrame:
     )
 
     price = pred["sale_price"].to_numpy()
-    model = pred["pred_lightgbm"].to_numpy()
+    model = pred["pred_point"].to_numpy()
     opa = pred["opa_assessment"].to_numpy()
     safe = ~pred["has_post_permit"].to_numpy()
 

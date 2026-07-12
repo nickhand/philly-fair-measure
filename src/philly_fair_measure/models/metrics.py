@@ -25,6 +25,20 @@ import numpy as np
 import numpy.typing as npt
 
 
+def stack_weight(
+    log_a: npt.NDArray[np.float64], log_b: npt.NDArray[np.float64], log_y: npt.NDArray[np.float64]
+) -> float:
+    """Least-squares weight for w*a + (1-w)*b vs y in log space, clipped to
+    [0, 1] so the stack stays a convex blend (never an extrapolation). Shared
+    by the trained GBM stack (models/baseline.py) and the ensemble diagnostic
+    (models/ensemble.py)."""
+    d = log_a - log_b
+    denom = float(d @ d)
+    if denom <= 0.0:
+        return 0.5
+    return float(np.clip((d @ (log_y - log_b)) / denom, 0.0, 1.0))
+
+
 def _clean(
     estimate: npt.ArrayLike, sale_price: npt.ArrayLike
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:

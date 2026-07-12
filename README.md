@@ -13,9 +13,9 @@ comparisons) is published in a per-property report.
 
 <!-- generated:readme-screen-counts:begin -->
 As of the latest run (Tax Year 2027 assessments), the screen covers
-**496,975** residential properties and condos: **1,091** flagged
-as likely over-assessed, **6,789** as likely under-assessed, and
-**42,794** unflagged but at or beyond the edge of the published
+**496,975** residential properties and condos: **1,020** flagged
+as likely over-assessed, **6,878** as likely under-assessed, and
+**42,494** unflagged but at or beyond the edge of the published
 range ("worth a look").
 A residential flag requires two independent uncertainty methods: the
 Bayesian posterior interval and a spatially weighted
@@ -31,7 +31,7 @@ area are reported as insufficient rather than valued.
   an immutable, manifest-tracked local data lake.
 - Classifies sale validity (arm's-length vs. distressed/related-party/nominal)
   following the Cook County Assessor's published methodology.
-- Trains valuation models on public data only: a LightGBM point model with
+- Trains valuation models on public data only: a LightGBM+CatBoost stack with
   financed-market calibration and conformalized-quantile-regression intervals
   (what the site displays), cross-examined by a hierarchical Bayesian model,
   a flag requires both methods to agree.
@@ -46,7 +46,7 @@ area are reported as insufficient rather than valued.
 ## Results
 
 <!-- generated:readme-results-tables:begin -->
-Out-of-time test set (n = 19,519), run `20260710T014946Z-baseline`. The same
+Out-of-time test set (n = 19,519), run `20260712T050600Z-baseline`. The same
 homes, the same treatment; OPA's assessed values are the incumbent benchmark.
 
 On the IAAO ratio-study basis (financed, arm's-length sales, the standard
@@ -54,14 +54,14 @@ assessment offices are evaluated on):
 
 |  | Median ratio | COD | PRD | PRB | MAPE |
 | --- | --- | --- | --- | --- | --- |
-| This model | 1.004 | 18.8 | 1.022 | +0.005 | 18.9% |
+| This model | 0.996 | 17.9 | 1.021 | +0.003 | 17.8% |
 | OPA | 0.920 | 23.1 | 1.065 | -0.057 | 22.5% |
 
 On the full untrimmed sample, including cash and distressed sales:
 
 |  | Median ratio | COD | PRD | PRB | MAPE |
 | --- | --- | --- | --- | --- | --- |
-| This model | 1.036 | 25.1 | 1.087 | -0.085 | 26.3% |
+| This model | 1.026 | 24.2 | 1.086 | -0.088 | 25.0% |
 | OPA | 0.983 | 34.7 | 1.192 | -0.235 | 34.2% |
 <!-- generated:readme-results-tables:end -->
 
@@ -85,7 +85,7 @@ snapshot (CARTO → Parquet + manifest)
   → stage (typed / deduped / classified, polars)
   → sale validity (CCAO-style reason codes)
   → feature marts (sales + assessment-date frames; docs/features.md)
-  → models (LightGBM point + calibration; Bayesian / conformal intervals)
+  → models (GBM-stack point + calibration; Bayesian / conformal intervals)
   → assessment screen (flag + screen_z + attention tier per parcel)
   → API + dashboard (FastAPI; Vue 3)
 ```
@@ -115,7 +115,7 @@ uv run fair-measure validate-sales    # marts/sale_validity.parquet with reason 
 # Features and models
 uv run fair-measure build-features        # residential feature marts
 uv run fair-measure build-condo-features  # condo feature marts
-uv run fair-measure train-baseline        # LightGBM + Ridge, benchmarked against OPA
+uv run fair-measure train-baseline        # GBM stack + Ridge, benchmarked against OPA
 uv run fair-measure train-baseline --market retail   # financed-only variant
 uv run fair-measure train-bayesian        # hierarchical Bayesian intervals
 uv run fair-measure train-condo           # condo LightGBM + conformal intervals
@@ -153,7 +153,7 @@ src/philly_fair_measure/
   validation/sales.py  # CCAO-style sale-validity classification
   validation/opa.py    # assessment screen: flags, screen_z, attention tier
   features/            # model-ready feature marts (registry: docs/features.md)
-  models/              # LightGBM/Bayesian/conformal models, scoring, IAAO metrics
+  models/              # GBM-stack/Bayesian/conformal models, scoring, IAAO metrics
   equity_context.py    # peer-group definitions shared by stats and reports
   web_stats.py         # exports the site's committed statistics JSON
   catalog.py           # DuckDB views over raw snapshots + staged/mart tables

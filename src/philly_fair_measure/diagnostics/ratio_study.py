@@ -107,7 +107,7 @@ def iaao_bridge(data_dir: Path | None = None) -> pl.DataFrame:
         fit_vertical_calibration,
     )
     from philly_fair_measure.models.conformal import split_frames
-    from philly_fair_measure.models.scoring import latest_run_dir, run_params, score_lightgbm
+    from philly_fair_measure.models.scoring import latest_run_dir, run_params, score_point
 
     run_dir = latest_run_dir("baseline", data_dir)
     params = run_params(run_dir)
@@ -119,7 +119,7 @@ def iaao_bridge(data_dir: Path | None = None) -> pl.DataFrame:
     style = test_df["char_style"].cast(pl.String).fill_null("").to_numpy()
     opa = test_df["asmt_market_value_sale_year"].cast(pl.Float64).to_numpy()
 
-    pred_ref = np.log(score_lightgbm(run_dir, test_df))  # isotonic-calibrated, ref frame
+    pred_ref = np.log(score_point(run_dir, test_df))  # stacked + isotonic-calibrated, ref frame
     pred_at_date = np.exp(pred_ref - adj)
 
     # assessor-analog refit: identical features/params/capacity, but the

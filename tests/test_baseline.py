@@ -135,15 +135,17 @@ def test_train_baseline_end_to_end(tmp_path):
         early_stopping_rounds=30,
     )
 
-    assert set(result.overall) == {"lightgbm", "ridge", "opa_assessment"}
-    lgb_overall = result.overall["lightgbm"]
-    assert lgb_overall["n"] == 120
-    assert lgb_overall["r2_log"] > 0.3
-    assert 0.8 < lgb_overall["median_ratio"] < 1.2
+    assert set(result.overall) == {"point", "lightgbm", "catboost", "ridge", "opa_assessment"}
+    point_overall = result.overall["point"]
+    assert point_overall["n"] == 120
+    assert point_overall["r2_log"] > 0.3
+    assert 0.8 < point_overall["median_ratio"] < 1.2
     assert result.overall["opa_assessment"]["cod"] is not None
 
     for artifact in (
         "model_lightgbm.txt",
+        "model_catboost.cbm",
+        "stack.json",
         "model_lightgbm_q05.txt",
         "model_lightgbm_q95.txt",
         "params.json",
@@ -176,7 +178,7 @@ def test_train_baseline_end_to_end(tmp_path):
     assert "style" in evaluation["segment_type"].unique().to_list()
 
     # scoring from the persisted run reproduces training-time predictions
-    from philly_fair_measure.models.scoring import score_lightgbm
+    from philly_fair_measure.models.scoring import score_point
 
     frame_scored = (
         _synthetic_mart()
@@ -187,8 +189,8 @@ def test_train_baseline_end_to_end(tmp_path):
             .alias("time_sale_epoch_days")
         )
     )
-    scored = score_lightgbm(result.run_dir, frame_scored)
-    np.testing.assert_allclose(scored, predictions["pred_lightgbm"].to_numpy(), rtol=1e-6)
+    scored = score_point(result.run_dir, frame_scored)
+    np.testing.assert_allclose(scored, predictions["pred_point"].to_numpy(), rtol=1e-6)
 
 
 def test_calibrate_on_financed_shifts_toward_market_value(tmp_path):
@@ -213,6 +215,5 @@ def test_calibrate_on_financed_shifts_toward_market_value(tmp_path):
     # centering on financed lifts predictions to market value, so ratios vs the
     # cash-blended sale prices rise (cash homes now assessed above their low price)
     assert (
-        res_fin.overall["lightgbm"]["median_ratio"]
-        > res_all.overall["lightgbm"]["median_ratio"] + 0.02
+        res_fin.overall["point"]["median_ratio"] > res_all.overall["point"]["median_ratio"] + 0.02
     )

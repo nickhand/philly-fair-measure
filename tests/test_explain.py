@@ -37,7 +37,7 @@ def test_explain_is_faithful_ranked_and_readable(tmp_path):
     from philly_fair_measure.ingest.manifests import InputRef
     from philly_fair_measure.models.baseline import train_baseline
     from philly_fair_measure.models.explain import explain, plain_language
-    from philly_fair_measure.models.scoring import score_lightgbm
+    from philly_fair_measure.models.scoring import score_point
     from tests.test_baseline import _synthetic_mart
 
     frame = _synthetic_mart()
@@ -56,8 +56,8 @@ def test_explain_is_faithful_ranked_and_readable(tmp_path):
     exps = explain(result.run_dir, sample)
     assert len(exps) == sample.height
 
-    # faithfulness: the explained value is exactly the value score_lightgbm serves
-    scored = score_lightgbm(result.run_dir, sample)
+    # faithfulness: the explained value is exactly the value score_point serves
+    scored = score_point(result.run_dir, sample)
     assert np.allclose([e.value for e in exps], scored, rtol=1e-6)
 
     for e in exps:

@@ -155,7 +155,7 @@ def test_finalize_screen_flags_and_ranking():
         {
             "parcel_id": ["over", "under", "ok", "none"],
             "opa_market_value": [900_000.0, 100_000.0, 310_000.0, None],
-            "pred_lightgbm_calibrated": [300_000.0, 300_000.0, 300_000.0, 300_000.0],
+            "pred_point_calibrated": [300_000.0, 300_000.0, 300_000.0, 300_000.0],
             "model_median": [300_000.0, 300_000.0, 300_000.0, 300_000.0],
             "model_pi_low_90": [150_000.0] * 4,
             "model_pi_high_90": [600_000.0] * 4,
@@ -185,7 +185,7 @@ def test_finalize_screen_flags_and_ranking():
                 {
                     "parcel_id": ["condo_over"],
                     "opa_market_value": [900_000.0],
-                    "pred_lightgbm_calibrated": [300_000.0],
+                    "pred_point_calibrated": [300_000.0],
                     "model_median": [300_000.0],
                     "model_pi_low_90": [200_000.0],
                     "model_pi_high_90": [450_000.0],
@@ -208,7 +208,7 @@ def test_finalize_screen_insufficient_record_and_newbuild_guard():
         {
             "parcel_id": ["no_area", "new_over", "old_over", "new_under"],
             "opa_market_value": [500_000.0, 900_000.0, 900_000.0, 100_000.0],
-            "pred_lightgbm_calibrated": [300_000.0] * 4,
+            "pred_point_calibrated": [300_000.0] * 4,
             "model_median": [3_000.0, 300_000.0, 300_000.0, 300_000.0],
             "model_pi_low_90": [1_500.0, 150_000.0, 150_000.0, 150_000.0],
             "model_pi_high_90": [6_000.0, 600_000.0, 600_000.0, 600_000.0],
@@ -247,7 +247,7 @@ def test_finalize_screen_attention_tier():
         {
             "parcel_id": ["watch_high", "watch_low", "mid", "outer_fifth"],
             "opa_market_value": [560_000.0, 175_000.0, 370_000.0, 520_000.0],
-            "pred_lightgbm_calibrated": [300_000.0] * 4,
+            "pred_point_calibrated": [300_000.0] * 4,
             "model_median": [300_000.0] * 4,
             "model_pi_low_90": [150_000.0] * 4,
             "model_pi_high_90": [600_000.0] * 4,
@@ -268,7 +268,7 @@ def test_finalize_screen_agreement_gate_and_display_band():
         {
             "parcel_id": ["agreed_over", "disputed_over", "disputed_under", "med_outside", "gap"],
             "opa_market_value": [900_000.0, 900_000.0, 100_000.0, 310_000.0, 310_000.0],
-            "pred_lightgbm_calibrated": [300_000.0] * 5,
+            "pred_point_calibrated": [300_000.0] * 5,
             "model_median": [300_000.0] * 5,
             "model_pi_low_90": [150_000.0] * 5,
             "model_pi_high_90": [600_000.0] * 5,
@@ -325,7 +325,7 @@ def test_screen_audit_invariants_and_report():
             {
                 "parcel_id": ["a", "b"],
                 "opa_market_value": [900_000.0, 250_000.0],
-                "pred_lightgbm_calibrated": [300_000.0, 300_000.0],
+                "pred_point_calibrated": [300_000.0, 300_000.0],
                 "model_median": [300_000.0, 300_000.0],
                 "model_pi_low_90": [150_000.0] * 2,
                 "model_pi_high_90": [600_000.0] * 2,

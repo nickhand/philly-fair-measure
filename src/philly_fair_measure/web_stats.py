@@ -112,10 +112,10 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
     sf = pl.read_parquet(root / "marts" / "sale_features.parquet")
     joined = preds.join(
         sf.select("sale_id", "time_adj_log", "fin_cash_sale"), on="sale_id", how="left"
-    ).drop_nulls(["sale_price", "pred_lightgbm", "opa_assessment"])
+    ).drop_nulls(["sale_price", "pred_point", "opa_assessment"])
 
     price = joined["sale_price"].to_numpy().astype(np.float64)
-    model = joined["pred_lightgbm"].to_numpy().astype(np.float64)
+    model = joined["pred_point"].to_numpy().astype(np.float64)
     opa = joined["opa_assessment"].to_numpy().astype(np.float64)
     adj = np.exp(joined["time_adj_log"].fill_null(0.0).to_numpy().astype(np.float64))
     financed = (joined["fin_cash_sale"].fill_null(1.0) == 0.0).to_numpy()

@@ -315,7 +315,13 @@ class Explanation:
 
 
 def explain(run_dir: Path, df: pl.DataFrame) -> list[Explanation]:
-    """One Explanation per row of ``df`` (which must carry the run's features)."""
+    """One Explanation per row of ``df`` (which must carry the run's features).
+
+    Explains the run's POINT estimate. For stack runs both arms contribute
+    SHAP values on the same feature order and the log-space contributions
+    blend with the persisted convex weight — the explained value stays exactly
+    what `score_point` serves. Pre-stack runs take the LightGBM-only path.
+    """
     import lightgbm as lgb
 
     booster = lgb.Booster(model_file=str(run_dir / "model_lightgbm.txt"))
@@ -329,7 +335,24 @@ def explain(run_dir: Path, df: pl.DataFrame) -> list[Explanation]:
 
     x = _encode(df, mappings, numeric, categorical)
     contribs = np.asarray(booster.predict(x, pred_contrib=True), dtype=np.float64)  # (n, F+1)
-    raw_log = booster.predict(x)
+    stack_path = run_dir / "stack.json"
+    if stack_path.exists():
+        from catboost import CatBoostRegressor, Pool
+
+        from philly_fair_measure.models.baseline import catboost_frame
+
+        cat_model = CatBoostRegressor()
+        cat_model.load_model(str(run_dir / "model_catboost.cbm"))
+        pool = Pool(
+            catboost_frame(df, numeric, categorical),
+            cat_features=list(range(len(numeric), len(numeric) + len(categorical))),
+        )
+        cat_contribs = np.asarray(
+            cat_model.get_feature_importance(data=pool, type="ShapValues"), dtype=np.float64
+        )  # (n, F+1), same feature order, last column = expected value
+        w = float(json.loads(stack_path.read_text())["weight_lightgbm"])
+        contribs = w * contribs + (1 - w) * cat_contribs
+    raw_log = contribs.sum(axis=1)  # base + drivers = the raw point, both arms
     cal_path = run_dir / "vertical_calibration.json"
     cal_log: npt.NDArray[np.float64] = (
         apply_vertical_calibration(raw_log, json.loads(cal_path.read_text()))

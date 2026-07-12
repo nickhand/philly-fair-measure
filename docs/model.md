@@ -44,8 +44,8 @@ feature.
 Out-of-time, per CCAO practice ([ccao-lessons.md](ccao-lessons.md)). Sales sort
 by date; the most recent 10% is the **test set**, the most recent 10% of the
 remainder is the **validation slice**. The validation slice does triple duty:
-LightGBM early stopping, isotonic-calibration fitting (§5.2), and conformal
-residual calibration (§5.6). The split is deterministic (sort by `sale_date`,
+GBM early stopping and the stack weight, isotonic-calibration fitting (§5.2),
+and conformal residual calibration (§5.6). The split is deterministic (sort by `sale_date`,
 `sale_id`, then head/tail), so every artifact is reproducible from the mart plus
 the persisted split fractions.
 
@@ -70,11 +70,19 @@ Roughly a hundred features (the exact lists live in `NUMERIC_FEATURES` /
 
 ## 5. Models
 
-### 5.1 LightGBM: primary point estimate
-Gradient-boosted trees on the full feature encoding. `learning_rate=0.05`,
-`num_leaves=255`, `min_data_in_leaf=40`, `feature_fraction=0.8`,
-`bagging_fraction=0.8`, `lambda_l1=0.1`, `lambda_l2=1.0`, ≤5000 rounds with
-100-round early stopping on the validation slice; categoricals passed natively.
+### 5.1 GBM stack: primary point estimate
+Two gradient-boosted arms on the full feature encoding, blended as a convex
+combination in log space with the weight least-squares-fit on the validation
+slice (`stack.json`). LightGBM: `learning_rate=0.05`, `num_leaves=255`,
+`min_data_in_leaf=40`, `feature_fraction=0.8`, `bagging_fraction=0.8`,
+`lambda_l1=0.1`, `lambda_l2=1.0`. CatBoost: `depth=10`, `l2_leaf_reg=3`,
+same learning rate — its ordered-target categorical encoding disagrees with
+LightGBM's split-based handling in exactly the way a stack can exploit. Both
+arms run ≤5000 rounds with 100-round early stopping on the validation slice
+and train with **3-year-half-life sale-recency weights** on the fit slice.
+Measured 2026-07-11 (financed out-of-time, paired bootstrap vs the LightGBM-
+only model): COD 18.85 → 17.90 (−0.95 [−1.13, −0.79]), PRB +0.005 → +0.003,
+VEI +1.9 → +0.3, median ratio and PRD unchanged.
 
 ### 5.2 Isotonic vertical calibration: the regressivity corrector
 GBDTs compress toward segment means at the tails (over-valuing cheap homes,
@@ -127,7 +135,7 @@ feature (~9k mostly-singleton levels would overfit); the rolling mean carries
 the building signal, and the unit's own prior sale enters as the same
 repeat-sales carry-forward the residential model uses (measured 2026-07-06:
 repeat-segment COD 23.9 → 21.6, median ratio 1.063 → 1.035). The screen pairs
-this LightGBM point estimate with conformal offsets (§5.6), a
+this stacked point estimate with conformal offsets (§5.6), a
 self-consistent anchor. The condo family also has a Bayesian arm (the §5.4
 hierarchy on condo covariates with an evidence-only σ design), kept as a
 research artifact rather than the screen's anchor: its median runs ~25% hot
@@ -151,7 +159,7 @@ attention tier with a report caveat), and records with no recorded living
 area get `insufficient_record` instead of a verdict.
 
 ### 5.6 Conformal intervals, frequentist cross-check
-Split-conformal intervals around the LightGBM point model, sharing **nothing**
+Split-conformal intervals around the stacked point, sharing **nothing**
 with the Bayesian arm except the feature mart, different model, different
 uncertainty mechanism. Offsets are asymmetric (the cheap-tail residual
 distribution is left-skewed), in global / Mondrian-by-district / kNN-locally-
@@ -185,12 +193,14 @@ a cross-check, and the bake-off was residential-only).
 ## 6. Results
 
 <!-- generated:model-results-table:begin -->
-Out-of-time test set, n = 19,519, run `20260710T014946Z-baseline`. Identical test
+Out-of-time test set, n = 19,519, run `20260712T050600Z-baseline`. Identical test
 set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **LightGBM** | **0.333** | **26.3%** | 1.036 | **25.2** | **1.087** | **-0.085** | 0.910 |
+| **GBM stack (ours)** | **0.321** | **25.0%** | 1.026 | **24.2** | **1.086** | **-0.088** | 0.912 |
+| LightGBM arm | 0.328 | 25.2% | 1.011 | 24.9 | 1.087 | -0.084 | 0.911 |
+| CatBoost arm | 0.320 | 24.3% | 0.998 | 24.3 | 1.086 | -0.088 | 0.912 |
 | Ridge | 0.424 | 36.6% | 1.026 | 35.6 | 1.068 | -0.113 | 0.978 |
 | **OPA (incumbent)** | **0.451** | **34.2%** | 0.983 | **34.7** | **1.192** | **-0.235** | 0.787 |
 <!-- generated:model-results-table:end -->
@@ -245,14 +255,14 @@ self-consistent with the point estimate:
   flags, concentrated on gentrification-edge blocks where the two arms
   disagree about the price level; disputed rows demote to the attention
   tier). **Surfaces show one self-consistent pair** (`display_median` /
-  `display_pi_*`): the calibrated LightGBM point, the machine the drivers
+  `display_pi_*`): the calibrated stacked point, the machine the drivers
   and comps panels explain, with its own CQR band. Intersecting the two
   bands was measured and retired: two 90% bands intersected guarantee only
   80% (union bound), and the shipped intersection realized 86.0% overall /
   72.9% in q1 against its "90%" label, while the CQR band alone realizes
   89.1% at the narrowest valid width.
 - **Condos**, split-conformal, kNN-locally-weighted offsets around the condo
-  LightGBM prediction (`interval_method="conformal_knn"`), a single
+  point prediction (`interval_method="conformal_knn"`), a single
   self-consistent machine. The Bayesian condo arm exists as a research
   artifact but does not drive flags: its district index over-adjusts
   homogeneous condo stock, and its linear form is too stiff to absorb
@@ -277,9 +287,9 @@ Guards keep the flags honest where the record, not the value, is the problem:
   beside it.
 
 <!-- generated:model-screen-counts:begin -->
-As of run `20260710T014946Z` (Tax Year 2027 roll): 496,975 properties
-screened: 1,091 over-assessed candidates, 6,789 under-assessed
-candidates, 42,794 in the attention tier, 93 insufficient
+As of run `20260712T050600Z` (Tax Year 2027 roll): 496,975 properties
+screened: 1,020 over-assessed candidates, 6,878 under-assessed
+candidates, 42,494 in the attention tier, 93 insufficient
 records.
 <!-- generated:model-screen-counts:end -->
 (The constant-quality index of 2026-07-06 cut under-assessed candidates

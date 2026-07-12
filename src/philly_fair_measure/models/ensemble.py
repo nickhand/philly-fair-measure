@@ -31,13 +31,15 @@ from philly_fair_measure.models.conformal import (
     split_frames,
     xy_district,
 )
-from philly_fair_measure.models.metrics import evaluate_estimates
+from philly_fair_measure.models.metrics import evaluate_estimates, stack_weight
 from philly_fair_measure.models.scoring import (
     latest_run_dir,
     run_params,
     score_bayesian_intervals,
     score_lightgbm,
 )
+
+__all__ = ["EnsembleCheckResult", "ensemble_check", "stack_weight"]
 
 logger = logging.getLogger(__name__)
 
@@ -49,16 +51,6 @@ class EnsembleCheckResult:
     weight_lightgbm: float
     points: pl.DataFrame  # point metrics per estimator, evaluation half
     intervals: pl.DataFrame  # coverage/width per interval system, evaluation half
-
-
-def stack_weight(log_a: np.ndarray, log_b: np.ndarray, log_y: np.ndarray) -> float:
-    """Least-squares weight for w*a + (1-w)*b vs y in log space, clipped to
-    [0, 1] so the stack stays a convex blend (never an extrapolation)."""
-    d = log_a - log_b
-    denom = float(d @ d)
-    if denom <= 0.0:
-        return 0.5
-    return float(np.clip((d @ (log_y - log_b)) / denom, 0.0, 1.0))
 
 
 def _interval_row(name: str, lo: np.ndarray, hi: np.ndarray, y: np.ndarray) -> dict[str, object]:

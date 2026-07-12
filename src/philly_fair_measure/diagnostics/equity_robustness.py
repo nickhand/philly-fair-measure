@@ -151,7 +151,7 @@ def equity_robustness(
         price = frame["sale_price"].to_numpy().astype(np.float64)
         by = frame[by_col].to_numpy().astype(np.float64)
         out: dict[str, Any] = {}
-        for name, col in (("opa", "opa_assessment"), ("model", "pred_lightgbm")):
+        for name, col in (("opa", "opa_assessment"), ("model", "pred_point")):
             r = _ratio(frame[col].to_numpy().astype(np.float64), price)
             q1, q5, n1, n5 = q1q5_medians(by, r)
             out[name] = {"q1": round(q1, 3), "q5": round(q5, 3), "n_q1": n1, "n_q5": n5}
@@ -180,7 +180,7 @@ def equity_robustness(
     p = financed["sale_price"].to_numpy().astype(np.float64)
     lon = financed["loc_lon"].to_numpy().astype(np.float64)
     lat = financed["loc_lat"].to_numpy().astype(np.float64)
-    for name, col in (("opa", "opa_assessment"), ("model", "pred_lightgbm")):
+    for name, col in (("opa", "opa_assessment"), ("model", "pred_point")):
         r = _ratio(financed[col].to_numpy().astype(np.float64), p)
         with np.errstate(all="ignore"):
             result["meta"][f"morans_i_{name}"] = round(morans_i(lon, lat, np.log(r)), 3)
