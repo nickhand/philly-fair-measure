@@ -234,6 +234,26 @@ def test_finalize_screen_insufficient_record_and_newbuild_guard():
     assert out["new_under"]["assessment_flag"] == "under_assessed_candidate"
 
 
+def test_finalize_screen_withholds_low_quality_record():
+    out = finalize_screen(
+        pl.DataFrame(
+            {
+                "parcel_id": ["conflict"],
+                "opa_market_value": [900_000.0],
+                "pred_point_calibrated": [300_000.0],
+                "model_median": [300_000.0],
+                "model_pi_low_90": [150_000.0],
+                "model_pi_high_90": [600_000.0],
+                "char_livable_area": [924.0],
+                "record_quality_low": [True],
+            }
+        )
+    ).to_dicts()[0]
+    assert out["assessment_flag"] == "insufficient_record"
+    assert out["screen_z"] is None
+    assert out["opa_vs_model_ratio"] is None
+
+
 def test_finalize_screen_attention_tier():
     # The tier follows the DISPLAYED band's linear geometry (the picture the
     # property page draws) at the outer TENTH, band 150k-600k around a 300k

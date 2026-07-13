@@ -152,6 +152,10 @@ def test_event_features_do_not_leak_the_future():
             "opa_account_num": "p1",
             "permitissuedate_parsed": datetime(2019, 6, 1),
             "typeofwork": "Alterations",
+            # Either completion field is evidence; use the earliest rather
+            # than blindly preferring this later administrative timestamp.
+            "permitcompleteddate_parsed": datetime(2020, 2, 1),
+            "certificateofoccupancydate_parsed": datetime(2019, 10, 1),
         },
         # future! — must not leak into either count
         {
@@ -170,6 +174,7 @@ def test_event_features_do_not_leak_the_future():
             "opa_account_num": "p1",
             "permitissuedate_parsed": datetime(2019, 8, 1),
             "typeofwork": "EZPLUM",
+            "approvedscopeofwork": "Change of occupancy to two dwelling units",
         },
     ]
     violations = [
@@ -196,6 +201,14 @@ def test_event_features_do_not_leak_the_future():
     # renovation-class only: the EZ trade permit and the future/old ones drop
     assert row["evt_n_reno_permits_5y_before"] == 1
     assert row["evt_days_since_last_reno_permit"] == 214
+    # The completed alteration and still-active occupancy change are not the
+    # same signal; this distinction prevents construction from reading as
+    # finished renovation uplift.
+    assert row["evt_n_completed_permits_5y_before"] == 1
+    assert row["evt_n_active_permits_at_sale"] == 1
+    assert row["evt_n_completed_reno_permits_5y_before"] == 1
+    assert row["evt_n_active_reno_permits_at_sale"] == 0
+    assert row["evt_n_active_change_occupancy_at_sale"] == 1
     assert row["evt_n_violations_5y_before"] == 2
     assert row["evt_n_open_violations_at_sale"] == 1
 
@@ -321,3 +334,33 @@ def test_assembled_frames_carry_the_price_anchors():
     by_id = _assemble([_sale("s1", "p1", 260_000.0, datetime(2019, 6, 1))], [_opa("p1")])
     assert "mkt_knn_price_anchor_log" in next(iter(by_id.values()))
     assert "mkt_newbuild_price_anchor_log" in next(iter(by_id.values()))
+
+
+def test_footprint_features_preserve_both_area_measurements():
+    from philly_fair_measure.features.structure import add_building_structure_features
+
+    frame = pl.DataFrame(
+        {
+            "parcel_id": ["192222401"],
+            "char_category": ["MULTI FAMILY"],
+            "char_livable_area": [924.0],
+            "char_beds": [0.0],
+            "char_baths": [0.0],
+            "char_stories": [3.0],
+            "mkt_knn_log_ppsf": [math.log(100.0)],
+        }
+    )
+    footprints = pl.LazyFrame(
+        {
+            "parcel_id": ["192222401"],
+            "bldg_footprint_sqft": [858.0],
+            "bldg_approx_height_ft": [34.0],
+        }
+    )
+    row = add_building_structure_features(frame, footprints).to_dicts()[0]
+    assert row["char_livable_area"] == 924.0  # raw OPA measurement is untouched
+    assert row["char_footprint_estimated_floors"] == 3.0
+    assert row["char_footprint_gross_sqft"] == pytest.approx(2_574.0)
+    assert row["char_livable_to_footprint_gross_ratio"] == pytest.approx(924 / 2574)
+    assert row["char_area_conflict"] == 1.0
+    assert math.exp(row["mkt_knn_footprint_price_anchor_log"]) == pytest.approx(257_400.0)

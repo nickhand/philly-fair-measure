@@ -127,10 +127,12 @@ RESIDENTIAL_SPEC = FamilySpec(
         # exists — the newbuild_thin sigma term carries that honesty)
         "char_new_build",
         "mkt_newbuild_premium",
-        # renovation-class permits before the valuation/sale date: the public
-        # trace of renovated-vs-shell, the latent state behind within-block
-        # disagreement between the arms (Stage 4)
-        "evt_n_reno_permits_5y_before",
+        # Completed work and active construction are different latent states.
+        # The old undifferentiated permit count falsely treated an issued gut
+        # conversion as completed renovation uplift.
+        "evt_n_completed_reno_permits_5y_before",
+        "evt_n_active_reno_permits_at_sale",
+        "evt_n_active_change_occupancy_at_sale",
     ],
     ordinals=["char_exterior_condition", "char_interior_condition"],
     missing=[
@@ -158,6 +160,10 @@ RESIDENTIAL_SPEC = FamilySpec(
         # freshly finished — the recorded characteristics are least reliable
         # exactly then, so widen instead of guessing which state it's in
         "reno_recent",
+        # independent footprint/height evidence contradicts the recorded
+        # multifamily area and 0/0 bed-bath record. Suspect measurement widens
+        # uncertainty; it does not mechanically change the conditional mean.
+        "area_conflict",
     ],
 )
 
@@ -428,6 +434,11 @@ def _sigma_design(df: pl.DataFrame, family: str = "residential") -> np.ndarray:
         if "evt_days_since_last_reno_permit" in df.columns
         else np.full(df.height, np.inf)
     )
+    area_conflict = (
+        df["char_area_conflict"].cast(pl.Float64).fill_null(0.0).to_numpy()
+        if "char_area_conflict" in df.columns
+        else np.zeros(df.height)
+    )
     return np.column_stack(
         [
             missing,
@@ -443,6 +454,7 @@ def _sigma_design(df: pl.DataFrame, family: str = "residential") -> np.ndarray:
             ((new_build > 0) & (newbuild_n < 3)).astype(np.float64),
             # renovation permit within ~3 years (see reno_recent in the spec)
             (reno_days <= 3 * 365.25).astype(np.float64),
+            area_conflict,
         ]
     )
 

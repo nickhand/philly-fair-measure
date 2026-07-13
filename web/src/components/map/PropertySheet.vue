@@ -12,11 +12,26 @@ import { verdictFor } from '@/utils/verdict'
 const props = defineProps<{ property: PropertyCore }>()
 defineEmits<{ close: [] }>()
 
+const isQualityWarning = computed(() => props.property.flag === 'insufficient_record')
+
+/** Warning records show the Bayesian band whose variance includes the data
+ * conflict; ordinary records use the tighter overlap of both methods. */
+const bandLo = computed(() =>
+  isQualityWarning.value
+    ? props.property.model_pi_low_90
+    : (props.property.display_pi_low_90 ?? props.property.model_pi_low_90),
+)
+const bandHi = computed(() =>
+  isQualityWarning.value
+    ? props.property.model_pi_high_90
+    : (props.property.display_pi_high_90 ?? props.property.model_pi_high_90),
+)
+
 const verdict = computed(() =>
   verdictFor(props.property.flag, props.property.attention, {
     cityValue: props.property.opa_market_value,
-    bandLo: props.property.display_pi_low_90 ?? props.property.model_pi_low_90,
-    bandHi: props.property.display_pi_high_90 ?? props.property.model_pi_high_90,
+    bandLo: bandLo.value,
+    bandHi: bandHi.value,
     newBuild: props.property.new_build,
   }),
 )
@@ -27,12 +42,6 @@ const hasInterval = computed(
     props.property.model_median != null &&
     props.property.opa_market_value != null,
 )
-
-/** The band the sheet shows: where both uncertainty methods agree
- * (display_pi_*), falling back to the flag-anchoring model band on older
- * payloads. */
-const bandLo = computed(() => props.property.display_pi_low_90 ?? props.property.model_pi_low_90)
-const bandHi = computed(() => props.property.display_pi_high_90 ?? props.property.model_pi_high_90)
 
 /** Compact 64px strip. */
 const W = 343
@@ -46,6 +55,12 @@ const x = computed(() => {
 const ariaLabel = computed(() => {
   const c = props.property
   const opa = c.opa_market_value
+  if (isQualityWarning.value)
+    return (
+      `Model estimate ${money(c.model_median)}, with a data-warning range of ` +
+      `${money(bandLo.value)} to ${money(bandHi.value)}. ` +
+      `City value ${money(opa)} is shown for reference; no over-or-under call is made.`
+    )
   // inside/outside must describe the drawn band, not the flag (demoted rows
   // are within_range with the city marker beyond the band)
   const inside = opa != null && opa >= bandLo.value! && opa <= bandHi.value!
@@ -135,7 +150,14 @@ function edgeAnchor(v: number): 'start' | 'middle' | 'end' {
         </text>
       </svg>
 
-      <dl v-else class="mt-3 grid grid-cols-2 gap-3 text-body-sm">
+      <p
+        v-if="isQualityWarning"
+        class="mt-1.5 rounded-md border border-gold-tint-border bg-gold-tint px-2.5 py-2 text-caption leading-normal text-body"
+      >
+        Estimate shown with a data-quality warning. Open the report for the reason and evidence.
+      </p>
+
+      <dl v-if="!hasInterval" class="mt-3 grid grid-cols-2 gap-3 text-body-sm">
         <div class="rounded-md bg-paper p-3">
           <dt class="text-muted">City’s value</dt>
           <dd class="text-lg font-bold tabular-nums text-ink">{{ money(property.opa_market_value) }}</dd>

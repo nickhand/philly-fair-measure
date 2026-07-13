@@ -25,6 +25,10 @@ def _frame():
             "char_beds": [3.0, 4.0, 3.0],
             "char_baths": [1.0, 2.0, 1.0],
             "char_year_built": [1920.0, 1950.0, None],
+            "char_footprint_gross_sqft": [1100.0, 2100.0, None],
+            "char_livable_to_footprint_gross_ratio": [0.91, 0.95, None],
+            "char_footprint_story_gap": [0.0, 0.0, None],
+            "char_area_conflict": [0.0, 0.0, 0.0],
             "mkt_knn_log_ppsf": [5.2, 5.6, None],
             "mkt_area_level_log_ppsf": [0.1, -0.2, 0.0],
             "mkt_knn_mean_dist_m": [40.0, 90.0, None],
@@ -32,10 +36,12 @@ def _frame():
             "char_new_build": [0.0, 1.0, 0.0],
             "mkt_newbuild_premium": [0.0, 0.35, 0.0],
             "mkt_newbuild_knn_n": [4, 1, 0],
-            "evt_n_reno_permits_5y_before": [0.0, 2.0, 0.0],
-            "evt_days_since_last_reno_permit": [None, 400.0, None],
+            "evt_n_completed_reno_permits_5y_before": [0.0, 2.0, 0.0],
+            "evt_n_active_reno_permits_at_sale": [0.0, 0.0, 1.0],
+            "evt_n_active_change_occupancy_at_sale": [0.0, 0.0, 1.0],
             "char_exterior_condition": ["4", "3", None],
             "char_interior_condition": ["4", None, "5"],
+            "char_style": ["row", "row", "twin"],
             "loc_market_area": ["ma_001", "ma_001", "ma_002"],
             "loc_district": ["d_00", "d_00", "d_01"],
         }
@@ -48,7 +54,7 @@ def test_covariate_encoder_imputes_and_standardizes():
     x = encoder.transform(df)
     assert x.shape == (3, len(encoder.feature_names))
     assert np.isfinite(x).all()
-    # two trailing missing indicators: block roll, then prev price
+    # trailing missing indicators: block roll, then previous price
     assert encoder.feature_names[-2:] == ["block_roll_missing", "prev_price_missing"]
     assert x[:, encoder.feature_names.index("block_roll_missing")].tolist() == [0.0, 1.0, 0.0]
     assert x[:, encoder.feature_names.index("prev_price_missing")].tolist() == [0.0, 1.0, 0.0]
@@ -62,6 +68,15 @@ def test_covariate_encoder_survives_float_nan():
     encoder = CovariateEncoder.fit(df)
     x = encoder.transform(df)
     assert np.isfinite(x).all()
+
+
+def test_area_conflict_enters_uncertainty_not_mean_covariates():
+    frame = _frame().with_columns(pl.Series("char_area_conflict", [0.0, 1.0, 0.0]))
+    encoder = CovariateEncoder.fit(frame)
+    assert "char_area_conflict" not in encoder.feature_names
+    z = _sigma_design(frame)
+    assert z.shape[1] == 10
+    assert z[:, -1].tolist() == [0.0, 1.0, 0.0]
 
 
 def test_condo_family_spec_encoder_and_sigma():

@@ -9,9 +9,9 @@ compared against its current OPA market value:
     under_assessed_candidate  OPA value below the interval
     within_range              OPA value inside the interval
     no_assessment             OPA value missing/zero — nothing to compare
-    insufficient_record       no recorded living area (usually brand-new
-                              construction still being written up) — the
-                              model cannot price it, so no verdict
+    insufficient_record       missing or conflicting core characteristics, or
+                              active occupancy-changing work — a numeric
+                              comparison is not defensible, so no verdict
 
 Newly built homes (year built within two years of the valuation date) never
 flag "over": comp evidence reflects the older stock they replaced and runs
@@ -79,6 +79,7 @@ from philly_fair_measure.models.scoring import (
     score_bayesian_intervals,
     score_point,
 )
+from philly_fair_measure.validation.record_quality import add_record_quality
 from philly_fair_measure.vocab import (
     ATTENTION_BAND_FRACTION,
     AssessmentFlag,
@@ -167,11 +168,17 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     # medians against $500k assessments, 19 of the top-100 z leads). Usually
     # brand-new construction the city is still writing up; no verdict.
     # (The column guards tolerate minimal test fixtures.)
-    insufficient = (
+    no_livable_area = (
         pl.col("char_livable_area").fill_null(0) <= 0
         if "char_livable_area" in df.columns
         else pl.lit(False)
     )
+    low_record_quality = (
+        pl.col("record_quality_low").fill_null(False)
+        if "record_quality_low" in df.columns
+        else pl.lit(False)
+    )
+    insufficient = no_livable_area | low_record_quality
     # New construction: until the home itself sells, nearby sales mostly
     # reflect the older stock it replaced, so a sale-comparison model runs
     # low (measured: new-build over-flag assessments at 3.2x our medians,
@@ -429,6 +436,7 @@ def build_assessment_screen(
         "rental_licenses",
         "appeals",
         "mortgages",
+        "building_footprints",
     ):
         path = root / "staged" / f"{name}.parquet"
         optional[name] = pl.scan_parquet(path) if path.exists() else None
@@ -452,6 +460,16 @@ def build_assessment_screen(
         optional["rental_licenses"],
         optional["appeals"],
         optional["mortgages"],
+        optional["building_footprints"],
+    )
+    # Precision-first no-verdict guards. They do not mechanically correct the
+    # point estimate; the corroborated area conflict also enters the Bayesian
+    # variance model so the predictive interval reflects measurement risk.
+    features = add_record_quality(
+        features,
+        pl.scan_parquet(paths["permits"]),
+        optional["building_footprints"],
+        valuation_date,
     )
     # pin row order: interval draws are seeded by row position, and polars
     # joins are not order-stable across runs — without this, borderline
@@ -518,6 +536,9 @@ def build_assessment_screen(
         "address",
         "char_category",
         "char_livable_area",
+        "char_beds",
+        "char_baths",
+        "char_stories",
         "char_year_built",
         "char_interior_condition",
         "loc_zip5",
@@ -534,6 +555,14 @@ def build_assessment_screen(
         "ten_rental_license_at_sale",
         "ten_owner_occupied_at_sale",
         "opa_market_value",
+        "quality_open_change_permits",
+        "quality_open_change_of_occupancy",
+        "bldg_footprint_sqft",
+        "bldg_approx_height_ft",
+        "quality_estimated_floors",
+        "quality_livable_to_gross_ratio",
+        "quality_multifamily_area_conflict",
+        "record_quality_low",
     ).with_columns(
         pl.Series("pred_point", pred_point),
         pl.Series("pred_point_calibrated", pred_point / calibration),
@@ -604,6 +633,15 @@ def build_assessment_screen(
         )
     for path in paths.values():
         manifest = read_derived_manifest(path)
+        inputs.append(
+            InputRef(
+                dataset=f"{manifest.layer}/{manifest.table}",
+                fetched_at=manifest.built_at.isoformat(),
+            )
+        )
+    footprint_path = root / "staged" / "building_footprints.parquet"
+    if footprint_path.exists():
+        manifest = read_derived_manifest(footprint_path)
         inputs.append(
             InputRef(
                 dataset=f"{manifest.layer}/{manifest.table}",

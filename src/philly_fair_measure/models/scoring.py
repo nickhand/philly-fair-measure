@@ -181,6 +181,9 @@ def score_bayesian_intervals(
     area, district = geo.indices(df)
     b = basis.transform(_xy(df)) if basis is not None else None
     z = _sigma_design(df, encoder.family)
+    # Sigma terms are append-only. Older runs have fewer posterior g columns;
+    # keep them scoreable with the design prefix they were trained on.
+    z = z[:, : draws["g"].shape[1]]
     parcel = parcels.seen(df) if parcels is not None else None
     if params.get("time_adjusted") and "time_adj_log" in df.columns:
         adj = df["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy()

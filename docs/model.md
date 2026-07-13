@@ -193,14 +193,14 @@ a cross-check, and the bake-off was residential-only).
 ## 6. Results
 
 <!-- generated:model-results-table:begin -->
-Out-of-time test set, n = 19,519, run `20260712T050600Z-baseline`. Identical test
+Out-of-time test set, n = 19,519, run `20260713T224356Z-baseline`. Identical test
 set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **GBM stack (ours)** | **0.321** | **25.0%** | 1.026 | **24.2** | **1.086** | **-0.088** | 0.912 |
-| LightGBM arm | 0.328 | 25.2% | 1.011 | 24.9 | 1.087 | -0.084 | 0.911 |
-| CatBoost arm | 0.320 | 24.3% | 0.998 | 24.3 | 1.086 | -0.088 | 0.912 |
+| **GBM stack (ours)** | **0.321** | **25.1%** | 1.027 | **24.3** | **1.086** | **-0.087** | 0.912 |
+| LightGBM arm | 0.329 | 25.3% | 1.013 | 25.0 | 1.086 | -0.084 | 0.912 |
+| CatBoost arm | 0.320 | 24.3% | 0.999 | 24.4 | 1.086 | -0.087 | 0.912 |
 | Ridge | 0.424 | 36.6% | 1.026 | 35.6 | 1.068 | -0.113 | 0.978 |
 | **OPA (incumbent)** | **0.451** | **34.2%** | 0.983 | **34.7** | **1.192** | **-0.235** | 0.787 |
 <!-- generated:model-results-table:end -->
@@ -287,9 +287,9 @@ Guards keep the flags honest where the record, not the value, is the problem:
   beside it.
 
 <!-- generated:model-screen-counts:begin -->
-As of run `20260712T050600Z` (Tax Year 2027 roll): 496,975 properties
-screened: 1,020 over-assessed candidates, 6,878 under-assessed
-candidates, 42,494 in the attention tier, 93 insufficient
+As of run `20260713T224356Z` (Tax Year 2027 roll): 496,975 properties
+screened: 1,032 over-assessed candidates, 6,781 under-assessed
+candidates, 42,198 in the attention tier, 439 insufficient
 records.
 <!-- generated:model-screen-counts:end -->
 (The constant-quality index of 2026-07-06 cut under-assessed candidates

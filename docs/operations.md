@@ -13,6 +13,16 @@ The core table set lives in `philly_fair_measure.config.CORE_CARTO_TABLES`.
 Parcel polygons (`fair-measure snapshot arcgis PWD_PARCELS`, ~10 min) change rarely;
 refresh them occasionally rather than weekly, then re-run
 `fair-measure stage --tables parcels`.
+Building footprints are also a separate large ArcGIS capture. Refresh and
+stage the current-only record-consistency layer with:
+
+```bash
+uv run fair-measure snapshot arcgis LI_BUILDING_FOOTPRINTS --dataset building_footprints
+uv run fair-measure stage --tables building_footprints
+```
+
+A default `fair-measure stage` skips this optional table when no footprint
+snapshot exists; an explicit request remains strict.
 A full weekly capture is currently ~842MB of zstd Parquet (~44GB/year).
 Per the project brief, do not prematurely optimize away full snapshots;
 revisit with delta tables once change detection lands.

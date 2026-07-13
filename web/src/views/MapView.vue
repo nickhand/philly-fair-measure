@@ -29,9 +29,12 @@ const router = useRouter()
 const container = ref<HTMLDivElement | null>(null)
 /** Which legend groups are visible; chips toggle these on/off. The gray
  * within-range majority starts hidden — the map's job is the pattern, and
- * 460k quiet dots drown it; the chip turns them on for anyone who asks. */
+ * 460k quiet dots drown it. The small data-warning set remains visible even
+ * though it uses the base layer at parcel zoom. */
 const enabledLabels = ref<Set<string>>(
-  new Set(legend.filter((l) => l.tier !== 'base').map((l) => l.label)),
+  new Set(
+    legend.filter((l) => l.tier !== 'base' || l.label === 'Data warning').map((l) => l.label),
+  ),
 )
 /** Condo flags come from the condo-unit model and cluster in Center City
  * towers — a separate toggle (applied at every zoom) keeps them from being

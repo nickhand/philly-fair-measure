@@ -18,6 +18,54 @@ as of the sale date, and the prefixes encode it:
 
 Coverage figures below measured on the 2026-07-02 build (209,680 sales).
 
+## Missing, invalid, and suspect measurements
+
+These are three different states and the pipeline does not collapse them:
+
+- Raw source values remain unchanged. Parsed dates and years receive a typed
+  value plus `ok` / `missing` / `invalid` / `implausible` status; an invalid or
+  implausible parsed value becomes null without erasing the source value.
+- A null event count created by a left join is filled with zero only where it
+  has the structural meaning “no qualifying event was found.” It is not a
+  generic numeric-imputation policy.
+- LightGBM and CatBoost retain numeric nulls for native missing-value routing;
+  categorical nulls use an explicit `__missing__` level. The Ridge benchmark
+  uses train-slice median imputation. The Bayesian mean model uses train-slice
+  median imputation and explicit indicators for the market block roll and
+  prior-sale value, where absence itself is meaningful.
+- A plausible-looking but wrong value is **measurement error**, not missing
+  data. It is preserved alongside independent evidence and an auditable
+  conflict flag. The flag can change predictive uncertainty and screen
+  eligibility, but does not silently replace the observed value or force a
+  point-value correction.
+
+The last distinction matters for zero beds/baths and suspect living area. A
+global rule such as “zero means null” would also erase legitimate structural
+zeros and source-specific conventions. The current precision-first rule fires
+only when the record is multi-family, both fields are zero, OPA and independent
+height evidence agree it is multi-story, and living area is below 40% of the
+footprint-derived gross-area proxy. This is the machine-readable version of a
+human cross-check, not an imputation.
+
+This design follows the [IAAO Standard on Data
+Quality](https://www.iaao.org/wp-content/uploads/Standard_on_Data_Quality.pdf),
+which separates accuracy, currency, consistency, and completeness and calls
+for anomaly detection and correction before valuation. Statistically, missing
+indicators can be required through interactions rather than as a single
+additive dummy ([Le Morvan et al., AISTATS
+2020](https://proceedings.mlr.press/v108/morvan20a.html)); single imputation
+alone discards information about the missingness process and understates
+uncertainty ([Josse et al., Statistical Papers
+2024](https://link.springer.com/article/10.1007/s00362-024-01550-4)). For
+wrong-but-present covariates, principled latent-value, regression-calibration,
+or multiple-imputation corrections require validation or replicate
+measurements that relate observed to true values ([Keogh and Bartlett,
+2019](https://arxiv.org/abs/1910.06443)). Until those labels exist, widening
+uncertainty and withholding an assessment verdict is more defensible than
+inventing a corrected living area. `Insufficient_record` therefore means
+“estimate shown with a prominent data warning and broader uncertainty,” not
+“no estimate”; it suppresses only the over/under comparison.
+
 ## Identifiers / target
 
 `sale_id` (rtt record_id), `parcel_id` (OPA account), `sale_date`, `sale_year`,
@@ -254,6 +302,27 @@ in both directions), and (c) splits the imagery roadmap cleanly: Mapillary
 facades check the code OPA actually maintains (exterior); only listings
 photos can see interiors.
 
+**Independent footprint/height record check (2026-07-13):** the current
+`LI_BUILDING_FOOTPRINTS` snapshot is joined to OPA through PWD parcels and
+preserves `char_footprint_sqft`, height-estimated floors, estimated gross
+area, the recorded-livable/gross ratio, and story disagreement. These are
+current-only diagnostic columns; OPA living area is never overwritten. A
+precision-first conflict flag requires a multi-family record, zero beds and
+baths, a sub-40% living/gross ratio, and agreement between OPA stories and
+height-estimated floors. A valuation ablation rejected these columns as
+production predictors: on 26 held-out conflict sales, log-RMSE worsened
+0.390→0.429. They remain record-quality evidence and suppress an assessment
+verdict when the input state is not defensible. On the 2026-07-12 assessment
+frame, 207 records meet the corroborated multifamily conflict rule; 140 more
+have a recent issued, incomplete change-of-occupancy permit. Together they are
+347 of roughly half a million residential screen rows and replace 22 prior
+over/under candidates with `insufficient_record`. The same conflict flag enters
+the Bayesian **variance**, not mean, model. On the 2025 out-of-time slice its
+log-sigma coefficient is 0.223 (90% posterior interval 0.049–0.420), about a
+25% multiplicative increase in residual standard deviation. The 26 flagged
+test sales receive 96.2% interval coverage versus 91.5% overall, but the small
+sample and current-only footprint timing require continued monitoring.
+
 ## Events (`evt_`), true event dates, no future leakage (tested)
 
 | Feature | Definition |
@@ -262,11 +331,29 @@ photos can see interiors.
 | `evt_days_since_last_permit` | Days since most recent permit before the sale (any age) |
 | `evt_n_reno_permits_5y_before` | Renovation-class permits (alterations, MAJOR, change of use, excludes EZ trade permits and new construction) in the 5y strictly before the sale |
 | `evt_days_since_last_reno_permit` | Days since most recent renovation-class permit before the sale (any age; null = never) |
+| `evt_n_completed_permits_5y_before` | Permits issued in the prior 5y with dated completion/occupancy evidence by the sale date |
+| `evt_n_active_permits_at_sale` | Permits issued in the prior 5y without completion evidence by the sale date |
+| `evt_n_completed_reno_permits_5y_before` | Completed alteration/major/change-of-use permits in the prior 5y |
+| `evt_n_active_reno_permits_at_sale` | Renovation-class permits still active at the sale date |
+| `evt_n_active_change_occupancy_at_sale` | Issued change-of-occupancy work not completed by the sale date; modeled separately because construction state is not completed-renovation uplift |
 | `evt_n_violations_5y_before` | Violations opened in the 5y strictly before the sale |
 | `evt_n_open_violations_at_sale` | Violations open (unresolved) on the sale date |
 
 Known limitation: unpermitted work is invisible by construction, permit
 features help the citywide model, not properties renovated without permits.
+The historical active-state feature is reconstructed from issue and completion
+dates; permits without a completion date can include administratively stale
+records, so the assessment screen additionally requires a recent current
+`Issued` status before withholding a verdict.
+
+**Permit-state ablation (2026-07-13):** replacing undifferentiated permit
+existence/recency predictors with completed/active state left citywide
+out-of-time accuracy essentially unchanged (19,550 sales: log-RMSE 0.3211→
+0.3213, COD 24.22→24.27). On the six held-out sales with an active
+change-of-occupancy signal—the failure mode this feature targets—log-RMSE
+improved 0.487→0.366 and median prediction/sale moved 1.236→1.078. This is a
+small slice and should be monitored, but it passes the intended stress test
+without trading away material citywide accuracy.
 
 ## Assessment (`asmt_`), Philly-specific advantage (15y history table)
 

@@ -44,10 +44,12 @@ from philly_fair_measure.features.sale_features import (
     era_expr,
     financing_features,
     homestead_now,
+    is_change_of_occupancy_permit,
     is_reno_permit,
     join_delinquencies,
     join_parcel_shapes,
     join_proximity,
+    permit_completion_date,
     price_anchor_exprs,
     style_expr,
 )
@@ -56,6 +58,7 @@ from philly_fair_measure.features.spatial import (
     NEWBUILD_KNN_K,
     knn_ppsf_at_date,
 )
+from philly_fair_measure.features.structure import add_building_structure_features
 from philly_fair_measure.models.baseline import RESIDENTIAL_CATEGORIES
 
 
@@ -92,6 +95,7 @@ def assemble_assessment_features(
     rental_licenses: pl.LazyFrame | None = None,
     appeals: pl.LazyFrame | None = None,
     mortgages: pl.LazyFrame | None = None,
+    building_footprints: pl.LazyFrame | None = None,
 ) -> pl.DataFrame:
     from philly_fair_measure.config import CONDO_ACCOUNT_PREFIX
 
@@ -255,7 +259,8 @@ def assemble_assessment_features(
     )
 
     # minimal fixtures may omit typeofwork; treat as non-renovation
-    has_typeofwork = "typeofwork" in permits.collect_schema().names()
+    permit_columns = set(permits.collect_schema().names())
+    has_typeofwork = "typeofwork" in permit_columns
     permit_events = (
         permits.filter(
             pl.col("opa_account_num").is_not_null()
@@ -267,9 +272,18 @@ def assemble_assessment_features(
             (pl.lit(valuation_date) - pl.col("permitissuedate_parsed"))
             .dt.total_days()
             .alias("days_before"),
+            permit_completion_date(permit_columns).alias("completion_date"),
             (is_reno_permit() if has_typeofwork else pl.lit(False)).alias("is_reno"),
+            is_change_of_occupancy_permit(permit_columns).alias("is_change_occupancy"),
         )
         .collect()
+        .with_columns(
+            (
+                pl.col("completion_date").is_not_null()
+                & (pl.col("completion_date") <= valuation_date)
+            ).alias("completed_at_sale")
+        )
+        .with_columns((~pl.col("completed_at_sale")).alias("active_at_sale"))
         .group_by("parcel_id")
         .agg(
             (pl.col("days_before") <= ROLL_WINDOW_DAYS).sum().alias("evt_n_permits_5y_before"),
@@ -281,6 +295,33 @@ def assemble_assessment_features(
             .filter(pl.col("is_reno"))
             .min()
             .alias("evt_days_since_last_reno_permit"),
+            ((pl.col("days_before") <= ROLL_WINDOW_DAYS) & pl.col("completed_at_sale"))
+            .sum()
+            .alias("evt_n_completed_permits_5y_before"),
+            ((pl.col("days_before") <= ROLL_WINDOW_DAYS) & pl.col("active_at_sale"))
+            .sum()
+            .alias("evt_n_active_permits_at_sale"),
+            (
+                (pl.col("days_before") <= ROLL_WINDOW_DAYS)
+                & pl.col("is_reno")
+                & pl.col("completed_at_sale")
+            )
+            .sum()
+            .alias("evt_n_completed_reno_permits_5y_before"),
+            (
+                (pl.col("days_before") <= ROLL_WINDOW_DAYS)
+                & pl.col("is_reno")
+                & pl.col("active_at_sale")
+            )
+            .sum()
+            .alias("evt_n_active_reno_permits_at_sale"),
+            (
+                (pl.col("days_before") <= ROLL_WINDOW_DAYS)
+                & pl.col("is_change_occupancy")
+                & pl.col("active_at_sale")
+            )
+            .sum()
+            .alias("evt_n_active_change_occupancy_at_sale"),
         )
     )
     violation_events = (
@@ -452,6 +493,11 @@ def assemble_assessment_features(
             .alias("char_new_build"),
             pl.col("evt_n_permits_5y_before").fill_null(0),
             pl.col("evt_n_reno_permits_5y_before").fill_null(0),
+            pl.col("evt_n_completed_permits_5y_before").fill_null(0),
+            pl.col("evt_n_active_permits_at_sale").fill_null(0),
+            pl.col("evt_n_completed_reno_permits_5y_before").fill_null(0),
+            pl.col("evt_n_active_reno_permits_at_sale").fill_null(0),
+            pl.col("evt_n_active_change_occupancy_at_sale").fill_null(0),
             pl.col("evt_n_violations_5y_before").fill_null(0),
             pl.col("evt_n_open_violations_at_sale").fill_null(0),
             pl.col("evt_n_severe_violations_5y_before").fill_null(0),
@@ -478,4 +524,5 @@ def assemble_assessment_features(
     )
     features = join_parcel_shapes(features, parcels)
     features = join_delinquencies(features, delinquencies)
-    return join_proximity(features, proximity)
+    features = join_proximity(features, proximity)
+    return add_building_structure_features(features, building_footprints)

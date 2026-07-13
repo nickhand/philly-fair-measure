@@ -37,6 +37,7 @@ from pathlib import Path
 import polars as pl
 
 from philly_fair_measure import config
+from philly_fair_measure.features.structure import add_building_structure_features
 from philly_fair_measure.ingest.derived import write_derived_table
 from philly_fair_measure.ingest.manifests import DerivedManifest, InputRef, read_derived_manifest
 
@@ -113,6 +114,39 @@ def is_reno_permit() -> pl.Expr:
     tw = pl.col("typeofwork").cast(pl.String).str.to_lowercase()
     is_reno = tw.str.contains("alter") | (tw == "major") | tw.str.contains("change of use")
     return is_reno.fill_null(False)
+
+
+def is_change_of_occupancy_permit(columns: set[str]) -> pl.Expr:
+    """Change-of-occupancy scope across the verified L&I text fields."""
+    available = [
+        name
+        for name in ("typeofwork", "permitdescription", "approvedscopeofwork")
+        if name in columns
+    ]
+    if not available:
+        return pl.lit(False)
+    return (
+        pl.concat_str(
+            [pl.col(name).cast(pl.String) for name in available],
+            separator=" ",
+            ignore_nulls=True,
+        )
+        .str.to_uppercase()
+        .str.contains("CHANGE OF OCCUPANCY")
+        .fill_null(False)
+    )
+
+
+def permit_completion_date(columns: set[str]) -> pl.Expr:
+    """Earliest dated evidence that permitted work was completed."""
+    available = [
+        pl.col(name)
+        for name in ("permitcompleteddate_parsed", "certificateofoccupancydate_parsed")
+        if name in columns
+    ]
+    if not available:
+        return pl.lit(None, dtype=pl.Datetime)
+    return available[0] if len(available) == 1 else pl.min_horizontal(available)
 
 
 DIST_COLUMNS = [
@@ -786,6 +820,7 @@ def assemble_sale_features(
     rental_licenses: pl.LazyFrame | None = None,
     appeals: pl.LazyFrame | None = None,
     mortgages: pl.LazyFrame | None = None,
+    building_footprints: pl.LazyFrame | None = None,
     *,
     min_sale_year: int = DEFAULT_MIN_SALE_YEAR,
 ) -> pl.DataFrame:
@@ -873,7 +908,8 @@ def assemble_sale_features(
     base = pool.filter(pl.col("sale_year") >= min_sale_year)
 
     # minimal fixtures may omit typeofwork; treat as non-renovation
-    has_typeofwork = "typeofwork" in permits.collect_schema().names()
+    permit_columns = set(permits.collect_schema().names())
+    has_typeofwork = "typeofwork" in permit_columns
     permit_events = (
         permits.filter(
             pl.col("opa_account_num").is_not_null() & pl.col("permitissuedate_parsed").is_not_null()
@@ -881,7 +917,9 @@ def assemble_sale_features(
         .select(
             pl.col("opa_account_num").alias("parcel_id"),
             pl.col("permitissuedate_parsed").alias("event_date"),
+            permit_completion_date(permit_columns).alias("completion_date"),
             (is_reno_permit() if has_typeofwork else pl.lit(False)).alias("is_reno"),
+            is_change_of_occupancy_permit(permit_columns).alias("is_change_occupancy"),
         )
         .collect()
     )
@@ -889,8 +927,13 @@ def assemble_sale_features(
         base.select("sale_id", "parcel_id", "sale_date")
         .join(permit_events, on="parcel_id")
         .with_columns(
-            (pl.col("sale_date") - pl.col("event_date")).dt.total_days().alias("days_before")
+            (pl.col("sale_date") - pl.col("event_date")).dt.total_days().alias("days_before"),
+            (
+                pl.col("completion_date").is_not_null()
+                & (pl.col("completion_date") <= pl.col("sale_date"))
+            ).alias("completed_at_sale"),
         )
+        .with_columns((~pl.col("completed_at_sale")).alias("active_at_sale"))
         .filter(pl.col("days_before") > 0)
         .group_by("sale_id")
         .agg(
@@ -903,6 +946,33 @@ def assemble_sale_features(
             .filter(pl.col("is_reno"))
             .min()
             .alias("evt_days_since_last_reno_permit"),
+            ((pl.col("days_before") <= EVENT_WINDOW_DAYS) & pl.col("completed_at_sale"))
+            .sum()
+            .alias("evt_n_completed_permits_5y_before"),
+            ((pl.col("days_before") <= EVENT_WINDOW_DAYS) & pl.col("active_at_sale"))
+            .sum()
+            .alias("evt_n_active_permits_at_sale"),
+            (
+                (pl.col("days_before") <= EVENT_WINDOW_DAYS)
+                & pl.col("is_reno")
+                & pl.col("completed_at_sale")
+            )
+            .sum()
+            .alias("evt_n_completed_reno_permits_5y_before"),
+            (
+                (pl.col("days_before") <= EVENT_WINDOW_DAYS)
+                & pl.col("is_reno")
+                & pl.col("active_at_sale")
+            )
+            .sum()
+            .alias("evt_n_active_reno_permits_at_sale"),
+            (
+                (pl.col("days_before") <= EVENT_WINDOW_DAYS)
+                & pl.col("is_change_occupancy")
+                & pl.col("active_at_sale")
+            )
+            .sum()
+            .alias("evt_n_active_change_occupancy_at_sale"),
         )
     )
 
@@ -1063,6 +1133,11 @@ def assemble_sale_features(
             .alias("char_new_build"),
             pl.col("evt_n_permits_5y_before").fill_null(0),
             pl.col("evt_n_reno_permits_5y_before").fill_null(0),
+            pl.col("evt_n_completed_permits_5y_before").fill_null(0),
+            pl.col("evt_n_active_permits_at_sale").fill_null(0),
+            pl.col("evt_n_completed_reno_permits_5y_before").fill_null(0),
+            pl.col("evt_n_active_reno_permits_at_sale").fill_null(0),
+            pl.col("evt_n_active_change_occupancy_at_sale").fill_null(0),
             pl.col("evt_n_violations_5y_before").fill_null(0),
             pl.col("evt_n_open_violations_at_sale").fill_null(0),
             pl.col("evt_n_severe_violations_5y_before").fill_null(0),
@@ -1094,6 +1169,7 @@ def assemble_sale_features(
     features = join_parcel_shapes(features, parcels)
     features = join_delinquencies(features, delinquencies)
     features = join_proximity(features, proximity)
+    features = add_building_structure_features(features, building_footprints)
     return features.sort("sale_date", "sale_id")
 
 
@@ -1133,6 +1209,7 @@ def build_sale_features(
         "rental_licenses",
         "appeals",
         "mortgages",
+        "building_footprints",
     ):
         path = root / "staged" / f"{name}.parquet"
         if path.exists():
@@ -1166,6 +1243,7 @@ def build_sale_features(
         optional["rental_licenses"],
         optional["appeals"],
         optional["mortgages"],
+        optional["building_footprints"],
         min_sale_year=min_sale_year,
     )
     inputs = []

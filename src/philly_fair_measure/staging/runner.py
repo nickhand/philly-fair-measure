@@ -27,6 +27,10 @@ BUILDERS: dict[str, tuple[Callable[..., pl.LazyFrame], tuple[str, ...]]] = {
     "opa_properties": (tables.stg_opa_properties, ("opa_properties_public",)),
     "deeds": (tables.stg_deeds, ("rtt_summary", "opa_properties_public")),
     "permits": (tables.stg_permits, ("permits",)),
+    "building_footprints": (
+        tables.stg_building_footprints,
+        ("building_footprints", "pwd_parcels"),
+    ),
     "violations": (tables.stg_violations, ("violations",)),
     "parcels": (stg_parcels, ("pwd_parcels", "opa_properties_public")),
     "delinquencies": (tables.stg_delinquencies, ("real_estate_tax_delinquencies",)),
@@ -37,6 +41,11 @@ BUILDERS: dict[str, tuple[Callable[..., pl.LazyFrame], tuple[str, ...]]] = {
     "rental_licenses": (tables.stg_rental_licenses, ("business_licenses",)),
     "appeals": (tables.stg_appeals, ("appeals",)),
 }
+
+# Large geospatial snapshots are refreshed separately from the weekly CARTO
+# capture. A default ``stage`` should still build the core tables when one has
+# never been fetched; explicitly requesting an optional table remains strict.
+OPTIONAL_BUILDERS = {"building_footprints"}
 
 
 @dataclass(frozen=True)
@@ -57,6 +66,11 @@ def build_all(data_dir: Path | None = None, only: Sequence[str] | None = None) -
     for table_name, (builder, input_datasets) in selected.items():
         missing = [d for d in input_datasets if d not in latest]
         if missing:
+            if only is None and table_name in OPTIONAL_BUILDERS:
+                logger.info(
+                    "skipping optional staged table %s; missing snapshots %s", table_name, missing
+                )
+                continue
             raise FileNotFoundError(
                 f"staged table {table_name!r} needs raw snapshots {missing}; "
                 "run `fair-measure snapshot` first"

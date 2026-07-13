@@ -50,6 +50,8 @@ export interface PropertyCore {
   /** Built within ~a year of the valuation date — comp models run low on
    * new construction, so the report shows a caveat. */
   new_build: boolean
+  /** Why the API withheld a numeric assessment verdict. */
+  quality_reasons?: Array<'open_change_of_occupancy' | 'multifamily_area_conflict'>
   twin_n: number | null
   twin_ratio: number | null
   lon: number | null

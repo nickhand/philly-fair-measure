@@ -87,7 +87,9 @@ describe('verdictFor', () => {
 
   it('gives incomplete city records a no-verdict explanation, not a judgment', () => {
     const v = verdictFor('insufficient_record')
-    expect(v.headline).toBe('The city’s record here is incomplete')
-    expect(v.detail).toMatch(/brand-new construction/)
+    expect(v.headline).toBe('Estimate available — data warning')
+    expect(v.detail).toMatch(/still estimate/)
+    expect(v.detail).toMatch(/do not make an over-or-under assessment call/)
+    expect(v.hex).toBe('#8a6100')
   })
 })

@@ -56,6 +56,7 @@ export const flagColor = [
   'case',
   flagIs('over_assessed_candidate'), VERDICTS.over_assessed_candidate.hex,
   flagIs('under_assessed_candidate'), VERDICTS.under_assessed_candidate.hex,
+  flagIs('insufficient_record'), VERDICTS.insufficient_record.hex,
   attentionIs('high'), WATCH_VERDICTS.high.hex,
   attentionIs('low'), WATCH_VERDICTS.low.hex,
   flagIs('within_range'), VERDICTS.within_range.hex,
@@ -133,8 +134,13 @@ export const legend = [
       'any',
       ['all', flagIs('within_range'), attentionIs('')],
       flagIs('no_assessment'),
-      flagIs('insufficient_record'),
     ],
+  },
+  {
+    hex: VERDICTS.insufficient_record.hex,
+    label: 'Data warning',
+    tier: 'base',
+    expr: flagIs('insufficient_record'),
   },
   {
     hex: WATCH_VERDICTS.low.hex,

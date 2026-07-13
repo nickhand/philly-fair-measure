@@ -103,12 +103,14 @@ NUMERIC_FEATURES: Final = (
     "mkt_parcel_days_since_prev",
     "mkt_parcel_prev_price",
     "mkt_parcel_prev_log_price_ref",
-    "evt_n_permits_5y_before",
-    "evt_days_since_last_permit",
-    # renovation-class permits (alterations/major/change-of-use): the public
-    # trace of the latent renovated-vs-shell state driving within-block errors
-    "evt_n_reno_permits_5y_before",
-    "evt_days_since_last_reno_permit",
+    # Permit state matters more than permit existence. Issued work is not a
+    # completed renovation; the old undifferentiated counts produced false
+    # uplift on active gut conversions.
+    "evt_n_completed_permits_5y_before",
+    "evt_n_active_permits_at_sale",
+    "evt_n_completed_reno_permits_5y_before",
+    "evt_n_active_reno_permits_at_sale",
+    "evt_n_active_change_occupancy_at_sale",
     "evt_n_violations_5y_before",
     "evt_n_open_violations_at_sale",
     # distress signals for the q1 tail (plan v2 follow-up)

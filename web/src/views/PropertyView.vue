@@ -69,31 +69,47 @@ async function load(id: string) {
 
 watch(() => props.parcelId, load, { immediate: true })
 
+const isQualityWarning = computed(() => core.value?.flag === 'insufficient_record')
+
+/** The ordinary UI shows the overlap supported by both uncertainty methods.
+ * A suspect-record estimate instead shows the Bayesian band because its
+ * variance model explicitly widens for measurement risk. */
+const bandLo = computed(() =>
+  isQualityWarning.value
+    ? (core.value?.model_pi_low_90 ?? null)
+    : (core.value?.display_pi_low_90 ?? core.value?.model_pi_low_90 ?? null),
+)
+const bandHi = computed(() =>
+  isQualityWarning.value
+    ? (core.value?.model_pi_high_90 ?? null)
+    : (core.value?.display_pi_high_90 ?? core.value?.model_pi_high_90 ?? null),
+)
+
 const verdict = computed(() =>
   core.value
     ? verdictFor(core.value.flag, core.value.attention, {
         cityValue: core.value.opa_market_value,
-        bandLo: core.value.display_pi_low_90 ?? core.value.model_pi_low_90,
-        bandHi: core.value.display_pi_high_90 ?? core.value.model_pi_high_90,
+        bandLo: bandLo.value,
+        bandHi: bandHi.value,
         newBuild: core.value.new_build,
       })
     : null,
 )
+const qualityExplanation = computed(() => {
+  const reasons = core.value?.quality_reasons ?? []
+  if (reasons.includes('open_change_of_occupancy'))
+    return 'City permit records show an issued change-of-occupancy permit, but not completed work. We still show our market-value estimate and range, but the model cannot tell whether today’s property is the old building, a construction site, or the finished conversion. No over-or-under assessment call is made.'
+  if (reasons.includes('multifamily_area_conflict'))
+    return 'The city calls this a multi-family building, but lists no bedrooms or bathrooms and a living area that conflicts with its footprint and story count. We still show the model’s estimate, with a wider range, but make no over-or-under assessment call.'
+  return null
+})
 const hasInterval = computed(
   () =>
     core.value != null &&
-    core.value.model_pi_low_90 != null &&
-    core.value.model_pi_high_90 != null &&
+    bandLo.value != null &&
+    bandHi.value != null &&
     core.value.model_median != null &&
     core.value.opa_market_value != null,
-)
-
-/** The band the UI shows: where both uncertainty methods agree
- * (display_pi_*), falling back to the flag-anchoring model band on older
- * payloads. Flags/attention still come from model_pi_* server-side. */
-const bandLo = computed(() => core.value?.display_pi_low_90 ?? core.value?.model_pi_low_90 ?? null)
-const bandHi = computed(
-  () => core.value?.display_pi_high_90 ?? core.value?.model_pi_high_90 ?? null,
 )
 
 /** Delta pill: computed dollar gap (data, not verdict copy). */
@@ -223,7 +239,8 @@ function printPage() {
 
       <div
         v-if="verdict"
-        class="verdict-card mt-5 overflow-hidden rounded-xl border border-line-soft bg-white shadow-verdict sm:rounded-[14px]"
+        class="verdict-card mt-5 overflow-hidden rounded-xl border bg-white shadow-verdict sm:rounded-[14px]"
+        :class="isQualityWarning ? 'border-gold-tint-border' : 'border-line-soft'"
       >
         <div class="h-1.5" :style="{ background: verdict.hex }" aria-hidden="true"></div>
         <div class="p-5 sm:p-6">
@@ -252,7 +269,9 @@ function printPage() {
               </p>
             </div>
           </div>
-          <p class="mt-3.5 max-w-2xl text-base leading-relaxed text-body">{{ verdict.detail }}</p>
+          <p class="mt-3.5 max-w-2xl text-base leading-relaxed text-body">
+            {{ qualityExplanation ?? verdict.detail }}
+          </p>
 
           <!-- the two numbers, as numbers (Tufte: show the data) — they also
                survive printing and screen readers without the chart -->
@@ -263,15 +282,17 @@ function printPage() {
                 {{ money(core.opa_market_value) }}
               </dd>
             </div>
-            <div v-if="core.flag !== 'insufficient_record'">
-              <dt class="text-caption text-muted">Our estimate</dt>
+            <div v-if="core.model_median != null">
+              <dt class="text-caption text-muted">
+                {{ isQualityWarning ? 'Our market-value estimate · use with caution' : 'Our estimate' }}
+              </dt>
               <dd class="money text-2xl font-extrabold tracking-tight text-brand-600">
                 {{ money(core.model_median) }}
               </dd>
             </div>
           </dl>
 
-          <div v-if="hasInterval && core.flag !== 'insufficient_record'" class="mt-4">
+          <div v-if="hasInterval" class="mt-4">
             <IntervalStrip
               :low="bandLo!"
               :high="bandHi!"
@@ -280,7 +301,16 @@ function printPage() {
               :flag="core.flag"
             />
             <div class="no-print">
-              <InfoTip label="Why a range and not one number?">
+              <InfoTip v-if="isQualityWarning" label="Why is this estimate still shown?">
+                A replacement assessment model must produce a value for every property it can
+                score. For records with a data warning, we show the model’s estimate and its broader
+                Bayesian range, but do not decide whether the city is over or under that value.
+                Verify the suspect facts before relying on the estimate for an appeal or assessment.
+                <RouterLink to="/methodology" class="font-semibold text-brand-600 underline"
+                  >Learn how this works</RouterLink
+                >.
+              </InfoTip>
+              <InfoTip v-else label="Why a range and not one number?">
                 No one knows a home’s exact value until it sells. Our model studies thousands of nearby
                 sales and gives its best estimate, plus the range where its two independent ways of
                 measuring uncertainty agree. It’s like a weather forecast for your home’s value.
@@ -322,7 +352,14 @@ function printPage() {
           :subtitle="`The biggest things pushing this home’s estimated value up or down, compared with a typical Philadelphia ${core.model_family === 'condo' ? 'condo' : 'home'}.`"
         >
           <SkeletonBlock v-if="reportLoading" />
-          <template v-else-if="report?.drivers && core.flag !== 'insufficient_record'">
+          <template v-else-if="report?.drivers">
+            <p
+              v-if="isQualityWarning"
+              class="mb-3 rounded-md border border-gold-tint-border bg-gold-tint px-3 py-2.5 text-caption leading-relaxed text-body"
+            >
+              <strong class="text-gold-700">Data warning:</strong> these effects use the city’s
+              recorded facts, including the values identified above as incomplete or conflicting.
+            </p>
             <DriverBars :drivers="report.drivers.drivers" />
             <div class="no-print">
               <InfoTip>
@@ -366,6 +403,10 @@ function printPage() {
               </InfoTip>
             </div>
           </template>
+          <p v-else-if="isQualityWarning" class="text-body-sm text-muted">
+            We show the estimate, but do not rank this city assessment against nearby homes while
+            its core property facts are in conflict or active conversion work is unresolved.
+          </p>
           <p v-else class="text-body-sm text-muted">
             Not enough similar homes nearby for a reliable comparison.
           </p>

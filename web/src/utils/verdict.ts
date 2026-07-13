@@ -76,14 +76,14 @@ export const VERDICTS: Record<Flag, Verdict> = {
   },
   insufficient_record: {
     flag: 'insufficient_record',
-    headline: 'The city’s record here is incomplete',
+    headline: 'Estimate available — data warning',
     detail:
-      'The city has not recorded basic facts for this home, like its living area. Without them, no model can fairly check its value. This usually means brand-new construction the city is still writing up.',
+      'We still estimate this property’s market value, but basic city records are missing, conflict with each other, or describe work in progress. Treat the estimate as less certain; we do not make an over-or-under assessment call.',
     nextStep:
-      'Check what the city has on file for this address. Once the record is complete, we can check it.',
-    textClass: 'text-fair',
-    badgeClass: 'bg-fair-soft text-fair',
-    hex: '#8593a4',
+      'Use the estimate as a starting point, then verify the city’s recorded facts, permits, and comparable sales before relying on it.',
+    textClass: 'text-gold-700',
+    badgeClass: 'bg-gold-soft text-gold-700',
+    hex: '#8a6100',
   },
 }
 

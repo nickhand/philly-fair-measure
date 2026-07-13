@@ -1,6 +1,11 @@
 import polars as pl
 
-from philly_fair_measure.staging.tables import stg_assessments, stg_deeds, stg_opa_properties
+from philly_fair_measure.staging.tables import (
+    stg_assessments,
+    stg_building_footprints,
+    stg_deeds,
+    stg_opa_properties,
+)
 from philly_fair_measure.staging.temporal import with_parsed_timestamp, with_parsed_year
 
 
@@ -58,6 +63,27 @@ def test_stg_assessments_dedupes_conflicting_keys():
     assert row_a["key_copies"].to_list() == [2]
     assert out.filter(pl.col("parcel_number") == "B")["key_copies"].to_list() == [1]
     assert out["year_parsed"].to_list() == [2024, 2024]
+
+
+def test_stg_building_footprints_bridges_pwd_and_keeps_main_building():
+    raw = pl.LazyFrame(
+        {
+            "objectid": [1, 2, 3],
+            "bin": ["main", "shed", "other"],
+            "address": ["1 TEST ST", "1 TEST ST", "3 TEST ST"],
+            "parcel_id_num": ["10", "10", "20"],
+            "square_ft": [800, 90, 600],
+            "approx_hgt": [30, 8, 20],
+            "max_hgt": [31.0, 9.0, 21.0],
+        }
+    )
+    pwd = pl.LazyFrame({"parcelid": [10, 20], "brt_id": ["111", "222"]})
+    by_id = {
+        row["parcel_id"]: row for row in stg_building_footprints(raw, pwd).collect().to_dicts()
+    }
+    assert by_id["111"]["bldg_bin"] == "main"
+    assert by_id["111"]["bldg_footprint_sqft"] == 800.0
+    assert by_id["111"]["bldg_footprint_count"] == 2
 
 
 def _deed_row(**overrides):

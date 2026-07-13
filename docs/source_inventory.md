@@ -149,7 +149,9 @@ so bulk geometry pulls need `resultOffset` paging or envelope tiling.
   2026-07-02); dedupe or disambiguate at staging. Joins to OPA via
   `opa_account_num`.
 - **Relevance:** Renovation/change proxy (CCAO's `char_recent_renovation`
-  analog); issue/completion dates give true event timing for temporal features.
+  analog); issue/completion/occupancy dates distinguish completed work from
+  work that was still active at the sale or valuation date. Permit existence
+  alone is not treated as renovation uplift.
 - **Limitations:** Only permitted work is visible, unpermitted renovations
   (including the motivating property's) are invisible by construction. System
   migration artifacts likely (`systemofrecord` column); date coverage to be
@@ -212,7 +214,7 @@ Base: `https://services.arcgis.com/fLeGjb7u4uXqeF9q/ArcGIS/rest/services/<name>/
 |---|---|---|---|---|
 | `DOR_Parcel` | polygon | 607,816 | `mapreg`, `basereg`, `parcel`, address parts | Legal (Dept. of Records) parcel fabric. Registry keys ≠ OPA accounts; DOR↔OPA linkage is nontrivial and must go through PWD parcels or AIS. |
 | `PWD_PARCELS` | polygon | 547,321 | `brt_id`, `num_brt`, `num_accounts`, `gross_area`, `pin`, owner, `bldg_code` | **Best parcel↔OPA bridge**: carries OPA/BRT account ids directly; `num_brt`/`num_accounts` expose multi-account parcels (the house + side-yard case). Also the geometry source for parcel-shape features. |
-| `LI_BUILDING_FOOTPRINTS` | polygon | 546,070 | `bin`, `parcel_id_num`, `approx_hgt`, `max_hgt`, `square_ft` | Building footprints with heights; footprint-change detection across snapshots. |
+| `LI_BUILDING_FOOTPRINTS` | polygon | 546,086 | `bin`, `parcel_id_num`, `approx_hgt`, `max_hgt`, `square_ft` | Building footprints with heights. Snapshot captured 2026-07-13; staged through `PWD_PARCELS.parcelid` to 496,017 OPA accounts. Used for record-consistency checks and future footprint-change detection, not as a blind replacement for OPA living area. |
 | `Census_Tracts_2020` | polygon | 408 | `GEOID` | Join key for ACS features. `Census_Tracts_2010` also available for older vintages. |
 | `Zoning_BaseDistricts` | polygon | 29,205 | `code`, `long_code`, `zoninggroup`, `pending` | Zoning base districts *are* available as geometry. Dated historical variants exist (`zoning_basedistricts_122019` … `122025`), a ready-made zoning time series. A `zoning_descriptions` service also exists (unverified). |
 | `Philadelphia_Neighborhoods` | polygon | 57 | `id` only, **no name field** | ⚠️ Weak: 57 unnamed polygons; likely *not* the canonical neighborhood layer (the widely used Azavea-derived layer has ~158 named neighborhoods). Needs vetting before any use; treat as unverified-for-purpose. |

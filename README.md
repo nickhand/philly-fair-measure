@@ -13,14 +13,14 @@ comparisons) is published in a per-property report.
 
 <!-- generated:readme-screen-counts:begin -->
 As of the latest run (Tax Year 2027 assessments), the screen covers
-**496,975** residential properties and condos: **1,020** flagged
-as likely over-assessed, **6,878** as likely under-assessed, and
-**42,494** unflagged but at or beyond the edge of the published
+**496,975** residential properties and condos: **1,032** flagged
+as likely over-assessed, **6,781** as likely under-assessed, and
+**42,198** unflagged but at or beyond the edge of the published
 range ("worth a look").
 A residential flag requires two independent uncertainty methods: the
 Bayesian posterior interval and a spatially weighted
 conformalized-quantile-regression band. Both must place the city's value
-outside on the same side. 93 records with no recorded livable
+outside on the same side. 439 records with no recorded livable
 area are reported as insufficient rather than valued.
 <!-- generated:readme-screen-counts:end -->
 
@@ -46,7 +46,7 @@ area are reported as insufficient rather than valued.
 ## Results
 
 <!-- generated:readme-results-tables:begin -->
-Out-of-time test set (n = 19,519), run `20260712T050600Z-baseline`. The same
+Out-of-time test set (n = 19,519), run `20260713T224356Z-baseline`. The same
 homes, the same treatment; OPA's assessed values are the incumbent benchmark.
 
 On the IAAO ratio-study basis (financed, arm's-length sales, the standard
@@ -54,14 +54,14 @@ assessment offices are evaluated on):
 
 |  | Median ratio | COD | PRD | PRB | MAPE |
 | --- | --- | --- | --- | --- | --- |
-| This model | 0.996 | 17.9 | 1.021 | +0.003 | 17.8% |
+| This model | 0.996 | 18.0 | 1.021 | +0.004 | 18.0% |
 | OPA | 0.920 | 23.1 | 1.065 | -0.057 | 22.5% |
 
 On the full untrimmed sample, including cash and distressed sales:
 
 |  | Median ratio | COD | PRD | PRB | MAPE |
 | --- | --- | --- | --- | --- | --- |
-| This model | 1.026 | 24.2 | 1.086 | -0.088 | 25.0% |
+| This model | 1.027 | 24.2 | 1.086 | -0.087 | 25.1% |
 | OPA | 0.983 | 34.7 | 1.192 | -0.235 | 34.2% |
 <!-- generated:readme-results-tables:end -->
 

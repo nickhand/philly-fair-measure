@@ -1135,7 +1135,7 @@ def main(argv: list[str] | None = None) -> int:
     screen = subparsers.add_parser(
         "screen-assessments",
         help="score every residential property and flag OPA values that both "
-        "uncertainty machines place outside their 90% intervals",
+        "uncertainty machines place outside their 90%% intervals",
     )
     screen.add_argument("--chunk-size", type=int, default=50_000)
     screen.add_argument(

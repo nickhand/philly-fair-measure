@@ -122,6 +122,60 @@ def stg_permits(raw: pl.LazyFrame) -> pl.LazyFrame:
     )
 
 
+def stg_building_footprints(raw: pl.LazyFrame, raw_pwd_parcels: pl.LazyFrame) -> pl.LazyFrame:
+    """One main-building record per OPA account, bridged through PWD parcels.
+
+    The footprint service keys buildings to ``PWD_PARCELS.parcelid``, not to
+    OPA accounts.  A parcel can contain sheds and other small structures, so
+    the largest positive-area footprint is retained as the main building and
+    the source-row count remains available as a quality signal.  Heights and
+    areas are current snapshot values; this table must not be treated as
+    historical evidence for old sales.
+    """
+    footprints = (
+        raw.with_columns(
+            pl.col("parcel_id_num").cast(pl.Int64, strict=False).alias("pwd_parcel_id"),
+            pl.col("square_ft").cast(pl.Float64, strict=False).alias("bldg_footprint_sqft"),
+            pl.col("approx_hgt").cast(pl.Float64, strict=False).alias("bldg_approx_height_ft"),
+            pl.col("max_hgt").cast(pl.Float64, strict=False).alias("bldg_max_height_ft"),
+        )
+        .filter(
+            pl.col("pwd_parcel_id").is_not_null() & (pl.col("bldg_footprint_sqft").fill_null(0) > 0)
+        )
+        .with_columns(pl.len().over("pwd_parcel_id").alias("bldg_footprint_count"))
+        .sort("bldg_footprint_sqft", descending=True)
+        .unique(subset="pwd_parcel_id", keep="first")
+        .select(
+            "pwd_parcel_id",
+            pl.col("objectid").alias("bldg_objectid"),
+            pl.col("bin").alias("bldg_bin"),
+            pl.col("address").alias("bldg_address"),
+            "bldg_footprint_sqft",
+            "bldg_approx_height_ft",
+            "bldg_max_height_ft",
+            "bldg_footprint_count",
+        )
+    )
+    bridge = (
+        raw_pwd_parcels.select(
+            pl.col("parcelid").cast(pl.Int64, strict=False).alias("pwd_parcel_id"),
+            pl.col("brt_id").cast(pl.String).str.strip_chars().alias("parcel_id"),
+        )
+        .filter(
+            pl.col("pwd_parcel_id").is_not_null()
+            & pl.col("parcel_id").is_not_null()
+            & (pl.col("parcel_id") != "")
+        )
+        .unique(subset="pwd_parcel_id", keep="first")
+    )
+    return (
+        footprints.join(bridge, on="pwd_parcel_id", how="inner")
+        .sort("bldg_footprint_sqft", descending=True)
+        .unique(subset="parcel_id", keep="first")
+        .sort("parcel_id")
+    )
+
+
 def stg_delinquencies(raw: pl.LazyFrame) -> pl.LazyFrame:
     """Real-estate tax delinquencies. CURRENT-ONLY snapshot: the table shows
     today's delinquents, not historical delinquency status — features derived

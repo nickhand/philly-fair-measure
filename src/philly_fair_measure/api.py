@@ -24,7 +24,7 @@ from typing import Any
 
 import polars as pl
 from fastapi import FastAPI, Header, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from philly_fair_measure import config
 from philly_fair_measure.ingest.manifests import read_derived_manifest
@@ -98,6 +98,9 @@ class PropertyCore(BaseModel):
     # built within ~a year of the valuation date: comp evidence runs low on
     # new construction, so the report shows a caveat
     new_build: bool = False
+    # Machine-readable reasons that a numeric model-vs-OPA verdict was
+    # suppressed. Empty on ordinary records and old screen fixtures.
+    quality_reasons: list[str] = Field(default_factory=list)
     twin_n: int | None
     twin_ratio: float | None
     lon: float | None
@@ -249,6 +252,11 @@ def _row(frame: pl.DataFrame, parcel_id: str) -> dict[str, Any]:
 
 
 def _core(s: dict[str, Any]) -> PropertyCore:
+    quality_reasons = []
+    if s.get("quality_open_change_of_occupancy"):
+        quality_reasons.append("open_change_of_occupancy")
+    if s.get("quality_multifamily_area_conflict"):
+        quality_reasons.append("multifamily_area_conflict")
     return PropertyCore(
         parcel_id=str(s["parcel_id"]),
         address=str(s.get("address") or ""),
@@ -285,6 +293,7 @@ def _core(s: dict[str, Any]) -> PropertyCore:
         flag=str(s.get("assessment_flag") or AssessmentFlag.NONE),
         attention=s.get("attention"),
         new_build=bool(s.get("new_build")),
+        quality_reasons=quality_reasons,
         twin_n=_i(s.get("twin_n")),
         twin_ratio=_f(s.get("opa_vs_twin_median")),
         lon=_f(s.get("loc_lon")),
