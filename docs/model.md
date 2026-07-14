@@ -224,6 +224,16 @@ by more than 0.0028 log-RMSE. Characteristic and zero-value subgroups were
 mixed by roughly one-thousandth in RMSE but improved in COD/PRB; those signals
 therefore stayed out of the point mean and continued to govern uncertainty.
 
+`fair-measure q1-experiments` applies this gate to four label-free cheap-tail
+ideas: a stable-home transaction-channel target, permit-confirmed repeat-sale
+recovery labels, a smoothly routed low-value specialist, and five-segment
+smoothed calibration. The 2026-07-13 run rejected all four. The strongest
+candidate improved retail log-RMSE 0.3213→0.3154 but worsened financed-Q1 median
+ratio 1.106→1.166, financed-Q5 RMSE 0.2491→0.2544, PRB, and VEI. This pattern
+means the current public features do not identify discounted transaction channel
+separately from low underlying property value. Experiment artifacts are retained
+under `data/diagnostics/`, but no rejected adjustment is used in scoring.
+
 ### 5.9 Selective error-risk model
 
 An always-on assessment system still needs to say when its estimate is likely

@@ -420,6 +420,24 @@ def _cmd_model_challengers(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_q1_experiments(args: argparse.Namespace) -> int:
+    import json
+
+    from philly_fair_measure.diagnostics.q1_experiments import q1_experiment_check
+
+    result = q1_experiment_check(args.data_dir)
+    print("label-free Q1 experiment gate")
+    for decision in result.decisions:
+        verdict = "PROMOTE" if decision.promote_to_full_retrain else "REJECT"
+        failed = ", ".join(decision.failed_gates) if decision.failed_gates else "none"
+        print(f"  {decision.challenger:<24} {verdict:<8} failed gates: {failed}")
+    print("diagnostics:")
+    print(json.dumps(result.diagnostics, indent=2))
+    print(f"metrics: {result.metrics_path}")
+    print(f"decisions: {result.decisions_path}")
+    return 0
+
+
 def _cmd_risk_check(args: argparse.Namespace) -> int:
     from philly_fair_measure.models.risk import fit_risk_model
     from philly_fair_measure.models.scoring import latest_run_dir
@@ -1288,6 +1306,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     challengers.add_argument("--data-dir", type=Path)
     challengers.set_defaults(func=_cmd_model_challengers)
+
+    q1 = subparsers.add_parser(
+        "q1-experiments",
+        help="leakage-safe channel, repeat-recovery, and smoothed low-value experiments",
+    )
+    q1.add_argument("--data-dir", type=Path)
+    q1.set_defaults(func=_cmd_q1_experiments)
 
     risk = subparsers.add_parser(
         "risk-check",

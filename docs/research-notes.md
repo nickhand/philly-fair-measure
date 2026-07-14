@@ -413,6 +413,50 @@ model's Black–White median-ratio gaps are substantially closer to zero than
 OPA's in the early folds and mixed but small in the last two. Demographic data
 remain diagnostic-only: these results audit outcomes, never determine values.
 
+## Label-free Q1 experiment verdict (2026-07-13)
+
+Four approaches that require no hand-labeled condition sample were implemented
+and tested with the production out-of-time split. All four were rejected by the
+same accuracy/fairness gate used for feature promotion; the production estimator
+was not changed.
+
+- A **transaction-channel target** estimated cash-versus-financed residual gaps
+  only among stable homes, by incumbent-predicted value quintile. It adjusted
+  historical training targets rather than using cash status at scoring, and its
+  effect faded to almost zero for distressed/active-work homes.
+- A **repeat-sale recovery label** used only confirming resales before the
+  validation cutoff. A positive required at least 60% time-adjusted recovery
+  within 120–1,095 days plus an increase in dated renovation-permit evidence;
+  no future sale price or permit could enter a historical feature row.
+- A **low-value specialist** was routed by the incumbent preliminary prediction,
+  never the unknown sale price, and smoothly blended at the boundary.
+- A **five-segment smoothed calibration** used financed validation residuals and
+  monotone interpolation, a leakage-safe implementation of the K-segment idea.
+
+The stable-channel model was the most promising null: retail log-RMSE improved
+0.3213→0.3154 and distress RMSE 0.4270→0.4212. But its financed-Q1 gain was only
+0.0018 log-RMSE, below the prespecified materiality threshold; Q1 median ratio
+worsened 1.106→1.166, financed-Q5 RMSE worsened 0.2491→0.2544, and retail PRB
+and VEI deteriorated. The specialist had the same pattern. Segment calibration
+learned a +6% correction for the lowest validation segment that failed in the
+future test period, raising financed-Q1 median ratio to 1.214. The high-precision
+repeat-sale/permit label produced 2,344 positives and 4,467 stable negatives but
+did not improve Q1 RMSE.
+
+This is a useful identification result. Existing public features can learn that
+some low-value transactions are discounted, but cannot reliably tell whether a
+new subject is a wholesale/distressed transaction or a genuinely inexpensive
+home. A channel correction therefore raises both groups and recreates vertical
+inequity. Permit-confirmed repeat sales are too selected and permits miss the
+unpermitted work that motivates the stress tests. The next credible Q1 gains
+need a new source of property-state evidence—verified inspection/listing/interior
+condition data, or a separately validated shell/land-value training set—not a
+more flexible correction on the same inputs.
+
+The complete experiment remains reproducible as `fair-measure q1-experiments`.
+It writes candidate metrics and machine-readable promotion decisions under
+`data/diagnostics/`; rejected candidates cannot silently enter production.
+
 **Modern Bayesian practice applicable here**
 - **HSGP** (Hilbert-space GP approximation; Solin & Särkkä, and the practical
   probabilistic-programming variant) gives near-exact low-dimensional GPs at
