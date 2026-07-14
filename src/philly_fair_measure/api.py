@@ -98,6 +98,11 @@ class PropertyCore(BaseModel):
     # built within ~a year of the valuation date: comp evidence runs low on
     # new construction, so the report shows a caveat
     new_build: bool = False
+    # Expected absolute log error from the independently audited selective-
+    # prediction layer. It never removes the estimate.
+    prediction_risk_score: float | None = None
+    prediction_risk_tier: str = "standard"
+    data_quality_warning: bool = False
     # Machine-readable reasons that a numeric model-vs-OPA verdict was
     # suppressed. Empty on ordinary records and old screen fixtures.
     quality_reasons: list[str] = Field(default_factory=list)
@@ -257,6 +262,14 @@ def _core(s: dict[str, Any]) -> PropertyCore:
         quality_reasons.append("open_change_of_occupancy")
     if s.get("quality_multifamily_area_conflict"):
         quality_reasons.append("multifamily_area_conflict")
+    if s.get("quality_zero_bed_bath_conflict"):
+        quality_reasons.append("learned_zero_bed_bath_conflict")
+    if s.get("quality_area_outlier"):
+        quality_reasons.append("learned_area_outlier")
+    if s.get("quality_characteristic_outlier") and not (
+        s.get("quality_zero_bed_bath_conflict") or s.get("quality_area_outlier")
+    ):
+        quality_reasons.append("learned_characteristic_outlier")
     return PropertyCore(
         parcel_id=str(s["parcel_id"]),
         address=str(s.get("address") or ""),
@@ -293,6 +306,9 @@ def _core(s: dict[str, Any]) -> PropertyCore:
         flag=str(s.get("assessment_flag") or AssessmentFlag.NONE),
         attention=s.get("attention"),
         new_build=bool(s.get("new_build")),
+        prediction_risk_score=_f(s.get("prediction_risk_score")),
+        prediction_risk_tier=str(s.get("prediction_risk_tier") or "standard"),
+        data_quality_warning=bool(s.get("record_quality_warning")),
         quality_reasons=quality_reasons,
         twin_n=_i(s.get("twin_n")),
         twin_ratio=_f(s.get("opa_vs_twin_median")),

@@ -163,10 +163,11 @@ def _require_coherent(
 def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
     """Pure classification/ranking step; expects prediction columns to be present."""
     has_assessment = (pl.col("opa_market_value").fill_null(0) > 0) & (pl.col("model_median") > 0)
-    # Record completeness: a home with no recorded living area cannot be
-    # priced — the model takes the zero literally (measured 2026-07-05: $3k
-    # medians against $500k assessments, 19 of the top-100 z leads). Usually
-    # brand-new construction the city is still writing up; no verdict.
+    # Record completeness: a home with no recorded living area can still
+    # receive the model's estimate, but the resulting OPA comparison is not
+    # defensible — the model takes the zero literally (measured 2026-07-05:
+    # $3k medians against $500k assessments, 19 of the top-100 z leads).
+    # Keep the estimate visible with a warning; withhold only the verdict.
     # (The column guards tolerate minimal test fixtures.)
     no_livable_area = (
         pl.col("char_livable_area").fill_null(0) <= 0
@@ -442,6 +443,10 @@ def build_assessment_screen(
         optional[name] = pl.scan_parquet(path) if path.exists() else None
     proximity_path = root / "marts" / "proximity.parquet"
     optional["proximity"] = pl.scan_parquet(proximity_path) if proximity_path.exists() else None
+    quality_path = root / "marts" / "characteristic_quality.parquet"
+    optional["characteristic_quality"] = (
+        pl.scan_parquet(quality_path) if quality_path.exists() else None
+    )
 
     features = assemble_assessment_features(
         pl.scan_parquet(paths["opa"]),
@@ -461,6 +466,7 @@ def build_assessment_screen(
         optional["appeals"],
         optional["mortgages"],
         optional["building_footprints"],
+        optional["characteristic_quality"],
     )
     # Precision-first no-verdict guards. They do not mechanically correct the
     # point estimate; the corroborated area conflict also enters the Bayesian
@@ -531,6 +537,10 @@ def build_assessment_screen(
         conformal_lo = np.exp(log_pred + conf_lo_off)
         conformal_hi = np.exp(log_pred + conf_hi_off)
 
+    from philly_fair_measure.models.risk import score_prediction_risk
+
+    prediction_risk_score, prediction_risk_tier = score_prediction_risk(baseline_run, features)
+
     residential = features.select(
         "parcel_id",
         "address",
@@ -562,7 +572,26 @@ def build_assessment_screen(
         "quality_estimated_floors",
         "quality_livable_to_gross_ratio",
         "quality_multifamily_area_conflict",
+        "quality_expected_livable_area",
+        "quality_area_reference_low_90",
+        "quality_area_reference_high_90",
+        "quality_area_ratio_to_expected",
+        "quality_area_disagreement_z",
+        "quality_area_outlier",
+        "quality_expected_beds",
+        "quality_expected_baths",
+        "quality_zero_bed_bath_conflict",
+        "quality_characteristic_conflict_score",
+        "quality_characteristic_outlier",
+        "state_active_work_evidence",
+        "state_distress_evidence",
+        "state_completed_reno_evidence",
+        "state_measurement_conflict_evidence",
+        "state_transition_evidence",
+        "state_competing_evidence",
+        "state_primary_evidence",
         "record_quality_low",
+        "record_quality_warning",
     ).with_columns(
         pl.Series("pred_point", pred_point),
         pl.Series("pred_point_calibrated", pred_point / calibration),
@@ -571,6 +600,8 @@ def build_assessment_screen(
         pl.Series("model_pi_high_90", hi),
         pl.Series("conformal_pi_low_90", conformal_lo),
         pl.Series("conformal_pi_high_90", conformal_hi),
+        pl.Series("prediction_risk_score", prediction_risk_score),
+        pl.Series("prediction_risk_tier", prediction_risk_tier),
         pl.lit(ModelFamily.RESIDENTIAL).alias("model_family"),
         pl.lit(IntervalMethod.BAYESIAN).alias("interval_method"),
         pl.lit(valuation_date).alias("valuation_date"),

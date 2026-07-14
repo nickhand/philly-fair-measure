@@ -312,16 +312,50 @@ baths, a sub-40% living/gross ratio, and agreement between OPA stories and
 height-estimated floors. A valuation ablation rejected these columns as
 production predictors: on 26 held-out conflict sales, log-RMSE worsened
 0.390→0.429. They remain record-quality evidence and suppress an assessment
-verdict when the input state is not defensible. On the 2026-07-12 assessment
-frame, 207 records meet the corroborated multifamily conflict rule; 140 more
-have a recent issued, incomplete change-of-occupancy permit. Together they are
-347 of roughly half a million residential screen rows and replace 22 prior
-over/under candidates with `insufficient_record`. The same conflict flag enters
-the Bayesian **variance**, not mean, model. On the 2025 out-of-time slice its
-log-sigma coefficient is 0.223 (90% posterior interval 0.049–0.420), about a
-25% multiplicative increase in residual standard deviation. The 26 flagged
-test sales receive 96.2% interval coverage versus 91.5% overall, but the small
-sample and current-only footprint timing require continued monitoring.
+verdict when the input state is not defensible. The same conflict flag enters
+the Bayesian **variance**, not mean, model. The small conflict cohort and
+current-only footprint timing require continued monitoring; the system never
+treats footprint-derived gross area as finished living area.
+
+**Learned characteristic plausibility (2026-07-13, model v1):**
+`fair-measure build-characteristic-quality` fits parcel-level, three-fold
+cross-fitted LightGBM reconstruction models for living area, bedrooms, and
+bathrooms. The predictors are structure, property type, location, and OPA
+condition fields; sale price and OPA/assessment value are explicitly excluded.
+The area model learns from 294,922 internally coherent records and calibrates
+its disagreement scale on 452,304 broader held-out records. Bed and bath models
+learn only from positive reported values, so a recorded zero can be represented
+as conflict with a plausible positive count rather than accepted literally or
+blindly overwritten. The versioned output is
+`marts/characteristic_quality.parquet`; its main fields are expected area and
+90% peer-reference bounds, area disagreement z-score, expected bed/bath counts,
+zero-value conflict scores, a continuous joint conflict score, and a calibrated
+top-5% conflict stratum. Every published prediction is out-of-fold by parcel.
+
+The output remains a **measurement prior, not corrected truth**. On the untouched
+2025 baseline test slice, the learned high-conflict stratum has 896 sales and
+log-RMSE 0.376 versus 0.321 overall, COD 30.6 versus 24.3, and PRB -0.155 versus
+-0.087. This validates it as an uncertainty input. The coherent Bayesian
+retrain learned a high-conflict log-sigma coefficient of 0.463 (90% posterior
+interval 0.433–0.492), multiplying residual standard deviation by about 1.59.
+Coverage for the high-conflict cohort increased 89.8%→94.9% and for area
+outliers 90.8%→95.9%, while overall coverage stayed essentially flat at 91.4%.
+The point-mean ablation did not clear all risk-cohort promotion gates, so the
+peer reconstructions are not valuation replacements. Reproduce with
+`fair-measure characteristic-quality-check` and `fair-measure model-challengers`.
+
+**Property-state evidence (2026-07-13):** `features/property_state.py` converts
+dated permits, violations, distress, and measurement conflicts into bounded
+noisy-OR evidence scores for active work, distress, completed renovation,
+measurement conflict, transition, and competing states. It also preserves
+entity-grain diagnostics such as multiple OPA accounts, multiple BRT records,
+and linked-parcel assemblages. Prices, assessment values, owners, and
+demographics are excluded. A prespecified accuracy/fairness gate promoted only
+the state scores to the point model: the full stack improved overall, financed,
+q1, q5, area-outlier, active-work, and distress RMSE without a material district
+regression. Entity-grain and learned-replacement features remain diagnostics
+or uncertainty inputs because their point-estimate benefit did not clear the
+same gate.
 
 ## Events (`evt_`), true event dates, no future leakage (tested)
 

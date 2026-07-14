@@ -139,9 +139,33 @@ def add_record_quality(
             ).alias("quality_multifamily_area_conflict")
         )
 
+    learned_zero_conflict = (
+        pl.col("quality_zero_bed_bath_conflict").fill_null(False)
+        if "quality_zero_bed_bath_conflict" in out.columns
+        else pl.lit(False)
+    )
+    learned_area_outlier = (
+        pl.col("quality_area_outlier").fill_null(False)
+        if "quality_area_outlier" in out.columns
+        else pl.lit(False)
+    )
+    learned_joint_outlier = (
+        pl.col("quality_characteristic_outlier").fill_null(False)
+        if "quality_characteristic_outlier" in out.columns
+        else pl.lit(False)
+    )
+    severe_learned_conflict = learned_area_outlier | (learned_zero_conflict & learned_joint_outlier)
     return out.with_columns(
         (
             pl.col("quality_open_change_of_occupancy").fill_null(False)
             | pl.col("quality_multifamily_area_conflict").fill_null(False)
-        ).alias("record_quality_low")
+            | severe_learned_conflict
+        ).alias("record_quality_low"),
+        (
+            pl.col("quality_open_change_of_occupancy").fill_null(False)
+            | pl.col("quality_multifamily_area_conflict").fill_null(False)
+            | learned_zero_conflict
+            | learned_area_outlier
+            | learned_joint_outlier
+        ).alias("record_quality_warning"),
     )

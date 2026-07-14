@@ -35,9 +35,12 @@ defensible over/under conclusion.
 On the six held-out sales with this active-occupancy-change pattern, the revised
 model improves log-RMSE from 0.487 to 0.366 and moves median prediction/sale
 from 1.236 to 1.078; citywide log-RMSE is effectively flat (0.3211 to 0.3213).
-In the refreshed assessment screen its deterministic calibrated estimate moves
-from about $216,000 to $196,000, but `insufficient_record` intentionally
-replaces the former under-assessment verdict while the conversion is open.
+In the final coherent screen its calibrated point estimate is $212,886 with a
+display range of $82,171–$418,211. The independent Bayesian gate has median
+$227,619 and a $86,558–$569,158 interval. The record is elevated prediction
+risk and its primary state is `active_work`; `insufficient_record`
+intentionally replaces the former under-assessment verdict while the
+conversion is open. The estimate itself remains visible.
 
 ## 2632 N 5th St: internally inconsistent OPA characteristics
 
@@ -60,12 +63,25 @@ sales with the same conservative conflict pattern, log-RMSE worsened from
 therefore receives no numeric assessment verdict until a better characteristic
 source or a verified unit/living-area record is available. The footprint
 conflict is excluded from the Bayesian mean but included in its variance. The
-learned log-sigma effect is 0.223 (90% posterior interval 0.049–0.420), about
-25% higher residual standard deviation; the refreshed Bayesian interval for
-this parcel is approximately $29,000–$246,000. This quantifies the uncertainty
-without pretending the footprint-derived gross area is finished living area.
+coherent learned-characteristic log-sigma effect is 0.463 (90% posterior
+interval 0.433–0.492), about a 59% residual-standard-deviation multiplier for
+the calibrated high-conflict stratum. This quantifies the uncertainty without
+pretending the footprint-derived gross area is finished living area.
 The estimate and this wider interval are displayed; only the comparison verdict
 is suppressed.
+
+Follow-up learned measurement model: a three-fold cross-fitted characteristic
+model trained without sale prices or assessment values reconstructs about
+1,899 square feet, 4.4 bedrooms, and 2.5 bathrooms for this record. Its recorded
+living area is in the extreme low tail of the peer-reference distribution, and
+the joint conflict score places the parcel in the calibrated high-conflict
+stratum. These are priors, not replacements: the model still preserves 924
+square feet and does not assert that the 2,574-square-foot envelope is finished
+living area. Its final calibrated point estimate is $52,569 with a display
+range of $20,166–$197,959; the independent Bayesian gate has median $81,658
+and interval $25,821–$278,004. OPA records $233,400. The row is high prediction
+risk, has primary state `distressed`, retains its estimate, and withholds only
+the over/under verdict. It also enters the stratified human-review queue.
 
 ## Production rules added
 
@@ -80,6 +96,13 @@ is suppressed.
    of footprint times stories.
 5. The screen also withholds a verdict for a change-of-occupancy permit issued
    within two years that remains `Issued` in the current snapshot.
+6. A warning is broader than verdict withholding: any learned joint, area, or
+   zero-value conflict is visible, while only severe combinations suppress the
+   assessment comparison.
+7. A separately validated prediction-risk tier warns when similar held-out
+   sales had high error; it never changes the point estimate.
+8. Human review is sampled across district and model-value quintile so bad-data
+   discovery is not concentrated in expensive neighborhoods.
 
 ## Sources
 

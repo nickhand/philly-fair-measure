@@ -164,6 +164,11 @@ RESIDENTIAL_SPEC = FamilySpec(
         # multifamily area and 0/0 bed-bath record. Suspect measurement widens
         # uncertainty; it does not mechanically change the conditional mean.
         "area_conflict",
+        # Cross-fitted joint characteristic model: the top 5% of conflicts
+        # have materially worse held-out errors (2026-07-13: log-RMSE 0.376 vs
+        # 0.321 overall). Appended for run portability; older posterior draws
+        # consume the design prefix they were trained with.
+        "characteristic_outlier",
     ],
 )
 
@@ -257,19 +262,26 @@ class CovariateEncoder:
 def _raw_covariates(df: pl.DataFrame, spec: FamilySpec) -> pl.DataFrame:
     # fill_nan: float NaN (e.g. from upstream 0/0) is not null in polars and
     # would otherwise poison the encoder's mean/std for the whole column
-    exprs = [
-        pl.col(src).cast(pl.Float64).fill_nan(None).log1p().alias(dst)
-        for src, dst in spec.log1p.items()
-    ]
-    exprs += [pl.col(c).cast(pl.Float64).fill_nan(None) for c in spec.linear]
+    available = set(df.columns)
+
+    def numeric(column: str) -> pl.Expr:
+        return (
+            pl.col(column).cast(pl.Float64).fill_nan(None)
+            if column in available
+            else pl.lit(None, dtype=pl.Float64)
+        )
+
+    exprs = [numeric(src).log1p().alias(dst) for src, dst in spec.log1p.items()]
+    exprs += [numeric(column).alias(column) for column in spec.linear]
     exprs += [
-        pl.col(c).cast(pl.String).cast(pl.Int32, strict=False).cast(pl.Float64)
-        for c in spec.ordinals
+        (
+            pl.col(column).cast(pl.String).cast(pl.Int32, strict=False).cast(pl.Float64)
+            if column in available
+            else pl.lit(None, dtype=pl.Float64)
+        ).alias(column)
+        for column in spec.ordinals
     ]
-    exprs += [
-        pl.col(src).cast(pl.Float64).fill_nan(None).is_null().alias(indicator)
-        for src, indicator in spec.missing
-    ]
+    exprs += [numeric(src).is_null().alias(indicator) for src, indicator in spec.missing]
     return df.select(exprs)
 
 
@@ -439,6 +451,11 @@ def _sigma_design(df: pl.DataFrame, family: str = "residential") -> np.ndarray:
         if "char_area_conflict" in df.columns
         else np.zeros(df.height)
     )
+    characteristic_outlier = (
+        df["quality_characteristic_outlier"].cast(pl.Float64).fill_null(0.0).to_numpy()
+        if "quality_characteristic_outlier" in df.columns
+        else np.zeros(df.height)
+    )
     return np.column_stack(
         [
             missing,
@@ -455,6 +472,7 @@ def _sigma_design(df: pl.DataFrame, family: str = "residential") -> np.ndarray:
             # renovation permit within ~3 years (see reno_recent in the spec)
             (reno_days <= 3 * 365.25).astype(np.float64),
             area_conflict,
+            characteristic_outlier,
         ]
     )
 

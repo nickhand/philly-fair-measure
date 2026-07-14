@@ -39,6 +39,11 @@ def _frame():
             "evt_n_completed_reno_permits_5y_before": [0.0, 2.0, 0.0],
             "evt_n_active_reno_permits_at_sale": [0.0, 0.0, 1.0],
             "evt_n_active_change_occupancy_at_sale": [0.0, 0.0, 1.0],
+            "state_active_work_evidence": [0.0, 0.2, 0.95],
+            "state_distress_evidence": [0.0, 0.0, 0.7],
+            "state_completed_reno_evidence": [0.0, 0.8, 0.0],
+            "state_competing_evidence": [0.0, 0.2, 0.7],
+            "state_measurement_conflict_evidence": [0.0, 0.0, 0.9],
             "char_exterior_condition": ["4", "3", None],
             "char_interior_condition": ["4", None, "5"],
             "char_style": ["row", "row", "twin"],
@@ -70,13 +75,18 @@ def test_covariate_encoder_survives_float_nan():
     assert np.isfinite(x).all()
 
 
-def test_area_conflict_enters_uncertainty_not_mean_covariates():
-    frame = _frame().with_columns(pl.Series("char_area_conflict", [0.0, 1.0, 0.0]))
+def test_characteristic_conflicts_enter_uncertainty_not_mean_covariates():
+    frame = _frame().with_columns(
+        pl.Series("char_area_conflict", [0.0, 1.0, 0.0]),
+        pl.Series("quality_characteristic_outlier", [1.0, 0.0, 0.0]),
+    )
     encoder = CovariateEncoder.fit(frame)
     assert "char_area_conflict" not in encoder.feature_names
+    assert "quality_characteristic_outlier" not in encoder.feature_names
     z = _sigma_design(frame)
-    assert z.shape[1] == 10
-    assert z[:, -1].tolist() == [0.0, 1.0, 0.0]
+    assert z.shape[1] == 11
+    assert z[:, -2].tolist() == [0.0, 1.0, 0.0]
+    assert z[:, -1].tolist() == [1.0, 0.0, 0.0]
 
 
 def test_condo_family_spec_encoder_and_sigma():

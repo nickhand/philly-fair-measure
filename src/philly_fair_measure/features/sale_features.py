@@ -821,6 +821,7 @@ def assemble_sale_features(
     appeals: pl.LazyFrame | None = None,
     mortgages: pl.LazyFrame | None = None,
     building_footprints: pl.LazyFrame | None = None,
+    characteristic_quality: pl.LazyFrame | None = None,
     *,
     min_sale_year: int = DEFAULT_MIN_SALE_YEAR,
 ) -> pl.DataFrame:
@@ -1170,7 +1171,11 @@ def assemble_sale_features(
     features = join_delinquencies(features, delinquencies)
     features = join_proximity(features, proximity)
     features = add_building_structure_features(features, building_footprints)
-    return features.sort("sale_date", "sale_id")
+    from philly_fair_measure.features.characteristic_quality import add_characteristic_quality
+    from philly_fair_measure.features.property_state import add_property_state_features
+
+    features = add_characteristic_quality(features, characteristic_quality)
+    return add_property_state_features(features).sort("sale_date", "sale_id")
 
 
 @dataclass(frozen=True)
@@ -1225,6 +1230,16 @@ def build_sale_features(
     else:
         optional["proximity"] = None
         logger.warning("marts/proximity.parquet missing; prox_ features will be null")
+    quality_path = root / "marts" / "characteristic_quality.parquet"
+    if quality_path.exists():
+        paths["characteristic_quality"] = quality_path
+        optional["characteristic_quality"] = pl.scan_parquet(quality_path)
+    else:
+        optional["characteristic_quality"] = None
+        logger.warning(
+            "marts/characteristic_quality.parquet missing; run "
+            "`fair-measure build-characteristic-quality` for learned quality features"
+        )
 
     frame = assemble_sale_features(
         pl.scan_parquet(paths["sale_validity"]),
@@ -1244,6 +1259,7 @@ def build_sale_features(
         optional["appeals"],
         optional["mortgages"],
         optional["building_footprints"],
+        optional["characteristic_quality"],
         min_sale_year=min_sale_year,
     )
     inputs = []

@@ -29,6 +29,7 @@ from datetime import datetime
 
 import polars as pl
 
+from philly_fair_measure.features.characteristic_quality import add_characteristic_quality
 from philly_fair_measure.features.market_areas import project_xy
 from philly_fair_measure.features.price_index import with_time_adjustment
 from philly_fair_measure.features.sale_features import (
@@ -96,6 +97,7 @@ def assemble_assessment_features(
     appeals: pl.LazyFrame | None = None,
     mortgages: pl.LazyFrame | None = None,
     building_footprints: pl.LazyFrame | None = None,
+    characteristic_quality: pl.LazyFrame | None = None,
 ) -> pl.DataFrame:
     from philly_fair_measure.config import CONDO_ACCOUNT_PREFIX
 
@@ -525,4 +527,8 @@ def assemble_assessment_features(
     features = join_parcel_shapes(features, parcels)
     features = join_delinquencies(features, delinquencies)
     features = join_proximity(features, proximity)
-    return add_building_structure_features(features, building_footprints)
+    features = add_building_structure_features(features, building_footprints)
+    features = add_characteristic_quality(features, characteristic_quality)
+    from philly_fair_measure.features.property_state import add_property_state_features
+
+    return add_property_state_features(features)

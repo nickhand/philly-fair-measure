@@ -351,6 +351,68 @@ Two modest wins did land:
   CPU-only here and OOM at useful context, and the current package gates weights
   behind a license token: a standing blocker for a commercial product.)*
 
+## Bad-data and property-state implementation verdict (2026-07-13)
+
+The two North Philadelphia stress tests motivated a general model change, not
+address-specific exceptions. The implementation follows the literature's
+separation of four problems: missing values, wrong-but-present measurements,
+latent property state, and uncertainty about prediction error.
+
+- **Missingness stays visible.** Tree models retain native numeric missing
+  routing and an explicit categorical missing level; the Bayesian model uses
+  train-only medians plus missingness indicators where absence carries market
+  information. Raw values and normalization status remain unchanged.
+- **Wrong-but-present data becomes a measurement prior.** Three-fold
+  cross-fitted area/bed/bath reconstruction models are trained without sale
+  price or OPA value. Their peer expectations, intervals, and conflict scores
+  are published, but never substituted for the recorded characteristics. This
+  is regression calibration without claiming a latent value has been observed.
+- **Property state is explicit.** Dated permits, violations, distress evidence,
+  and record conflicts feed bounded active-work, distress, completed-renovation,
+  transition, and competing-state scores. This prevents an active gut
+  conversion from being interpreted as completed renovation.
+- **Prediction risk is separately learned.** A selective-prediction model uses
+  model disagreement, raw interval width, comp density, state, and measurement
+  quality to label standard/elevated/high risk. It cannot change the estimate.
+- **Humans close the data loop.** The review queue samples by district × model-
+  value quintile and ranks relative—not dollar—disagreement plus uncertainty.
+  Owner identity and demographic fields are prohibited from both ranking and
+  valuation.
+
+Every point-feature hypothesis faced the same out-of-time promotion gate on
+RMSE, COD, PRB, VEI, price quintiles, intended risk cohorts, and districts.
+The state-only challenger passed and was promoted. Measurement, entity-only,
+measurement+state, and the full combination were rejected from the mean when
+they violated an overall or risk-cohort gate or lacked material benefit. In the
+full stack, promoted state features moved overall log-RMSE 0.3213→0.3208 and
+COD 24.27→24.22; financed RMSE 0.2786→0.2782; q1 0.4937→0.4930; q5
+0.2308→0.2274; active-work 0.3400→0.3385; distress 0.4156→0.4145; no
+district worsened by more than 0.0028. Characteristic-outlier RMSE moved
+0.3763→0.3773 even as COD and PRB improved, confirming that learned
+replacement values belong in uncertainty rather than the mean.
+
+The coherent Bayesian retrain learned a characteristic-outlier log-sigma
+coefficient 0.463 (90% posterior 0.433–0.492). High-conflict coverage rose
+89.8%→94.9% and area-outlier coverage 90.8%→95.9%, while citywide coverage
+remained 91.4%. A larger state-heavy Bayesian specification was explicitly
+rejected operationally after exceeding the acceptable sampling budget without
+an evaluation artifact; the compact variance change preserves coherent,
+repeatable 21-minute training.
+
+The promoted risk model has held-out Spearman 0.397 with absolute log error;
+standard/elevated/high tiers show RMSE 0.268/0.415/0.507. This is strong enough
+to communicate varying reliability without using abstention as a substitute
+for assessment: estimates remain visible, severe data problems suppress only
+the over/under verdict, and warnings are broader than verdict suppression.
+
+The final fairness audits remain favorable to OPA. On individual sales, model
+q1/q5 median ratios are 1.254/0.989 versus OPA 1.547/0.882; at the market-area
+level they are 1.018/1.040 versus 1.165/0.930. Financed Moran's I of log ratios
+is 0.084 for the model versus 0.128 for OPA. Across five temporal folds the
+model's Black–White median-ratio gaps are substantially closer to zero than
+OPA's in the early folds and mixed but small in the last two. Demographic data
+remain diagnostic-only: these results audit outcomes, never determine values.
+
 **Modern Bayesian practice applicable here**
 - **HSGP** (Hilbert-space GP approximation; Solin & Särkkä, and the practical
   probabilistic-programming variant) gives near-exact low-dimensional GPs at

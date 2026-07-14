@@ -50,8 +50,19 @@ export interface PropertyCore {
   /** Built within ~a year of the valuation date — comp models run low on
    * new construction, so the report shows a caveat. */
   new_build: boolean
+  /** Independently calibrated expected-error tier; the estimate is always shown. */
+  prediction_risk_score?: number | null
+  prediction_risk_tier?: 'standard' | 'elevated' | 'high'
+  /** A suspect public record; independent of whether the verdict is withheld. */
+  data_quality_warning?: boolean
   /** Why the API withheld a numeric assessment verdict. */
-  quality_reasons?: Array<'open_change_of_occupancy' | 'multifamily_area_conflict'>
+  quality_reasons?: Array<
+    | 'open_change_of_occupancy'
+    | 'multifamily_area_conflict'
+    | 'learned_zero_bed_bath_conflict'
+    | 'learned_area_outlier'
+    | 'learned_characteristic_outlier'
+  >
   twin_n: number | null
   twin_ratio: number | null
   lon: number | null

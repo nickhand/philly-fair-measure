@@ -7,6 +7,7 @@ import pytest
 from philly_fair_measure.features.assessment_features import assemble_assessment_features
 from philly_fair_measure.features.sale_features import _CHAR_RENAMES, _LOC_RENAMES
 from philly_fair_measure.validation.opa import finalize_screen
+from philly_fair_measure.validation.record_quality import add_record_quality
 
 VALUATION_DATE = datetime(2026, 7, 1)
 
@@ -252,6 +253,32 @@ def test_finalize_screen_withholds_low_quality_record():
     assert out["assessment_flag"] == "insufficient_record"
     assert out["screen_z"] is None
     assert out["opa_vs_model_ratio"] is None
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [
+        {"quality_area_outlier": True},
+        {
+            "quality_zero_bed_bath_conflict": True,
+            "quality_characteristic_outlier": True,
+        },
+    ],
+)
+def test_learned_high_confidence_conflict_withholds_verdict(flags):
+    features = pl.DataFrame({"parcel_id": ["x"], **{key: [value] for key, value in flags.items()}})
+    permits = pl.DataFrame(schema={"irrelevant": pl.String})
+    quality = add_record_quality(features, permits, None, VALUATION_DATE)
+    assert quality["record_quality_low"][0]
+    assert quality["record_quality_warning"][0]
+
+
+def test_broad_zero_room_conflict_warns_without_automatically_withholding():
+    features = pl.DataFrame({"parcel_id": ["x"], "quality_zero_bed_bath_conflict": [True]})
+    permits = pl.DataFrame(schema={"irrelevant": pl.String})
+    quality = add_record_quality(features, permits, None, VALUATION_DATE)
+    assert not quality["record_quality_low"][0]
+    assert quality["record_quality_warning"][0]
 
 
 def test_finalize_screen_attention_tier():

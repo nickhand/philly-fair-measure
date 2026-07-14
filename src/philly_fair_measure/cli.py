@@ -84,6 +84,15 @@ def _cmd_build_features(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_build_characteristic_quality(args: argparse.Namespace) -> int:
+    from philly_fair_measure.features.characteristic_quality import build_characteristic_quality
+
+    result = build_characteristic_quality(args.data_dir, n_folds=args.folds)
+    print(f"{result.manifest.row_count:,} rows -> {result.path}")
+    print(f"metadata -> {result.metadata_path}")
+    return 0
+
+
 def _cmd_build_condo_features(args: argparse.Namespace) -> int:
     from philly_fair_measure.features.condo_features import build_condo_features
 
@@ -374,6 +383,60 @@ def _cmd_ensemble_check(args: argparse.Namespace) -> int:
             f"{row['interval']:<26}{row['coverage']:>10.3f}"
             f"{row['median_width_ratio']:>12.2f}{row['mean_width_rel']:>16.2f}"
         )
+    return 0
+
+
+def _cmd_characteristic_quality_check(args: argparse.Namespace) -> int:
+    from philly_fair_measure.diagnostics.characteristic_quality import (
+        characteristic_quality_check,
+    )
+
+    result = characteristic_quality_check(args.data_dir)
+    print(f"characteristic quality audit — {result.baseline_run.name}")
+    columns = ("n", "rmse_log", "median_ratio", "cod", "prd", "prb")
+    print(f"{'segment':<28}" + "".join(f"{column:>14}" for column in columns))
+    for row in result.segments.to_dicts():
+        cells = []
+        for column in columns:
+            value = row[column]
+            cells.append(f"{value:>14,}" if column == "n" else f"{value:>14.4f}")
+        print(f"{row['segment']:<28}" + "".join(cells))
+    print("\nstress properties:")
+    print(result.stress_properties)
+    return 0
+
+
+def _cmd_model_challengers(args: argparse.Namespace) -> int:
+    from philly_fair_measure.diagnostics.model_challengers import model_challenger_check
+
+    result = model_challenger_check(args.data_dir)
+    print("model challenger promotion gate")
+    for decision in result.decisions:
+        verdict = "PROMOTE" if decision.promote_to_full_retrain else "REJECT"
+        failed = ", ".join(decision.failed_gates) if decision.failed_gates else "none"
+        print(f"  {decision.challenger:<18} {verdict:<8} failed gates: {failed}")
+    print(f"metrics: {result.metrics_path}")
+    print(f"decisions: {result.decisions_path}")
+    return 0
+
+
+def _cmd_risk_check(args: argparse.Namespace) -> int:
+    from philly_fair_measure.models.risk import fit_risk_model
+    from philly_fair_measure.models.scoring import latest_run_dir
+
+    run = latest_run_dir("baseline", args.data_dir)
+    result = fit_risk_model(run, args.data_dir)
+    print(f"risk model: {'PROMOTED' if result.promoted else 'REJECTED'} — {run.name}")
+    print(result.evaluation)
+    return 0
+
+
+def _cmd_review_queue(args: argparse.Namespace) -> int:
+    from philly_fair_measure.diagnostics.review_queue import build_review_queue
+
+    result = build_review_queue(args.data_dir, limit=args.limit)
+    print(f"{result.frame.height:,} stratified review candidates -> {result.path}")
+    print(result.frame.head(20))
     return 0
 
 
@@ -1055,6 +1118,16 @@ def main(argv: list[str] | None = None) -> int:
     build_features.add_argument("--data-dir", type=Path)
     build_features.set_defaults(func=_cmd_build_features)
 
+    characteristic_quality = subparsers.add_parser(
+        "build-characteristic-quality",
+        help=(
+            "cross-fit living-area/bed/bath plausibility into marts/characteristic_quality.parquet"
+        ),
+    )
+    characteristic_quality.add_argument("--folds", type=int, default=3)
+    characteristic_quality.add_argument("--data-dir", type=Path)
+    characteristic_quality.set_defaults(func=_cmd_build_characteristic_quality)
+
     condo_features = subparsers.add_parser(
         "build-condo-features", help="build marts/condo_sale_features.parquet"
     )
@@ -1201,6 +1274,35 @@ def main(argv: list[str] | None = None) -> int:
     ensemble.add_argument("--k", type=int, default=500, help="calibration neighbors (knn method)")
     ensemble.add_argument("--data-dir", type=Path)
     ensemble.set_defaults(func=_cmd_ensemble_check)
+
+    quality_check = subparsers.add_parser(
+        "characteristic-quality-check",
+        help="audit learned characteristic conflicts on the latest out-of-time predictions",
+    )
+    quality_check.add_argument("--data-dir", type=Path)
+    quality_check.set_defaults(func=_cmd_characteristic_quality_check)
+
+    challengers = subparsers.add_parser(
+        "model-challengers",
+        help="same-split accuracy/fairness promotion gate for measurement and state features",
+    )
+    challengers.add_argument("--data-dir", type=Path)
+    challengers.set_defaults(func=_cmd_model_challengers)
+
+    risk = subparsers.add_parser(
+        "risk-check",
+        help="fit and audit the validation-trained expected-error/risk-coverage model",
+    )
+    risk.add_argument("--data-dir", type=Path)
+    risk.set_defaults(func=_cmd_risk_check)
+
+    review = subparsers.add_parser(
+        "review-queue",
+        help="build a district/value-stratified active-learning audit queue",
+    )
+    review.add_argument("--limit", type=int, default=2_000)
+    review.add_argument("--data-dir", type=Path)
+    review.set_defaults(func=_cmd_review_queue)
 
     acs = subparsers.add_parser(
         "acs-sensitivity",

@@ -12,7 +12,11 @@ import { verdictFor } from '@/utils/verdict'
 const props = defineProps<{ property: PropertyCore }>()
 defineEmits<{ close: [] }>()
 
-const isQualityWarning = computed(() => props.property.flag === 'insufficient_record')
+const isVerdictWithheld = computed(() => props.property.flag === 'insufficient_record')
+const isQualityWarning = computed(
+  () => props.property.data_quality_warning === true || isVerdictWithheld.value,
+)
+const isHighModelRisk = computed(() => props.property.prediction_risk_tier === 'high')
 
 /** Warning records show the Bayesian band whose variance includes the data
  * conflict; ordinary records use the tighter overlap of both methods. */
@@ -59,7 +63,8 @@ const ariaLabel = computed(() => {
     return (
       `Model estimate ${money(c.model_median)}, with a data-warning range of ` +
       `${money(bandLo.value)} to ${money(bandHi.value)}. ` +
-      `City value ${money(opa)} is shown for reference; no over-or-under call is made.`
+      `City value ${money(opa)} is shown for reference; ` +
+      `${isVerdictWithheld.value ? 'no over-or-under call is made.' : `assessment result: ${verdict.value.headline}.`}`
     )
   // inside/outside must describe the drawn band, not the flag (demoted rows
   // are within_range with the city marker beyond the band)
@@ -155,6 +160,12 @@ function edgeAnchor(v: number): 'start' | 'middle' | 'end' {
         class="mt-1.5 rounded-md border border-gold-tint-border bg-gold-tint px-2.5 py-2 text-caption leading-normal text-body"
       >
         Estimate shown with a data-quality warning. Open the report for the reason and evidence.
+      </p>
+      <p
+        v-else-if="isHighModelRisk"
+        class="mt-1.5 rounded-md border border-gold-tint-border bg-gold-tint px-2.5 py-2 text-caption leading-normal text-body"
+      >
+        High model uncertainty. Review comparable sales and recorded facts before relying on this estimate.
       </p>
 
       <dl v-if="!hasInterval" class="mt-3 grid grid-cols-2 gap-3 text-body-sm">

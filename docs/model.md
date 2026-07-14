@@ -65,6 +65,7 @@ Roughly a hundred features (the exact lists live in `NUMERIC_FEATURES` /
 | Rolling means (`mkt_*_roll_`) | block/building leave-one-out $/sqft level (the CCAO workhorse) |
 | Parcel geometry (`shp_`) | area, perimeter, vertex/angle SDs, min-rotated-rect ratios from PWD polygons |
 | Distress & tenure (`dist_`, `evt_`, `ten_`) | delinquency, severe violations, vacancy complaints, homestead-derived owner-occupancy (rental-license features were dropped 2026-07-07: stale feed, no measured accuracy cost) |
+| Property state (`state_`) | bounded evidence for active work, distress, completed renovation, measurement conflict, transition, and competing states; derived without prices, assessments, owners, or demographics |
 | Mortgage forensics (`fin_`) | prior-mortgage count/recency, hard-money; `fin_cash_sale` is a *diagnostic* attribute, kept out of the model |
 | Proximity (`prox_`) | rapid transit, rail, parks, expressway/arterial, bus density |
 
@@ -121,7 +122,11 @@ intervals the screen consumes:
   collinear, sample >15× slower, and the kNN covariate already carries the
   surface; measured 2026-07-03).
 - **Heteroscedastic noise** `log σ = g₀ + z·g + district effect`, widening
-  where evidence is thin (missing block roll, sparse kNN, atypical style).
+  where evidence is thin (missing block roll, sparse kNN, atypical style) or
+  the cross-fitted characteristic model places the parcel in its calibrated
+  high-conflict stratum. This characteristic term is appended to preserve
+  scoring of older runs; it enters uncertainty, not the mean, until a mean
+  ablation passes.
 - **Student-t likelihood** with fixed moderate ν (a learned ν couples every
   observation through one global parameter and samples for hours; fixed keeps
   the fat-tail robustness cheaply).
@@ -190,17 +195,64 @@ into the watch tier, while under-candidates are ~unchanged (6,353 → 6,289).
 Condos keep the 5.6 fixed-offset variant (their band is the flag anchor, not
 a cross-check, and the bake-off was residential-only).
 
+### 5.8 Accuracy/fairness promotion gate
+
+New feature families do not enter production because they look intuitively
+useful. `fair-measure model-challengers` retrains the incumbent and each
+prespecified challenger on the identical out-of-time split, target, seed,
+recency weights, and financed calibration. Promotion requires non-inferiority
+in overall accuracy and vertical equity, no material harm in the cheapest and
+most expensive quintiles, no material harm in any sufficiently large district,
+and improvement in at least one intended risk cohort. The gate reports RMSE,
+COD, PRB, and VEI for every comparison.
+
+The 2026-07-13 bake-off tested learned measurement priors, parcel/entity-grain
+features, property-state evidence, and their combinations. Only the six
+property-state features entered the production point model. They improved
+held-out log-RMSE 0.3310→0.3299, cheapest-quintile 0.5060→0.5045,
+characteristic-outlier 0.3993→0.3958, area-outlier 0.3806→0.3701,
+active-work 0.3497→0.3481, distress 0.4323→0.4288, and multi-account
+0.3970→0.3746 in the fast LightGBM gate. Learned replacement values remain
+uncertainty evidence, because using a peer reconstruction as truth would
+convert anomaly detection into unverified imputation. Entity-grain ratios did
+not show independent point-estimate benefit.
+
+The subsequent full LightGBM/CatBoost retrain passed the same audit: overall
+log-RMSE 0.3213→0.3208, COD 24.27→24.22, financed log-RMSE
+0.2786→0.2782, q1 0.4937→0.4930, q5 0.2308→0.2274, and no district worsened
+by more than 0.0028 log-RMSE. Characteristic and zero-value subgroups were
+mixed by roughly one-thousandth in RMSE but improved in COD/PRB; those signals
+therefore stayed out of the point mean and continued to govern uncertainty.
+
+### 5.9 Selective error-risk model
+
+An always-on assessment system still needs to say when its estimate is likely
+to be fragile. A separate LightGBM risk model predicts absolute log error from
+raw CQR width, disagreement between the two GBM arms, comp density, property
+state, and record-quality signals. It cannot see the subject sale price at
+scoring time, OPA value, owner identity, or demographics, and it never changes
+the point estimate. It trains on the first 80% of the point-model validation
+slice, fixes tier thresholds on the remaining 20%, and earns promotion only on
+the untouched test set.
+
+The promoted model has held-out Spearman correlation 0.397 with absolute
+error. Standard/elevated/high tiers have log-RMSE 0.268/0.415/0.507 and COD
+20.2/35.3/42.5. Retaining the 25%, 50%, 75%, 90%, and 100% least-risky cases
+produces monotone log-RMSE 0.168, 0.218, 0.267, 0.294, and 0.321. The site
+still shows every scoreable estimate; a high-risk tier adds a prominent
+warning and directs the user to verify facts and comps.
+
 ## 6. Results
 
 <!-- generated:model-results-table:begin -->
-Out-of-time test set, n = 19,519, run `20260713T224356Z-baseline`. Identical test
+Out-of-time test set, n = 19,519, run `20260714T002146Z-baseline`. Identical test
 set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **GBM stack (ours)** | **0.321** | **25.1%** | 1.027 | **24.3** | **1.086** | **-0.087** | 0.912 |
-| LightGBM arm | 0.329 | 25.3% | 1.013 | 25.0 | 1.086 | -0.084 | 0.912 |
-| CatBoost arm | 0.320 | 24.3% | 0.999 | 24.4 | 1.086 | -0.087 | 0.912 |
+| **GBM stack (ours)** | **0.321** | **25.0%** | 1.027 | **24.2** | **1.085** | **-0.086** | 0.913 |
+| LightGBM arm | 0.328 | 25.3% | 1.013 | 24.9 | 1.086 | -0.084 | 0.911 |
+| CatBoost arm | 0.319 | 24.3% | 1.000 | 24.3 | 1.085 | -0.086 | 0.913 |
 | Ridge | 0.424 | 36.6% | 1.026 | 35.6 | 1.068 | -0.113 | 0.978 |
 | **OPA (incumbent)** | **0.451** | **34.2%** | 0.983 | **34.7** | **1.192** | **-0.235** | 0.787 |
 <!-- generated:model-results-table:end -->
@@ -274,9 +326,17 @@ Guards keep the flags honest where the record, not the value, is the problem:
   never flags as over-assessed, the sale history the model learns from lags
   the finished building. Such homes demote to within-range, surface in the
   attention tier instead, and carry an explicit caveat on their report.
-- **Insufficient records** (no recorded livable area) are reported as
-  `insufficient_record` and are not valued at all rather than being priced as
-  if the missing size were real.
+- **Data-quality warnings** cover plausible-but-suspicious characteristics,
+  including learned area/bed/bath conflicts. They do not change recorded
+  values or suppress the estimate. A verdict is withheld only for severe
+  cases: no living area, open occupancy-changing work, a corroborated
+  multi-family footprint conflict, an extreme learned area outlier, or a
+  zero-bed/bath conflict that is also in the calibrated top-5% joint-conflict
+  stratum. This deliberately separates “inspect this record” from “the model
+  cannot defend an over/under call.”
+- **Prediction-risk warnings** flag estimates whose evidence pattern resembles
+  held-out sales with materially larger errors. They do not alter estimates or
+  assessment flags.
 - **Attention tier** ("worth a look"): properties inside the displayed 90%
   band but in its outer tenth, on the far side of the estimate, roughly the
   model's 90th percentile, are labeled high/low attention rather than
@@ -287,9 +347,9 @@ Guards keep the flags honest where the record, not the value, is the problem:
   beside it.
 
 <!-- generated:model-screen-counts:begin -->
-As of run `20260713T224356Z` (Tax Year 2027 roll): 496,975 properties
-screened: 1,032 over-assessed candidates, 6,781 under-assessed
-candidates, 42,198 in the attention tier, 439 insufficient
+As of run `20260714T002146Z` (Tax Year 2027 roll): 496,975 properties
+screened: 958 over-assessed candidates, 6,533 under-assessed
+candidates, 39,757 in the attention tier, 19020 insufficient
 records.
 <!-- generated:model-screen-counts:end -->
 (The constant-quality index of 2026-07-06 cut under-assessed candidates
@@ -318,7 +378,9 @@ strict out-of-time evaluation · uncertainty-gated flags requiring two
 independent interval methods (Bayesian posterior and spatially weighted
 conformal) to place OPA outside on the same side · published channel
 discounts rather than opaque adjustments · deterministic, reproducible
-pipeline · a full model-vs-OPA benchmark on every run.
+pipeline · a full model-vs-OPA benchmark on every run · a district/value-
+stratified human-review queue that uses relative gaps and uncertainty, never
+owner or demographic data.
 
 ## 9. Known limitations
 

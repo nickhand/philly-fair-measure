@@ -171,6 +171,18 @@ NUMERIC_FEATURES: Final = (
     "prox_dist_bike_network_m",
     "prox_parcel_density_400m",
     "prox_dist_vacant_land_m",
+    # Property-state evidence: transparent noisy-OR summaries of dated
+    # construction/distress/condition signals. Same-split challenger gate
+    # (2026-07-13): overall RMSE -0.0011, q1 RMSE -0.0015/COD -0.26,
+    # active-work RMSE -0.0016/COD -0.37, distress RMSE -0.0035; all
+    # prespecified non-inferiority and district gates passed. Entity-grain
+    # ratios did not earn promotion and remain diagnostic-only.
+    "state_active_work_evidence",
+    "state_distress_evidence",
+    "state_completed_reno_evidence",
+    "state_measurement_conflict_evidence",
+    "state_transition_evidence",
+    "state_competing_evidence",
 )
 TIME_FEATURES: Final = ("time_sale_epoch_days", "time_quarter", "time_month")
 CATEGORICAL_FEATURES: Final = (
@@ -193,6 +205,7 @@ CATEGORICAL_FEATURES: Final = (
     "loc_market_area",
     "loc_district",
     "loc_street_class",
+    "state_primary_evidence",
 )
 STYLE_SEGMENTS: Final = ("row", "twin", "detached")
 
@@ -729,5 +742,13 @@ def train_baseline(
         notes="row_count is the test-set size; see params.json for split details",
     )
     write_derived_manifest(manifest, run_dir / "run.parquet")
+    # Separate selective-prediction layer: learns expected error on validation
+    # rows and must prove monotone risk separation on the untouched test rows.
+    # It never changes the point estimate; rejected artifacts score everyone
+    # as standard risk (models/risk.py).
+    if market is Market.BLEND:
+        from philly_fair_measure.models.risk import fit_risk_model
+
+        fit_risk_model(run_dir, root)
     logger.info("baseline run %s -> %s", run_id, run_dir)
     return BaselineRunResult(run_dir=run_dir, run_id=run_id, overall=overall, evaluation=evaluation)

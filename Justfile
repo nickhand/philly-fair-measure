@@ -61,6 +61,7 @@ snapshot-current:
 [group: "pipeline"]
 retrain-all:
 	uv run fair-measure validate-sales
+	uv run fair-measure build-characteristic-quality
 	uv run fair-measure build-features
 	uv run fair-measure build-condo-features
 	uv run fair-measure train-baseline
@@ -68,6 +69,7 @@ retrain-all:
 	uv run fair-measure train-bayesian
 	uv run fair-measure train-condo
 	uv run fair-measure screen-assessments
+	uv run fair-measure review-queue --limit 2000
 	uv run fair-measure export-web-stats
 	uv run fair-measure sync-docs
 
@@ -75,6 +77,7 @@ retrain-all:
 [group: "pipeline"]
 rescreen:
 	uv run fair-measure screen-assessments
+	uv run fair-measure review-queue --limit 2000
 	uv run fair-measure export-web-stats
 
 # Regenerate web/src/data/siteStats.json from the latest runs

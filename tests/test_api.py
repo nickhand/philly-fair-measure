@@ -90,6 +90,8 @@ def _screen_rows() -> list[dict]:
         )
         for i in range(15)
     ]
+    rows[0]["quality_area_outlier"] = True
+    rows[0]["record_quality_warning"] = True
     return rows
 
 
@@ -152,6 +154,10 @@ def test_property_core_and_404(tmp_path):
     assert body["lon"] == -75.1426 and body["lat"] == 39.9528
     assert body["signals"]["unpermitted_work_complaints_5y"] == 1
     assert c.get("/api/property/nope").status_code == 404
+
+    warning = c.get("/api/property/p1").json()
+    assert warning["quality_reasons"] == ["learned_area_outlier"]
+    assert warning["data_quality_warning"] is True
 
 
 def test_parcels_bbox_filters(tmp_path):

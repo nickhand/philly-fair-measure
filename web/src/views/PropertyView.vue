@@ -69,7 +69,11 @@ async function load(id: string) {
 
 watch(() => props.parcelId, load, { immediate: true })
 
-const isQualityWarning = computed(() => core.value?.flag === 'insufficient_record')
+const isVerdictWithheld = computed(() => core.value?.flag === 'insufficient_record')
+const isQualityWarning = computed(
+  () => core.value?.data_quality_warning === true || isVerdictWithheld.value,
+)
+const isHighModelRisk = computed(() => core.value?.prediction_risk_tier === 'high')
 
 /** The ordinary UI shows the overlap supported by both uncertainty methods.
  * A suspect-record estimate instead shows the Bayesian band because its
@@ -101,6 +105,12 @@ const qualityExplanation = computed(() => {
     return 'City permit records show an issued change-of-occupancy permit, but not completed work. We still show our market-value estimate and range, but the model cannot tell whether today’s property is the old building, a construction site, or the finished conversion. No over-or-under assessment call is made.'
   if (reasons.includes('multifamily_area_conflict'))
     return 'The city calls this a multi-family building, but lists no bedrooms or bathrooms and a living area that conflicts with its footprint and story count. We still show the model’s estimate, with a wider range, but make no over-or-under assessment call.'
+  if (reasons.includes('learned_zero_bed_bath_conflict'))
+    return 'The city records zero bedrooms and zero bathrooms, but an independent model of the building, lot, and nearby peer records strongly expects usable rooms. We still show the market-value estimate and range; verify those facts before relying on the result.'
+  if (reasons.includes('learned_area_outlier'))
+    return 'The recorded living area is an extreme outlier relative to independent building-footprint, story, lot, and peer-record evidence. We still show the market-value estimate and range; verify the square footage before relying on the result.'
+  if (reasons.includes('learned_characteristic_outlier'))
+    return 'The city’s recorded size, room counts, and independent building evidence form an unusual combination compared with Philadelphia peer records. We still show the estimate and range, but the recorded facts should be verified.'
   return null
 })
 const hasInterval = computed(
@@ -301,7 +311,7 @@ function printPage() {
               :flag="core.flag"
             />
             <div class="no-print">
-              <InfoTip v-if="isQualityWarning" label="Why is this estimate still shown?">
+              <InfoTip v-if="isVerdictWithheld" label="Why is this estimate still shown?">
                 A replacement assessment model must produce a value for every property it can
                 score. For records with a data warning, we show the model’s estimate and its broader
                 Bayesian range, but do not decide whether the city is over or under that value.
@@ -309,6 +319,12 @@ function printPage() {
                 <RouterLink to="/methodology" class="font-semibold text-brand-600 underline"
                   >Learn how this works</RouterLink
                 >.
+              </InfoTip>
+              <InfoTip v-else-if="isQualityWarning" label="Why is there a data warning?">
+                The estimate is still produced, but one or more public-record facts look
+                inconsistent with independent building or peer evidence. The warning does not
+                mechanically replace the city’s values; it tells you which facts to verify before
+                relying on the result.
               </InfoTip>
               <InfoTip v-else label="Why a range and not one number?">
                 No one knows a home’s exact value until it sells. Our model studies thousands of nearby
@@ -334,6 +350,19 @@ function printPage() {
               ours. Until the home itself sells, nearby sales mostly reflect older homes, so our
               estimate and range can run low. The city’s value may rest on information we can’t
               see, like the builder’s own numbers.
+            </p>
+          </div>
+
+          <div
+            v-if="isHighModelRisk && !isQualityWarning"
+            class="mt-3.5 flex gap-2.5 rounded-md border border-gold-tint-border bg-gold-tint px-3.5 py-3"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a6100" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mt-0.5 shrink-0"><path d="M12 3 2.5 20h19L12 3Z" /><path d="M12 9v5" /><path d="M12 17h.01" /></svg>
+            <p class="text-body-sm leading-normal text-body">
+              <strong class="text-gold-700">High model uncertainty.</strong> On held-out sales
+              with similar evidence, valuation errors were materially larger than usual. We still
+              show the estimate and range, but comparable sales and recorded facts deserve extra
+              review before relying on the result.
             </p>
           </div>
 
