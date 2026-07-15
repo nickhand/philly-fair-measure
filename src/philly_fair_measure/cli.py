@@ -438,6 +438,24 @@ def _cmd_q1_experiments(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_renovation_episodes(args: argparse.Namespace) -> int:
+    import json
+
+    from philly_fair_measure.diagnostics.renovation_episodes import renovation_episode_check
+
+    result = renovation_episode_check(args.data_dir, full_stack=args.full_stack)
+    print("sale → permit → resale latent-state gate")
+    for decision in result.decisions:
+        verdict = "PROMOTE" if decision.promote_to_full_retrain else "REJECT"
+        failed = ", ".join(decision.failed_gates) if decision.failed_gates else "none"
+        print(f"  {decision.challenger:<24} {verdict:<8} failed gates: {failed}")
+    print("diagnostics:")
+    print(json.dumps(result.diagnostics, indent=2))
+    print(f"metrics: {result.metrics_path}")
+    print(f"decisions: {result.decisions_path}")
+    return 0
+
+
 def _cmd_risk_check(args: argparse.Namespace) -> int:
     from philly_fair_measure.models.risk import fit_risk_model
     from philly_fair_measure.models.scoring import latest_run_dir
@@ -1313,6 +1331,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     q1.add_argument("--data-dir", type=Path)
     q1.set_defaults(func=_cmd_q1_experiments)
+
+    renovation = subparsers.add_parser(
+        "renovation-episodes",
+        help="exact-date sale/permit/resale latent-state probability and valuation gate",
+    )
+    renovation.add_argument("--data-dir", type=Path)
+    renovation.add_argument(
+        "--full-stack",
+        action="store_true",
+        help="also run the slower LightGBM/CatBoost stack promotion audit",
+    )
+    renovation.set_defaults(func=_cmd_renovation_episodes)
 
     risk = subparsers.add_parser(
         "risk-check",

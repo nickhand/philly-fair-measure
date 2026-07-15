@@ -357,6 +357,19 @@ regression. Entity-grain and learned-replacement features remain diagnostics
 or uncertainty inputs because their point-estimate benefit did not clear the
 same gate.
 
+**Renovation episodes (2026-07-14):** `features/renovation_episodes.py`
+reconstructs a parcel's acquisition-to-observation sequence for 120–1,095 day
+holding periods. The raw `episode_` fields include days held; permit, renovation,
+trade, completion, and active counts; first/last permit timing; permit span;
+completion share; a three-permit bundle flag; and the prior purchase discount
+to the contemporaneous local surface. `episode_transition_probability` is a
+run-specific calibrated probability of at least 60% time-adjusted repeat-sale
+recovery. Training rows receive expanding-time cross-fitted probabilities;
+current assessment rows use the run's persisted classifier. Sale price,
+assessment, cash status, owners, and demographics are excluded from inputs.
+Historical comp/diagnostic rows reuse persisted cross-fitted scores rather than
+being rescored by a classifier that has seen their weak outcomes.
+
 ## Events (`evt_`), true event dates, no future leakage (tested)
 
 | Feature | Definition |

@@ -338,6 +338,9 @@ def explain(run_dir: Path, df: pl.DataFrame) -> list[Explanation]:
     """
     import lightgbm as lgb
 
+    from philly_fair_measure.models.scoring import prepare_model_frame
+
+    df = prepare_model_frame(run_dir, df)
     booster = lgb.Booster(model_file=str(run_dir / "model_lightgbm.txt"))
     mappings: dict[str, dict[str, int]] = json.loads(
         (run_dir / "categorical_mappings.json").read_text()

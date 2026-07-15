@@ -66,6 +66,7 @@ Roughly a hundred features (the exact lists live in `NUMERIC_FEATURES` /
 | Parcel geometry (`shp_`) | area, perimeter, vertex/angle SDs, min-rotated-rect ratios from PWD polygons |
 | Distress & tenure (`dist_`, `evt_`, `ten_`) | delinquency, severe violations, vacancy complaints, homestead-derived owner-occupancy (rental-license features were dropped 2026-07-07: stale feed, no measured accuracy cost) |
 | Property state (`state_`) | bounded evidence for active work, distress, completed renovation, measurement conflict, transition, and competing states; derived without prices, assessments, owners, or demographics |
+| Renovation episodes (`episode_`) | exact acquisition→permit/completion→observation sequences plus an expanding-time cross-fitted transition probability; resale outcomes are weak labels only and never direct valuation inputs |
 | Mortgage forensics (`fin_`) | prior-mortgage count/recency, hard-money; `fin_cash_sale` is a *diagnostic* attribute, kept out of the model |
 | Proximity (`prox_`) | rapid transit, rail, parks, expressway/arterial, bus density |
 
@@ -255,14 +256,14 @@ warning and directs the user to verify facts and comps.
 ## 6. Results
 
 <!-- generated:model-results-table:begin -->
-Out-of-time test set, n = 19,519, run `20260714T002146Z-baseline`. Identical test
+Out-of-time test set, n = 19,519, run `20260714T190028Z-baseline`. Identical test
 set and treatment; OPA's own values as the incumbent:
 
 | Model | RMSE(log) | MAPE | Median ratio | COD | PRD | PRB | MKI |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **GBM stack (ours)** | **0.321** | **25.0%** | 1.027 | **24.2** | **1.085** | **-0.086** | 0.913 |
-| LightGBM arm | 0.328 | 25.3% | 1.013 | 24.9 | 1.086 | -0.084 | 0.911 |
-| CatBoost arm | 0.319 | 24.3% | 1.000 | 24.3 | 1.085 | -0.086 | 0.913 |
+| **GBM stack (ours)** | **0.319** | **24.9%** | 1.025 | **24.1** | **1.086** | **-0.088** | 0.912 |
+| LightGBM arm | 0.327 | 25.1% | 1.010 | 24.8 | 1.086 | -0.084 | 0.912 |
+| CatBoost arm | 0.318 | 24.1% | 0.996 | 24.2 | 1.086 | -0.088 | 0.912 |
 | Ridge | 0.424 | 36.6% | 1.026 | 35.6 | 1.068 | -0.113 | 0.978 |
 | **OPA (incumbent)** | **0.451** | **34.2%** | 0.983 | **34.7** | **1.192** | **-0.235** | 0.787 |
 <!-- generated:model-results-table:end -->
@@ -357,9 +358,9 @@ Guards keep the flags honest where the record, not the value, is the problem:
   beside it.
 
 <!-- generated:model-screen-counts:begin -->
-As of run `20260714T002146Z` (Tax Year 2027 roll): 496,975 properties
-screened: 958 over-assessed candidates, 6,533 under-assessed
-candidates, 39,757 in the attention tier, 19020 insufficient
+As of run `20260714T190028Z` (Tax Year 2027 roll): 496,975 properties
+screened: 970 over-assessed candidates, 6,465 under-assessed
+candidates, 40,200 in the attention tier, 19020 insufficient
 records.
 <!-- generated:model-screen-counts:end -->
 (The constant-quality index of 2026-07-06 cut under-assessed candidates

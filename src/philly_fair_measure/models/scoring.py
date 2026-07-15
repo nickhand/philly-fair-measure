@@ -40,9 +40,29 @@ def run_params(run_dir: Path) -> dict[str, Any]:
     return cast(dict[str, Any], json.loads((run_dir / "params.json").read_text()))
 
 
+def prepare_model_frame(run_dir: Path, df: pl.DataFrame) -> pl.DataFrame:
+    """Attach run-specific derived inputs needed by persisted model features."""
+    from philly_fair_measure.models.renovation_state import (
+        TRANSITION_PROBABILITY_FEATURE,
+        add_persisted_transition_probability,
+    )
+
+    params = run_params(run_dir)
+    if TRANSITION_PROBABILITY_FEATURE not in params["numeric_features"]:
+        return df
+    out = add_persisted_transition_probability(run_dir, df)
+    if TRANSITION_PROBABILITY_FEATURE not in out.columns:
+        raise FileNotFoundError(
+            f"{run_dir} expects {TRANSITION_PROBABILITY_FEATURE} but its "
+            "renovation transition artifact is missing"
+        )
+    return out
+
+
 def _lightgbm_arm_log(run_dir: Path, df: pl.DataFrame) -> npt.NDArray[np.float64]:
     import lightgbm as lgb
 
+    df = prepare_model_frame(run_dir, df)
     booster = lgb.Booster(model_file=str(run_dir / "model_lightgbm.txt"))
     mappings = json.loads((run_dir / "categorical_mappings.json").read_text())
     params = run_params(run_dir)
@@ -68,6 +88,7 @@ def score_point(run_dir: Path, df: pl.DataFrame) -> npt.NDArray[np.float64]:
         catboost_frame,
     )
 
+    df = prepare_model_frame(run_dir, df)
     pred_log = _lightgbm_arm_log(run_dir, df)
     stack_path = run_dir / STACK_FILE
     if stack_path.exists():
@@ -139,6 +160,7 @@ def score_quantile_heads(
     paths = {q: run_dir / QUANTILE_HEAD_FILES[q] for q in QUANTILE_HEAD_LEVELS}
     if not all(p.exists() for p in paths.values()):
         return None
+    df = prepare_model_frame(run_dir, df)
     mappings = json.loads((run_dir / "categorical_mappings.json").read_text())
     params = run_params(run_dir)
     x = _encode(df, mappings, params["numeric_features"], params["categorical_features"])

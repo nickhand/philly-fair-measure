@@ -911,18 +911,15 @@ def assemble_sale_features(
     # minimal fixtures may omit typeofwork; treat as non-renovation
     permit_columns = set(permits.collect_schema().names())
     has_typeofwork = "typeofwork" in permit_columns
-    permit_events = (
-        permits.filter(
-            pl.col("opa_account_num").is_not_null() & pl.col("permitissuedate_parsed").is_not_null()
-        )
-        .select(
-            pl.col("opa_account_num").alias("parcel_id"),
-            pl.col("permitissuedate_parsed").alias("event_date"),
-            permit_completion_date(permit_columns).alias("completion_date"),
-            (is_reno_permit() if has_typeofwork else pl.lit(False)).alias("is_reno"),
-            is_change_of_occupancy_permit(permit_columns).alias("is_change_occupancy"),
-        )
-        .collect()
+    permit_source = permits.collect()
+    permit_events = permit_source.filter(
+        pl.col("opa_account_num").is_not_null() & pl.col("permitissuedate_parsed").is_not_null()
+    ).select(
+        pl.col("opa_account_num").alias("parcel_id"),
+        pl.col("permitissuedate_parsed").alias("event_date"),
+        permit_completion_date(permit_columns).alias("completion_date"),
+        (is_reno_permit() if has_typeofwork else pl.lit(False)).alias("is_reno"),
+        is_change_of_occupancy_permit(permit_columns).alias("is_change_occupancy"),
     )
     permit_feats = (
         base.select("sale_id", "parcel_id", "sale_date")
@@ -1175,7 +1172,15 @@ def assemble_sale_features(
     from philly_fair_measure.features.property_state import add_property_state_features
 
     features = add_characteristic_quality(features, characteristic_quality)
-    return add_property_state_features(features).sort("sale_date", "sale_id")
+    features = add_property_state_features(features)
+    # A flip/renovation is a dated sequence, not a timeless permit flag.  The
+    # weak recovery label is retained for the auxiliary classifier but is
+    # explicitly excluded from every valuation feature list.
+    from philly_fair_measure.features.renovation_episodes import (
+        add_renovation_episode_features,
+    )
+
+    return add_renovation_episode_features(features, permit_source).sort("sale_date", "sale_id")
 
 
 @dataclass(frozen=True)

@@ -28,7 +28,7 @@ import numpy as np
 import polars as pl
 
 from philly_fair_measure import config
-from philly_fair_measure.models.scoring import latest_run_dir, run_params
+from philly_fair_measure.models.scoring import latest_run_dir, prepare_model_frame, run_params
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,7 @@ def _leaf_matrix(run_dir: Path, df: pl.DataFrame) -> np.ndarray:
 
     from philly_fair_measure.models.baseline import _encode
 
+    df = prepare_model_frame(run_dir, df)
     booster = lgb.Booster(model_file=str(run_dir / "model_lightgbm.txt"))
     mappings = json.loads((run_dir / "categorical_mappings.json").read_text())
     params = run_params(run_dir)

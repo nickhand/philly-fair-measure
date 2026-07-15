@@ -472,12 +472,58 @@ def train_baseline(
 
     df = _load_frame(mart_path)
     numeric, categorical = feature_lists(time_adjusted)
-    features = numeric + categorical
 
     n_test = max(1, int(df.height * test_fraction))
     train_df, test_df = df.head(df.height - n_test), df.tail(n_test)
     n_val = max(1, int(train_df.height * validation_fraction))
     fit_df, val_df = train_df.head(train_df.height - n_val), train_df.tail(n_val)
+    transition_result = None
+    transition_probability_rows = None
+    # The point-in-time mart carries weak resale labels for this auxiliary
+    # model, but the valuation arms receive only expanding-time cross-fitted
+    # probabilities plus raw dated episode evidence.  Minimal/synthetic marts
+    # that predate these columns remain trainable with the incumbent feature
+    # set, which also keeps historical runs reproducible.
+    from philly_fair_measure.features.renovation_episodes import EPISODE_RAW_FEATURES
+    from philly_fair_measure.models.renovation_state import (
+        TRANSITION_PROBABILITY_FEATURE,
+        cross_fitted_transition_probability,
+    )
+
+    episode_training_columns = {
+        *EPISODE_RAW_FEATURES,
+        "episode_high_recovery_label",
+    }
+    if episode_training_columns.issubset(df.columns):
+        transition_result = cross_fitted_transition_probability(fit_df, val_df, test_df)
+        fit_df = fit_df.with_columns(
+            pl.Series(TRANSITION_PROBABILITY_FEATURE, transition_result.probabilities["fit"])
+        )
+        val_df = val_df.with_columns(
+            pl.Series(TRANSITION_PROBABILITY_FEATURE, transition_result.probabilities["val"])
+        )
+        test_df = test_df.with_columns(
+            pl.Series(TRANSITION_PROBABILITY_FEATURE, transition_result.probabilities["test"])
+        )
+        transition_probability_rows = pl.concat(
+            [
+                frame.select(
+                    "sale_id",
+                    "parcel_id",
+                    "sale_date",
+                    TRANSITION_PROBABILITY_FEATURE,
+                )
+                for frame in (fit_df, val_df, test_df)
+            ]
+        )
+        numeric.extend((*EPISODE_RAW_FEATURES, TRANSITION_PROBABILITY_FEATURE))
+        numeric = list(dict.fromkeys(numeric))
+        logger.info(
+            "renovation transition model: %s completed fit labels, prior %.3f",
+            transition_result.diagnostics["fit_label_rows"],
+            transition_result.diagnostics["fit_label_prior"],
+        )
+    features = numeric + categorical
     if market is Market.RETAIL:
         financed = pl.col("fin_cash_sale").fill_null(1.0) == 0.0
         fit_df, val_df = fit_df.filter(financed), val_df.filter(financed)
@@ -676,6 +722,15 @@ def train_baseline(
     run_dir.mkdir(parents=True, exist_ok=False)
     booster.save_model(run_dir / "model_lightgbm.txt")
     cat_model.save_model(str(run_dir / CATBOOST_MODEL_FILE))
+    if transition_result is not None:
+        from philly_fair_measure.models.renovation_state import save_transition_model
+
+        save_transition_model(
+            transition_result.model,
+            run_dir,
+            diagnostics=transition_result.diagnostics,
+            cross_fitted_probabilities=transition_probability_rows,
+        )
     (run_dir / STACK_FILE).write_text(
         json.dumps({"weight_lightgbm": weight_lightgbm}, indent=2) + "\n"
     )
@@ -701,6 +756,7 @@ def train_baseline(
                 "numeric_features": numeric,
                 "categorical_features": categorical,
                 "residential_categories": list(RESIDENTIAL_CATEGORIES),
+                "renovation_transition_probability": transition_result is not None,
                 "test_start_date": str(test_df["sale_date"].min()),
             },
             indent=2,

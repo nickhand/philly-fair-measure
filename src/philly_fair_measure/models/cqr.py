@@ -172,10 +172,13 @@ def cqr_check(
     import lightgbm as lgb
 
     from philly_fair_measure.models.baseline import _encode
-    from philly_fair_measure.models.scoring import score_bayesian_intervals
+    from philly_fair_measure.models.scoring import prepare_model_frame, score_bayesian_intervals
 
     run_dir = latest_run_dir("baseline", data_dir)
     fit_df, val_df, test_df = split_frames(run_dir, data_dir)
+    fit_df = prepare_model_frame(run_dir, fit_df)
+    val_df = prepare_model_frame(run_dir, val_df)
+    test_df = prepare_model_frame(run_dir, test_df)
     params = run_params(run_dir)
     mappings = json.loads((run_dir / "categorical_mappings.json").read_text())
     numeric, categorical = params["numeric_features"], params["categorical_features"]

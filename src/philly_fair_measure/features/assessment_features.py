@@ -219,7 +219,6 @@ def assemble_assessment_features(
             .dt.total_days()
             .alias("mkt_parcel_days_since_prev")
         )
-        .drop("last_sale_date")
     )
 
     # kNN surfaces from the trailing window (own parcel excluded inside):
@@ -263,8 +262,9 @@ def assemble_assessment_features(
     # minimal fixtures may omit typeofwork; treat as non-renovation
     permit_columns = set(permits.collect_schema().names())
     has_typeofwork = "typeofwork" in permit_columns
+    permit_source = permits.collect()
     permit_events = (
-        permits.filter(
+        permit_source.filter(
             pl.col("opa_account_num").is_not_null()
             & pl.col("permitissuedate_parsed").is_not_null()
             & (pl.col("permitissuedate_parsed") < valuation_date)
@@ -278,7 +278,6 @@ def assemble_assessment_features(
             (is_reno_permit() if has_typeofwork else pl.lit(False)).alias("is_reno"),
             is_change_of_occupancy_permit(permit_columns).alias("is_change_occupancy"),
         )
-        .collect()
         .with_columns(
             (
                 pl.col("completion_date").is_not_null()
@@ -530,5 +529,11 @@ def assemble_assessment_features(
     features = add_building_structure_features(features, building_footprints)
     features = add_characteristic_quality(features, characteristic_quality)
     from philly_fair_measure.features.property_state import add_property_state_features
+    from philly_fair_measure.features.renovation_episodes import (
+        add_current_renovation_episode_features,
+    )
 
-    return add_property_state_features(features)
+    features = add_property_state_features(features)
+    return add_current_renovation_episode_features(features, permit_source, valuation_date).drop(
+        "last_sale_date"
+    )

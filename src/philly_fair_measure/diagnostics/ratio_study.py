@@ -107,11 +107,19 @@ def iaao_bridge(data_dir: Path | None = None) -> pl.DataFrame:
         fit_vertical_calibration,
     )
     from philly_fair_measure.models.conformal import split_frames
-    from philly_fair_measure.models.scoring import latest_run_dir, run_params, score_point
+    from philly_fair_measure.models.scoring import (
+        latest_run_dir,
+        prepare_model_frame,
+        run_params,
+        score_point,
+    )
 
     run_dir = latest_run_dir("baseline", data_dir)
     params = run_params(run_dir)
     fit_df, val_df, test_df = split_frames(run_dir, data_dir)
+    fit_df = prepare_model_frame(run_dir, fit_df)
+    val_df = prepare_model_frame(run_dir, val_df)
+    test_df = prepare_model_frame(run_dir, test_df)
 
     price = test_df["sale_price"].to_numpy()
     adj = test_df["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy()

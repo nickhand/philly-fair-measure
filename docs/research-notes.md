@@ -457,6 +457,54 @@ The complete experiment remains reproducible as `fair-measure q1-experiments`.
 It writes candidate metrics and machine-readable promotion decisions under
 `data/diagnostics/`; rejected candidates cannot silently enter production.
 
+## Renovation-episode model verdict (2026-07-14)
+
+The rejected high-precision repeat label above was too narrow, but its event
+sequence was useful. We therefore tested a different two-stage design: learn a
+calibrated *probability* of a large resale recovery from every eligible repeat
+sale, then give the valuation model that probability together with the raw
+acquisition-to-observation sequence. Eligibility is a 120–1,095 day holding
+period. Permit issue dates must be strictly after acquisition and strictly
+before observation; completion evidence must exist by observation. The weak
+target is at least 60% time-adjusted recovery and never enters a valuation
+feature directly.
+
+The descriptive pattern is strong and monotone. Among 20,043 eligible repeat
+sales, median recovery was 27.2% with no intervening permits, 47.0% with one,
+105.3% with three or four, and 191.2% with five or more. A renovation-class
+permit was not required: bundles of trade permits also identified rehabs that
+the permit taxonomy misses. The calibrated classifier reached test ROC AUC
+0.900 and Brier 0.129 versus 0.250 for the test-period base rate. Permit-only
+evidence reached AUC 0.764, market context 0.846, and the combination 0.900,
+so permits add information rather than merely proxying the low acquisition
+price.
+
+The combined challenger passed the prespecified full LightGBM/CatBoost gate:
+overall log-RMSE 0.32079→0.31950, financed 0.27824→0.27660, financed Q1
+0.38837→0.38653, financed Q5 0.23599→0.23407, eligible repeat sales
+0.30758→0.30282, permit bundles 0.31183→0.30605, and confirmed transitions
+0.27989→0.27242. Overall COD improved 24.216→24.137; no district exceeded the
+0.01 non-inferiority bound. Adding the probability to the separate expected-
+error model did not materially improve its overall rank correlation, so it was
+promoted to the point estimator but not used as a new warning/risk rule.
+
+Production training uses expanding-time cross-fitting: no fit row's own weak
+target can affect its probability; validation and test probabilities come
+only from completed fit-period labels. Each run persists both the final
+current-property classifier and the original per-row cross-fitted scores.
+Historical rows used by diagnostics or comp-leaf assignment reuse those
+scores, preventing outcome leakage. Current properties receive a probability
+only from evidence observable by the valuation date. Reproduce the gate with
+`fair-measure renovation-episodes --full-stack`.
+
+The two stress tests illustrate the intended separation. `2537 N 7TH ST` has
+seven permits in 550 days, a 0.978 transition probability, and remains a
+high-risk estimate with active/competing work evidence. `2632 N 5TH ST` has no
+observable acquisition episode and therefore a zero transition probability;
+its problem remains the independent characteristic-quality layer (924 sqft
+and recorded 0 bed/0 bath), not a fabricated renovation inference. Both still
+receive estimates and visibly wide warnings rather than categorical verdicts.
+
 **Modern Bayesian practice applicable here**
 - **HSGP** (Hilbert-space GP approximation; Solin & Särkkä, and the practical
   probabilistic-programming variant) gives near-exact low-dimensional GPs at

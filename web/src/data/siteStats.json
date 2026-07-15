@@ -1,8 +1,8 @@
 {
   "meta": {
     "generated_at": "2026-07-14",
-    "model_run_id": "20260714T002146Z-baseline",
-    "interval_run_id": "20260714T011143Z-bayesian",
+    "model_run_id": "20260714T190028Z-baseline",
+    "interval_run_id": "20260714T193149Z-bayesian",
     "n_test": 19519,
     "n_sales_pool": 205182,
     "tax_year": 2027,
@@ -20,12 +20,12 @@
       "vei_verdict": "unacceptable"
     },
     "model": {
-      "median_ratio": 1.027,
-      "cod": 24.2,
-      "prd": 1.085,
-      "prb": -0.086,
-      "mape_pct": 25.0,
-      "vei": -18.1,
+      "median_ratio": 1.025,
+      "cod": 24.1,
+      "prd": 1.086,
+      "prb": -0.088,
+      "mape_pct": 24.8,
+      "vei": -18.0,
       "vei_verdict": "unacceptable"
     }
   },
@@ -40,12 +40,12 @@
       "vei_verdict": "unacceptable"
     },
     "model": {
-      "median_ratio": 0.997,
-      "cod": 18.0,
+      "median_ratio": 0.994,
+      "cod": 17.8,
       "prd": 1.021,
-      "prb": 0.003,
-      "mape_pct": 17.9,
-      "vei": 0.4,
+      "prb": 0.004,
+      "mape_pct": 17.7,
+      "vei": 0.7,
       "vei_verdict": "acceptable"
     }
   },
@@ -74,7 +74,7 @@
     },
     "q5": {
       "opa_pct": 88,
-      "model_pct": 99
+      "model_pct": 98
     }
   },
   "cash": {
@@ -147,35 +147,35 @@
   },
   "tax_shift": {
     "millage_pct": 1.4,
-    "base_change_pct": 0.9,
-    "new_revenue_musd": 19,
+    "base_change_pct": -0.2,
+    "new_revenue_musd": -3,
     "cheapest_home_usd": -203,
-    "priciest_home_usd": 302,
+    "priciest_home_usd": 212,
     "tiers": [
       {
         "name": "cheapest fifth",
         "home_usd": -203,
-        "total_musd": -20.1
+        "total_musd": -20.2
       },
       {
         "name": "second fifth",
-        "home_usd": -102,
-        "total_musd": -10.1
+        "home_usd": -128,
+        "total_musd": -12.8
       },
       {
         "name": "middle fifth",
-        "home_usd": 41,
-        "total_musd": 4.1
+        "home_usd": -9,
+        "total_musd": -0.9
       },
       {
         "name": "fourth fifth",
-        "home_usd": 149,
-        "total_musd": 14.8
+        "home_usd": 94,
+        "total_musd": 9.4
       },
       {
         "name": "priciest fifth",
-        "home_usd": 302,
-        "total_musd": 30.0
+        "home_usd": 212,
+        "total_musd": 21.1
       }
     ]
   },
@@ -189,8 +189,8 @@
           "n_q5": 3909
         },
         "model": {
-          "q1": 1.254,
-          "q5": 0.989,
+          "q1": 1.252,
+          "q5": 0.984,
           "n_q1": 3910,
           "n_q5": 3929
         }
@@ -203,8 +203,8 @@
           "n_q5": 3963
         },
         "model": {
-          "q1": 1.018,
-          "q5": 1.04,
+          "q1": 1.017,
+          "q5": 1.038,
           "n_q1": 3923,
           "n_q5": 3977
         }
@@ -219,8 +219,8 @@
           "n_q5": 2815
         },
         "model": {
-          "q1": 1.101,
-          "q5": 0.987,
+          "q1": 1.104,
+          "q5": 0.981,
           "n_q1": 2807,
           "n_q5": 2829
         }
@@ -233,8 +233,8 @@
           "n_q5": 2753
         },
         "model": {
-          "q1": 0.921,
-          "q5": 1.035,
+          "q1": 0.926,
+          "q5": 1.033,
           "n_q1": 2765,
           "n_q5": 2763
         }
@@ -248,8 +248,8 @@
         "n_q5": 3945
       },
       "model": {
-        "q1": 1.019,
-        "q5": 1.045,
+        "q1": 1.02,
+        "q5": 1.044,
         "n_q1": 3912,
         "n_q5": 3956
       }
@@ -261,52 +261,52 @@
       "test_rows": 19550,
       "test_rows_without_area": 192,
       "morans_i_opa": 0.128,
-      "morans_i_model": 0.084
+      "morans_i_model": 0.081
     }
   },
   "screen": {
     "properties": 496975,
-    "over": 958,
-    "under": 6533,
-    "watch": 39757,
+    "over": 970,
+    "under": 6465,
+    "watch": 40200,
     "insufficient": 19020,
     "by_family_flag": {
       "condo/over_assessed_candidate": 746,
       "condo/under_assessed_candidate": 3655,
       "condo/within_range": 27752,
       "residential/insufficient_record": 19020,
-      "residential/over_assessed_candidate": 212,
-      "residential/under_assessed_candidate": 2878,
-      "residential/within_range": 442712
+      "residential/over_assessed_candidate": 224,
+      "residential/under_assessed_candidate": 2810,
+      "residential/within_range": 442768
     }
   },
   "results_table": {
     "point": {
-      "rmse_log": 0.321,
-      "mape_pct": 25.0,
-      "median_ratio": 1.027,
-      "cod": 24.2,
-      "prd": 1.085,
-      "prb": -0.086,
-      "mki": 0.913
+      "rmse_log": 0.319,
+      "mape_pct": 24.9,
+      "median_ratio": 1.025,
+      "cod": 24.1,
+      "prd": 1.086,
+      "prb": -0.088,
+      "mki": 0.912
     },
     "lightgbm": {
-      "rmse_log": 0.328,
-      "mape_pct": 25.3,
-      "median_ratio": 1.013,
-      "cod": 24.9,
+      "rmse_log": 0.327,
+      "mape_pct": 25.1,
+      "median_ratio": 1.01,
+      "cod": 24.8,
       "prd": 1.086,
       "prb": -0.084,
-      "mki": 0.911
+      "mki": 0.912
     },
     "catboost": {
-      "rmse_log": 0.319,
-      "mape_pct": 24.3,
-      "median_ratio": 1.0,
-      "cod": 24.3,
-      "prd": 1.085,
-      "prb": -0.086,
-      "mki": 0.913
+      "rmse_log": 0.318,
+      "mape_pct": 24.1,
+      "median_ratio": 0.996,
+      "cod": 24.2,
+      "prd": 1.086,
+      "prb": -0.088,
+      "mki": 0.912
     },
     "ridge": {
       "rmse_log": 0.424,

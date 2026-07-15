@@ -35,6 +35,7 @@ from philly_fair_measure.models.conformal import split_frames
 from philly_fair_measure.models.metrics import evaluate_estimates
 from philly_fair_measure.models.scoring import (
     _lightgbm_arm_log,
+    prepare_model_frame,
     run_params,
     score_point,
     score_quantile_heads,
@@ -82,6 +83,7 @@ class RiskModelResult:
 def _catboost_arm_log(run_dir: Path, frame: pl.DataFrame) -> npt.NDArray[np.float64]:
     from catboost import CatBoostRegressor
 
+    frame = prepare_model_frame(run_dir, frame)
     params = run_params(run_dir)
     model = CatBoostRegressor()
     model.load_model(str(run_dir / CATBOOST_MODEL_FILE))
@@ -94,6 +96,7 @@ def _catboost_arm_log(run_dir: Path, frame: pl.DataFrame) -> npt.NDArray[np.floa
 
 
 def _risk_matrix(run_dir: Path, frame: pl.DataFrame) -> npt.NDArray[np.float64]:
+    frame = prepare_model_frame(run_dir, frame)
     quantiles = score_quantile_heads(run_dir, frame)
     if quantiles is None:
         raw_width = np.zeros(frame.height)
