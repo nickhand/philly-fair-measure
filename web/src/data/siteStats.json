@@ -231,6 +231,17 @@
         "old": -50.0,
         "new": -60.1
       },
+      "metric_directions": {
+        "prd": "worsened",
+        "prb": "worsened",
+        "vei": "worsened"
+      },
+      "standard_metrics_verdict": "worsened",
+      "tier_movement": {
+        "cheapest": "farther",
+        "most_expensive": "closer",
+        "larger_shift": "cheapest"
+      },
       "basis": "Assessment divided by the same independent model benchmark"
     },
     "uniformity": {
@@ -1018,6 +1029,26 @@
           "median_distance_m": 3856
         }
       ]
+    },
+    "benchmark_validation": {
+      "basis": "Out-of-time financed sales with IAAO 3\u00d7IQR trimming",
+      "metric_directions": {
+        "prd": "model_fairer",
+        "prb": "model_fairer",
+        "vei": "model_fairer"
+      },
+      "verdict": "model_less_regressive"
+    },
+    "opa_study_verdict": "within_recommended_ranges",
+    "appeal_deadlines": {
+      "first_level_review": "2026-09-01",
+      "formal_appeal": "2026-10-05"
+    },
+    "sources": {
+      "opa_methodology_url": "https://www.phila.gov/media/20260629163818/opa-tax-year-2027-mass-appraisal-valuation-methodology-summary.pdf",
+      "opa_ratio_studies_url": "https://www.phila.gov/documents/annual-ratio-studies/",
+      "iaao_ratio_study_url": "https://www.iaao.org/wp-content/uploads/2025_Ratio_Studies_Exposure_Draft.pdf",
+      "notebook_url": "https://github.com/nickhand/philly-fair-measure/blob/main/notebooks/ty2027_report_reproduction.ipynb"
     }
   },
   "equity_robustness": {

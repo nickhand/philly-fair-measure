@@ -1,4 +1,14 @@
 /** Site-wide links and credits, in one place. */
+import stats from '@/data/siteStats.json'
+
+function formatCycleDate(value: string): string {
+  return new Date(`${value}T00:00:00Z`).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+}
 
 export const SITE = {
   creatorName: 'Nick Hand',
@@ -13,19 +23,11 @@ export const SITE = {
   appealFormsUrl: 'https://www.phila.gov/documents/property-assessment-appeal-documents-and-forms/',
   propertyTaxReliefUrl:
     'https://www.phila.gov/services/payments-assistance-taxes/taxes/property-and-real-estate-taxes/get-real-estate-tax-relief/',
-  ty2027ReleaseUrl:
-    'https://www.phila.gov/2026-06-30-city-of-philadelphia-to-mail-2027-property-assessments-and-launch-expanded-outreach-to-connect-homeowners-to-tax-relief/',
-  ty2027MethodologyUrl:
-    'https://www.phila.gov/media/20260629163818/opa-tax-year-2027-mass-appraisal-valuation-methodology-summary.pdf',
-  ty2027RatioStudiesUrl: 'https://www.phila.gov/documents/annual-ratio-studies/',
-  ty2027NotebookUrl:
-    'https://github.com/nickhand/philly-fair-measure/blob/main/notebooks/ty2027_report_reproduction.ipynb',
-  iaaoRatioStudyUrl:
-    'https://www.iaao.org/wp-content/uploads/2025_Ratio_Studies_Exposure_Draft.pdf',
-  /** The assessment cycle currently shown. Update on each reassessment. */
-  assessmentTaxYear: 2027,
-  flrDeadlineText: 'September 1, 2026',
-  appealDeadlineText: 'October 5, 2026',
+  /** Compatibility names used across the appeal flow; all come from the
+   * generated annual-report contract rather than hand-entered frontend data. */
+  assessmentTaxYear: stats.annual_report.tax_year,
+  flrDeadlineText: formatCycleDate(stats.annual_report.appeal_deadlines.first_level_review),
+  appealDeadlineText: formatCycleDate(stats.annual_report.appeal_deadlines.formal_appeal),
 } as const
 
 /** The city's public record for a property — where an owner reviews the facts

@@ -82,11 +82,26 @@ def test_annual_roll_report_keeps_warning_out_of_direction_verdict() -> None:
     assert report["correction"]["corrective_pct"] > 0
     assert report["correction"]["widening_pct"] > 0
     assert set(report["vertical_equity"]) >= {"prd", "prb", "vei", "basis"}
+    assert set(report["vertical_equity"]["metric_directions"]) == {"prd", "prb", "vei"}
+    assert report["vertical_equity"]["standard_metrics_verdict"] in {
+        "improved",
+        "worsened",
+        "unchanged",
+        "mixed",
+    }
+    assert set(report["vertical_equity"]["tier_movement"]) == {
+        "cheapest",
+        "most_expensive",
+        "larger_shift",
+    }
     assert set(report["uniformity"]) == {"old_cod", "new_cod", "verdict"}
     assert len(report["tiers"]) == 5
     assert report["tiers"][0]["label"] == "Cheapest 20%"
     assert report["tiers"][-1]["label"] == "Most expensive 20%"
     assert {area["zip"] for area in report["areas"]} == {"19125", "19134"}
+    assert report["areas"] == sorted(
+        report["areas"], key=lambda area: (-area["median_change_pct"], area["zip"])
+    )
 
 
 def test_annual_roll_report_requires_both_named_rolls() -> None:

@@ -29,6 +29,7 @@ class AnnualRollConfig:
     comparison_year: int
     effective_date: str
     sales_cutoff: str
+    status: str = "provisional"
     millage: float = 0.013998
     min_log_direction: float = 0.02
     min_area_n: int = 500
@@ -96,6 +97,41 @@ def _roll_metrics(assessment: np.ndarray, benchmark: np.ndarray) -> dict[str, fl
         "prb": rounded(ratio.prb, 4),
         "vei": rounded(vei.vei, 1),
     }
+
+
+def _metric_direction(
+    old: float | None,
+    new: float | None,
+    *,
+    ideal: float,
+    tolerance: float = 1e-9,
+) -> str:
+    """Say whether a metric moved toward or away from its fairness ideal."""
+
+    if old is None or new is None:
+        return "unavailable"
+    change = abs(new - ideal) - abs(old - ideal)
+    if abs(change) <= tolerance:
+        return "unchanged"
+    return "worsened" if change > 0 else "improved"
+
+
+def _combined_direction(directions: dict[str, str]) -> str:
+    """Combine several metric directions without hiding disagreement."""
+
+    values = set(directions.values())
+    if len(values) == 1:
+        return next(iter(values))
+    return "mixed"
+
+
+def _benchmark_movement(old_ratio: float, new_ratio: float, tolerance: float = 0.05) -> str:
+    """Classify movement in absolute distance from the 100% benchmark line."""
+
+    change = abs(new_ratio - 100.0) - abs(old_ratio - 100.0)
+    if abs(change) <= tolerance:
+        return "unchanged"
+    return "farther" if change > 0 else "closer"
 
 
 def _direction_expr(min_log_direction: float) -> pl.Expr:
@@ -438,7 +474,7 @@ def build_annual_roll_report(
             pl.col("_new_ratio").filter(~pl.col("_data_warning")).median().alias("new_ratio"),
         )
         .filter(pl.col("n") >= config.min_area_n)
-        .sort("median_change", descending=True)
+        .sort(["median_change", "loc_zip5"], descending=[True, False])
         .to_dicts()
     ):
         area_reliable = int(row["n_reliable"])
@@ -509,10 +545,32 @@ def build_annual_roll_report(
             )
 
     q1, q5 = tier_rows[0], tier_rows[-1]
+    gap_change_pp = round(
+        abs(q1["new_ratio_pct"] - q5["new_ratio_pct"])
+        - abs(q1["old_ratio_pct"] - q5["old_ratio_pct"]),
+        1,
+    )
+    gap_verdict = (
+        "worsened" if gap_change_pp > 0 else "improved" if gap_change_pp < 0 else "unchanged"
+    )
+    metric_directions = {
+        "prd": _metric_direction(old_metrics["prd"], new_metrics["prd"], ideal=1.0),
+        "prb": _metric_direction(old_metrics["prb"], new_metrics["prb"], ideal=0.0),
+        "vei": _metric_direction(old_metrics["vei"], new_metrics["vei"], ideal=0.0),
+    }
+    q1_shift = abs(q1["new_ratio_pct"] - q1["old_ratio_pct"])
+    q5_shift = abs(q5["new_ratio_pct"] - q5["old_ratio_pct"])
+    larger_shift = (
+        "cheapest"
+        if q1_shift > q5_shift + 0.05
+        else "most_expensive"
+        if q5_shift > q1_shift + 0.05
+        else "equal"
+    )
     report = {
         "tax_year": config.tax_year,
         "comparison_year": config.comparison_year,
-        "status": "provisional",
+        "status": config.status,
         "effective_date": config.effective_date,
         "benchmark_date": benchmark_date,
         "sales_cutoff": config.sales_cutoff,
@@ -552,32 +610,24 @@ def build_annual_roll_report(
         "vertical_equity": {
             "old_gap_pp": round(abs(q1["old_ratio_pct"] - q5["old_ratio_pct"]), 1),
             "new_gap_pp": round(abs(q1["new_ratio_pct"] - q5["new_ratio_pct"]), 1),
-            "gap_change_pp": round(
-                abs(q1["new_ratio_pct"] - q5["new_ratio_pct"])
-                - abs(q1["old_ratio_pct"] - q5["old_ratio_pct"]),
-                1,
-            ),
-            "verdict": (
-                "worsened"
-                if abs(q1["new_ratio_pct"] - q5["new_ratio_pct"])
-                > abs(q1["old_ratio_pct"] - q5["old_ratio_pct"])
-                else "improved"
-            ),
+            "gap_change_pp": gap_change_pp,
+            "verdict": gap_verdict,
             "prd": {"old": old_metrics["prd"], "new": new_metrics["prd"]},
             "prb": {"old": old_metrics["prb"], "new": new_metrics["prb"]},
             "vei": {"old": old_metrics["vei"], "new": new_metrics["vei"]},
+            "metric_directions": metric_directions,
+            "standard_metrics_verdict": _combined_direction(metric_directions),
+            "tier_movement": {
+                "cheapest": _benchmark_movement(q1["old_ratio_pct"], q1["new_ratio_pct"]),
+                "most_expensive": _benchmark_movement(q5["old_ratio_pct"], q5["new_ratio_pct"]),
+                "larger_shift": larger_shift,
+            },
             "basis": "Assessment divided by the same independent model benchmark",
         },
         "uniformity": {
             "old_cod": old_metrics["cod"],
             "new_cod": new_metrics["cod"],
-            "verdict": (
-                "improved"
-                if old_metrics["cod"] is not None
-                and new_metrics["cod"] is not None
-                and new_metrics["cod"] < old_metrics["cod"]
-                else "worsened"
-            ),
+            "verdict": _metric_direction(old_metrics["cod"], new_metrics["cod"], ideal=0.0),
         },
         "tiers": tier_rows,
         "areas": areas,

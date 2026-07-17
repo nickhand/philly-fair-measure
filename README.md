@@ -133,6 +133,10 @@ uv run fair-measure catalog
 uv run fair-measure sql "SELECT ... FROM mart_assessment_screen LIMIT 5"
 ```
 
+`annual_report.json` holds the current assessment cycle’s official dates,
+appeal deadlines, status, and source links. The web-stats export validates and
+embeds it alongside the computed report measures.
+
 The [Tax Year 2027 report notebook](notebooks/ty2027_report_reproduction.ipynb)
 rebuilds every published annual-report statistic, audits demographic and
 data-warning coverage, and runs the value-adjusted race sensitivity check.

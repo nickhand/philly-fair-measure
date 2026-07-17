@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "tax_year": 2027,
+  "comparison_year": 2026,
+  "effective_date": "2027-01-01",
+  "sales_cutoff": "2025-06-30",
+  "status": "provisional",
+  "opa_study_verdict": "within_recommended_ranges",
+  "appeal_deadlines": {
+    "first_level_review": "2026-09-01",
+    "formal_appeal": "2026-10-05"
+  },
+  "sources": {
+    "opa_methodology_url": "https://www.phila.gov/media/20260629163818/opa-tax-year-2027-mass-appraisal-valuation-methodology-summary.pdf",
+    "opa_ratio_studies_url": "https://www.phila.gov/documents/annual-ratio-studies/",
+    "iaao_ratio_study_url": "https://www.iaao.org/wp-content/uploads/2025_Ratio_Studies_Exposure_Draft.pdf",
+    "notebook_url": "https://github.com/nickhand/philly-fair-measure/blob/main/notebooks/ty2027_report_reproduction.ipynb"
+  }
+}

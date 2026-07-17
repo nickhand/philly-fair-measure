@@ -1,10 +1,8 @@
 <script setup lang="ts">
-/** Site-wide timing notice: the assessments shown are the newly released
- * Tax Year 2027 values, and the free review/appeal windows are open NOW.
- * Dismissible, persisted per browser. */
+/** Site-wide timing notice driven by the exported annual-report cycle. */
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { SITE } from '@/config/site'
+import stats from '@/data/siteStats.json'
 
 const route = useRoute()
 /** On a property report the route param IS the OPA account number, so carry it
@@ -16,8 +14,20 @@ const appealTo = computed(() =>
     : { name: 'appeal' },
 )
 
-const KEY = `fm-ty${SITE.assessmentTaxYear}-banner-dismissed`
+const report = stats.annual_report
+const KEY = `fm-ty${report.tax_year}-banner-dismissed`
 const show = ref(false)
+const firstLevelReviewDeadline = formatDate(report.appeal_deadlines.first_level_review)
+const formalAppealDeadline = formatDate(report.appeal_deadlines.formal_appeal)
+
+function formatDate(value: string): string {
+  return new Date(`${value}T00:00:00Z`).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+}
 
 onMounted(() => {
   show.value = localStorage.getItem(KEY) !== '1'
@@ -38,10 +48,10 @@ function dismiss() {
   >
     <div class="mx-auto flex max-w-5xl items-start justify-between gap-3 px-4 py-2.5">
       <p class="text-body-sm leading-relaxed text-body">
-        <strong class="text-ink">The new Tax Year {{ SITE.assessmentTaxYear }} assessments are
+        <strong class="text-ink">The new Tax Year {{ report.tax_year }} assessments are
         out.</strong>
         If yours looks wrong, free First Level Reviews are due by
-        {{ SITE.flrDeadlineText }}, and formal appeals by {{ SITE.appealDeadlineText }}.
+        {{ firstLevelReviewDeadline }}, and formal appeals by {{ formalAppealDeadline }}.
         <RouterLink
           :to="appealTo"
           class="whitespace-nowrap font-bold text-brand-600 underline underline-offset-2 hover:text-brand-900"

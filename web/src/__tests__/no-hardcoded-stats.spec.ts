@@ -116,4 +116,18 @@ describe('frontend does not hardcode run-dependent stats', () => {
     }
     expect(offenders, `\n${offenders.join('\n')}\n`).toEqual([])
   })
+
+  it('does not pin the annual-report year in the report UI', () => {
+    const year = String(stats.annual_report.tax_year)
+    const reportFiles = [
+      join(SRC, 'App.vue'),
+      join(SRC, 'components', 'ui', 'TaxYearBanner.vue'),
+      join(SRC, 'views', 'AnnualReportView.vue'),
+    ]
+    const offenders = reportFiles
+      .filter((file) => new RegExp(`\\b${year}\\b`).test(read(file)))
+      .map((file) => `${rel(file)}: pinned annual-report year ${year}`)
+
+    expect(offenders, `\n${offenders.join('\n')}\n`).toEqual([])
+  })
 })

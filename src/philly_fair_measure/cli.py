@@ -877,7 +877,7 @@ def _cmd_report(args: argparse.Namespace) -> int:
 def _cmd_export_web_stats(args: argparse.Namespace) -> int:
     from philly_fair_measure.web_stats import export_web_stats
 
-    stats = export_web_stats(args.data_dir, args.out)
+    stats = export_web_stats(args.data_dir, args.out, args.annual_report_config)
     meta = stats["meta"]
     print(f"web stats -> {args.out} (run {meta['model_run_id']}, n_test {meta['n_test']:,})")
     return 0
@@ -1515,6 +1515,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     web_stats.add_argument("--out", type=Path, default=Path("web/src/data/siteStats.json"))
     web_stats.add_argument("--data-dir", type=Path)
+    web_stats.add_argument(
+        "--annual-report-config",
+        type=Path,
+        default=Path("annual_report.json"),
+        help="assessment-cycle dates, status, and source links",
+    )
     web_stats.set_defaults(func=_cmd_export_web_stats)
 
     comps = subparsers.add_parser(

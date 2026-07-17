@@ -1,9 +1,10 @@
 <script setup lang="ts">
-/** Public TY2027 assessment report. All numbers come from generated site stats. */
+/** Public annual assessment report. All measured claims come from generated site stats. */
 import { useRouter } from 'vue-router'
 import AddressSearch from '@/components/search/AddressSearch.vue'
 import { SITE } from '@/config/site'
 import stats from '@/data/siteStats.json'
+import { annualReportNarrative } from '@/utils/annualReportNarrative'
 import { num } from '@/utils/format'
 import type { SearchHit } from '@/api/types'
 
@@ -11,8 +12,8 @@ const router = useRouter()
 const report = stats.annual_report
 const equity = report.vertical_equity
 const uniformity = report.uniformity
-const lowTier = report.tiers[0]!
-const highTier = report.tiers.at(-1)!
+const saleTest = stats.iaao_card
+const narrative = annualReportNarrative(report)
 
 const generatedDate = formatDate(stats.meta.generated_at)
 const effectiveDate = formatDate(report.effective_date)
@@ -27,9 +28,13 @@ function formatDate(value: string): string {
   })
 }
 
-/** Shared 70–155% scale for all five value groups. */
+/** One shared scale, padded to the exported tier values and anchored at 100%. */
+const ratioValues = report.tiers.flatMap((tier) => [tier.old_ratio_pct, tier.new_ratio_pct])
+const ratioMin = Math.floor((Math.min(100, ...ratioValues) - 5) / 5) * 5
+const ratioMax = Math.ceil((Math.max(100, ...ratioValues) + 5) / 5) * 5
+
 function ratioPosition(value: number): string {
-  return `${Math.max(0, Math.min(100, ((value - 70) / 85) * 100))}%`
+  return `${Math.max(0, Math.min(100, ((value - ratioMin) / (ratioMax - ratioMin)) * 100))}%`
 }
 
 function ratioLine(tier: (typeof report.tiers)[number]): { left: string; width: string } {
@@ -58,41 +63,19 @@ function goToProperty(hit: SearchHit) {
             Tax Year {{ report.tax_year }}
           </span>
           <span class="rounded-full border border-gold-border bg-gold-soft px-2.5 py-1 text-caption font-bold uppercase tracking-[0.08em] text-gold-700">
-            Early check
+            {{ narrative.statusLabel }}
           </span>
           <span class="text-caption text-muted">Updated {{ generatedDate }}</span>
         </div>
 
         <h1 class="mt-4 max-w-3xl font-display text-[31px] font-bold leading-[1.08] tracking-tight text-ink sm:text-[46px]">
-          The {{ report.tax_year }} update widened the gap between cheaper and more expensive homes.
+          {{ narrative.headline }}
         </h1>
         <p class="mt-3 max-w-3xl text-base leading-relaxed text-body sm:text-lg">
-          Cheaper homes moved farther above our estimate. More expensive homes moved closer, but
-          not enough to close the gap.
-        </p>
-        <p class="mt-3 max-w-3xl text-body-sm leading-relaxed text-body">
-          <strong class="text-ink">That is what “more regressive” means:</strong> cheaper homes are
-          assessed higher, as a share of our estimate, than more expensive homes.
+          {{ narrative.lead }}
         </p>
 
-        <dl class="mt-6 grid border-y border-line sm:grid-cols-2">
-          <div class="py-4 sm:pr-6">
-            <dt class="text-caption font-bold uppercase tracking-[0.06em] text-muted">Cheapest 20% of homes</dt>
-            <dd class="money mt-1 text-2xl font-extrabold text-over-text">
-              {{ (lowTier.old_ratio_pct - 100).toFixed(0) }}% → {{ (lowTier.new_ratio_pct - 100).toFixed(0) }}% above our estimate
-            </dd>
-            <p class="mt-1 text-caption text-muted">TY{{ report.comparison_year }} → TY{{ report.tax_year }}</p>
-          </div>
-          <div class="border-t border-line py-4 sm:border-l sm:border-t-0 sm:pl-6">
-            <dt class="text-caption font-bold uppercase tracking-[0.06em] text-muted">Most expensive 20% of homes</dt>
-            <dd class="money mt-1 text-2xl font-extrabold text-brand-700">
-              {{ (100 - highTier.old_ratio_pct).toFixed(0) }}% → {{ (100 - highTier.new_ratio_pct).toFixed(0) }}% below our estimate
-            </dd>
-            <p class="mt-1 text-caption text-muted">TY{{ report.comparison_year }} → TY{{ report.tax_year }}</p>
-          </div>
-        </dl>
-
-        <nav aria-label="Report sections" class="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-body-sm font-semibold">
+        <nav aria-label="Report sections" class="mt-6 flex flex-wrap gap-x-5 gap-y-2 border-t border-line pt-4 text-body-sm font-semibold">
           <a href="#finding" class="text-brand-600 underline underline-offset-2">What happened</a>
           <a href="#next" class="text-brand-600 underline underline-offset-2">Check your home</a>
           <a href="#methods" class="text-brand-600 underline underline-offset-2">How we checked</a>
@@ -104,7 +87,7 @@ function goToProperty(hit: SearchHit) {
       <section id="finding" class="scroll-mt-5 pt-8 sm:pt-11">
         <p class="text-caption font-bold uppercase tracking-[0.08em] text-brand-600">What happened</p>
         <h2 class="mt-1 max-w-3xl font-display text-2xl font-bold text-ink sm:text-3xl">
-          The cheaper the home, the farther above our estimate.
+          {{ narrative.findingHeadline }}
         </h2>
         <p class="mt-2 max-w-3xl text-body-sm leading-relaxed text-body">
           We ranked homes by our estimate and split them into five equal groups. A ratio above
@@ -157,10 +140,8 @@ function goToProperty(hit: SearchHit) {
           this fairness comparison.
         </p>
         <p class="mt-4 max-w-3xl border-l-2 border-brand-300 pl-3 text-body-sm leading-relaxed text-body">
-          <strong class="text-ink">Not every measure got worse.</strong> Slightly more homes moved
-          closer to our estimate than farther, and overall consistency improved a little. The
-          problem shown here is fairness by home value: the gap between cheaper and more expensive
-          homes grew.
+          <strong class="text-ink">{{ narrative.calloutLead }}</strong>
+          {{ narrative.callout }}
         </p>
       </section>
 
@@ -200,30 +181,43 @@ function goToProperty(hit: SearchHit) {
               records out of the fairness totals.
             </p>
             <p>
-              The new assessments take effect {{ effectiveDate }}. There are no sales from that tax year yet,
-              so we compared both years with the same model estimate, dated {{ benchmarkDate }}.
-              The model is a check, not ground truth.
+              Why use our estimate as the benchmark? {{ narrative.benchmarkMethodsIntro }}: PRD
+              {{ saleTest.model.prd.toFixed(3) }} versus {{ saleTest.opa.prd.toFixed(3) }}, PRB
+              {{ saleTest.model.prb.toFixed(3) }} versus {{ saleTest.opa.prb.toFixed(3) }}, and VEI
+              {{ saleTest.model.vei.toFixed(1) }}% versus {{ saleTest.opa.vei.toFixed(1) }}%.
+              Values closer to 1.000 for PRD and zero for PRB and VEI are fairer by home value.
+              The model is still a check, not ground truth.
             </p>
             <p>
-              OPA’s own and outside sales studies found its citywide {{ report.tax_year }} measures
-              within recommended ranges. Our early check asks a different question: using one
-              independent estimate for both years, did the result become more or less fair by home
-              value? The two studies use different benchmarks and can reach different conclusions.
+              <template v-if="report.status === 'provisional'">
+                The new assessments take effect {{ effectiveDate }}.
+                There are no sales from that tax year yet, so we compared both years with the same
+                model estimate, dated {{ benchmarkDate }}.
+              </template>
+              <template v-else>
+                The assessments took effect {{ effectiveDate }}.
+                We compared both years with the same model estimate, dated {{ benchmarkDate }}.
+              </template>
             </p>
             <p>
-              All three vertical-equity measures worsened: PRD
+              {{ narrative.opaStudyIntro }} Our check asks a different question: using one independent
+              estimate for both years, did the result become more or less fair by home value? The two
+              studies use different benchmarks and can reach different conclusions.
+            </p>
+            <p>
+              Against that benchmark, {{ narrative.standardMetricsIntro.toLowerCase() }}: PRD
               {{ equity.prd.old.toFixed(3) }} → {{ equity.prd.new.toFixed(3) }}, PRB
               {{ equity.prb.old.toFixed(3) }} → {{ equity.prb.new.toFixed(3) }}, and VEI
               {{ equity.vei.old.toFixed(1) }}% → {{ equity.vei.new.toFixed(1) }}%. COD, which measures
-              consistency rather than fairness by value, edged down from
-              {{ uniformity.old_cod.toFixed(1) }} to {{ uniformity.new_cod.toFixed(1) }}.
+              consistency rather than fairness by value, changed from {{ uniformity.old_cod.toFixed(1) }}
+              to {{ uniformity.new_cod.toFixed(1) }}.
             </p>
             <div class="flex flex-wrap gap-x-5 gap-y-2 font-semibold">
-              <a :href="SITE.ty2027MethodologyUrl" rel="noopener" class="text-brand-600 underline">OPA’s TY2027 methods</a>
-              <a :href="SITE.ty2027RatioStudiesUrl" rel="noopener" class="text-brand-600 underline">OPA’s ratio studies</a>
-              <a :href="SITE.iaaoRatioStudyUrl" rel="noopener" class="text-brand-600 underline">IAAO ratio-study guide</a>
+              <a :href="report.sources.opa_methodology_url" rel="noopener" class="text-brand-600 underline">OPA’s TY{{ report.tax_year }} methods</a>
+              <a :href="report.sources.opa_ratio_studies_url" rel="noopener" class="text-brand-600 underline">OPA’s ratio studies</a>
+              <a :href="report.sources.iaao_ratio_study_url" rel="noopener" class="text-brand-600 underline">IAAO ratio-study guide</a>
               <a :href="SITE.modelDocsUrl" rel="noopener" class="text-brand-600 underline">Our model</a>
-              <a :href="SITE.ty2027NotebookUrl" rel="noopener" class="text-brand-600 underline">Reproduce this report</a>
+              <a :href="report.sources.notebook_url" rel="noopener" class="text-brand-600 underline">Reproduce this report</a>
             </div>
             <p class="text-caption text-faint">
               Model run {{ stats.meta.model_run_id }} · report generated {{ stats.meta.generated_at }} · Philadelphia OPA open data.

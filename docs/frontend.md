@@ -142,6 +142,15 @@ writes the three prespecified majority-race groups under
 valuation model. The public page labels these as census-tract context, not the
 race of an owner or resident.
 
+Assessment-cycle facts that cannot be inferred from the data lake live in the
+committed `annual_report.json`: the named comparison year, effective date,
+sales cutoff, provisional/final status, appeal deadlines, OPA study context,
+and source links. `fair-measure export-web-stats` validates that file, checks
+that its tax year agrees with the current assessment screen, and copies the
+settings into `siteStats.json`. The page derives its headline and explanatory
+sentences from exported verdict fields, so reversed or mixed results cannot
+retain stale “widened” or “improved” prose.
+
 `notebooks/ty2027_report_reproduction.ipynb` independently rebuilds the public
 figures, asserts agreement with `siteStats.json`, reports all omitted tract
 categories and warning rates, and standardizes the race comparison within the

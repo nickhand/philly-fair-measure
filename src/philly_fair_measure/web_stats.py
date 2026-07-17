@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import polars as pl
@@ -26,6 +27,67 @@ from philly_fair_measure.models.scoring import latest_run_dir
 logger = logging.getLogger(__name__)
 
 DEFAULT_OUT = Path("web/src/data/siteStats.json")
+DEFAULT_ANNUAL_REPORT_CONFIG = Path("annual_report.json")
+PHILADELPHIA_TZ = ZoneInfo("America/New_York")
+
+
+def load_annual_report_settings(path: Path = DEFAULT_ANNUAL_REPORT_CONFIG) -> dict[str, Any]:
+    """Load and validate the externally sourced settings for one assessment cycle."""
+
+    settings = json.loads(path.read_text())
+    required = {
+        "schema_version",
+        "tax_year",
+        "comparison_year",
+        "effective_date",
+        "sales_cutoff",
+        "status",
+        "opa_study_verdict",
+        "appeal_deadlines",
+        "sources",
+    }
+    missing = required - set(settings)
+    if missing:
+        raise ValueError(f"annual report config is missing: {sorted(missing)}")
+    if settings["schema_version"] != 1:
+        raise ValueError("annual report config schema_version must be 1")
+    if settings["status"] not in {"provisional", "final"}:
+        raise ValueError("annual report status must be provisional or final")
+    if settings["opa_study_verdict"] not in {
+        "within_recommended_ranges",
+        "outside_recommended_ranges",
+        "mixed",
+    }:
+        raise ValueError("annual report opa_study_verdict is invalid")
+
+    tax_year = int(settings["tax_year"])
+    comparison_year = int(settings["comparison_year"])
+    if comparison_year >= tax_year:
+        raise ValueError("annual report comparison_year must precede tax_year")
+    effective_date = date.fromisoformat(str(settings["effective_date"]))
+    date.fromisoformat(str(settings["sales_cutoff"]))
+    if effective_date.year != tax_year:
+        raise ValueError("annual report effective_date must fall in tax_year")
+
+    deadline_keys = {"first_level_review", "formal_appeal"}
+    deadlines = settings["appeal_deadlines"]
+    if not isinstance(deadlines, dict) or deadline_keys - set(deadlines):
+        raise ValueError(f"annual report appeal_deadlines must include: {sorted(deadline_keys)}")
+    for key in deadline_keys:
+        date.fromisoformat(str(deadlines[key]))
+
+    source_keys = {
+        "opa_methodology_url",
+        "opa_ratio_studies_url",
+        "iaao_ratio_study_url",
+        "notebook_url",
+    }
+    sources = settings["sources"]
+    if not isinstance(sources, dict) or source_keys - set(sources):
+        raise ValueError(f"annual report sources must include: {sorted(source_keys)}")
+    if any(not str(sources[key]).startswith("https://") for key in source_keys):
+        raise ValueError("annual report source URLs must use https")
+    return settings
 
 
 def _req(value: float | None, name: str) -> float:
@@ -48,6 +110,38 @@ def _card(estimate: np.ndarray, price: np.ndarray) -> dict[str, float | str]:
         # IAAO 2025 exposure-draft primary vertical-equity test (§8.2.1)
         "vei": round(_req(vei.vei, "vei"), 1),
         "vei_verdict": vei.verdict,
+    }
+
+
+def _benchmark_validation(card: dict[str, dict[str, float | str]]) -> dict[str, Any]:
+    """Compare model and OPA regressivity by distance from each metric's ideal."""
+
+    ideals = {"prd": 1.0, "prb": 0.0, "vei": 0.0}
+    directions: dict[str, str] = {}
+    for metric, ideal in ideals.items():
+        model_distance = abs(float(card["model"][metric]) - ideal)
+        opa_distance = abs(float(card["opa"][metric]) - ideal)
+        directions[metric] = (
+            "tie"
+            if np.isclose(model_distance, opa_distance)
+            else "model_fairer"
+            if model_distance < opa_distance
+            else "opa_fairer"
+        )
+    values = set(directions.values())
+    verdict = (
+        "model_less_regressive"
+        if values == {"model_fairer"}
+        else "opa_less_regressive"
+        if values == {"opa_fairer"}
+        else "tie"
+        if values == {"tie"}
+        else "mixed"
+    )
+    return {
+        "basis": "Out-of-time financed sales with IAAO 3×IQR trimming",
+        "metric_directions": directions,
+        "verdict": verdict,
     }
 
 
@@ -103,7 +197,11 @@ def _tax_shift(screen: pl.DataFrame) -> dict[str, Any]:
     }
 
 
-def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT) -> dict[str, Any]:
+def export_web_stats(
+    data_dir: Path | None = None,
+    out_path: Path = DEFAULT_OUT,
+    annual_report_config: Path = DEFAULT_ANNUAL_REPORT_CONFIG,
+) -> dict[str, Any]:
     root = data_dir if data_dir is not None else config.data_dir()
     run_dir = latest_run_dir("baseline", root)
     run_id = run_dir.name.removeprefix("run_id=")
@@ -287,7 +385,14 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
     # The roll on display: assessments are certified the year before they take
     # effect, so the screen's valuation year + 1 is the tax year of the values
     # shown (valuation 2026 -> Tax Year 2027 roll).
-    tax_year = int(np.max(screen_df["valuation_date"].dt.year().to_numpy())) + 1
+    inferred_tax_year = int(np.max(screen_df["valuation_date"].dt.year().to_numpy())) + 1
+    annual_settings = load_annual_report_settings(annual_report_config)
+    tax_year = int(annual_settings["tax_year"])
+    if tax_year != inferred_tax_year:
+        raise ValueError(
+            f"annual report config says tax year {tax_year}, but the assessment screen implies "
+            f"{inferred_tax_year}"
+        )
 
     # Release-day annual report.  Unlike the historical ratio cards above,
     # this compares the newly published roll with the last reassessment and
@@ -303,26 +408,35 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
         root / "marts" / "assessment_features.parquet",
         columns=["parcel_id", "loc_lon", "loc_lat"],
     )
-    race_context = join_tracts(locations, _acs_frame(root)).select(
-        "parcel_id", "acs_majority_race"
-    )
+    race_context = join_tracts(locations, _acs_frame(root)).select("parcel_id", "acs_majority_race")
 
     annual_report = build_annual_roll_report(
         pl.read_parquet(root / "staged" / "assessments.parquet"),
         screen_df,
         AnnualRollConfig(
             tax_year=tax_year,
-            comparison_year=2026,
-            effective_date="2027-01-01",
-            sales_cutoff="2025-06-30",
+            comparison_year=int(annual_settings["comparison_year"]),
+            effective_date=str(annual_settings["effective_date"]),
+            sales_cutoff=str(annual_settings["sales_cutoff"]),
+            status=str(annual_settings["status"]),
         ),
         locations=locations,
         demographics=race_context,
     )
+    annual_report.update(
+        {
+            "benchmark_validation": _benchmark_validation(iaao_card),
+            "opa_study_verdict": annual_settings["opa_study_verdict"],
+            "appeal_deadlines": annual_settings["appeal_deadlines"],
+            "sources": annual_settings["sources"],
+        }
+    )
 
     stats: dict[str, Any] = {
         "meta": {
-            "generated_at": datetime.now(UTC).strftime("%Y-%m-%d"),
+            # This is a public, day-only "updated" label. Use Philadelphia's
+            # calendar date so an evening export does not appear dated tomorrow.
+            "generated_at": datetime.now(PHILADELPHIA_TZ).strftime("%Y-%m-%d"),
             "model_run_id": run_id,
             "interval_run_id": bayes_dir.name.removeprefix("run_id="),
             "n_test": int(ok.sum()),

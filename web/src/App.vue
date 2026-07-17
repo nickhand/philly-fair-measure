@@ -8,6 +8,8 @@ import stats from '@/data/siteStats.json'
 
 const route = useRoute()
 const mobileMenuOpen = ref(false)
+const annualReportPath = `/reports/ty-${stats.annual_report.tax_year}`
+const annualReportLabel = `${stats.annual_report.tax_year} assessment report`
 
 watch(
   () => route.fullPath,
@@ -67,10 +69,10 @@ const runDate = new Date(`${stats.meta.generated_at}T00:00:00Z`).toLocaleDateStr
             >Map</RouterLink
           >
           <RouterLink
-            to="/reports/ty-2027"
+            :to="annualReportPath"
             class="rounded-sm px-3 py-2 text-[#334155] hover:bg-brand-50"
             active-class="bg-brand-50 text-brand-600"
-            >2027 Report</RouterLink
+            >{{ stats.annual_report.tax_year }} Report</RouterLink
           >
           <RouterLink
             to="/findings"
@@ -119,11 +121,11 @@ const runDate = new Date(`${stats.meta.generated_at}T00:00:00Z`).toLocaleDateStr
               >Map</RouterLink
             >
             <RouterLink
-              to="/reports/ty-2027"
+              :to="annualReportPath"
               class="block px-3 py-2.5 text-[#334155] hover:bg-brand-50"
               active-class="bg-brand-50 text-brand-600"
               @click="mobileMenuOpen = false"
-              >2027 assessment report</RouterLink
+              >{{ annualReportLabel }}</RouterLink
             >
             <RouterLink
               to="/findings"
@@ -192,7 +194,7 @@ const runDate = new Date(`${stats.meta.generated_at}T00:00:00Z`).toLocaleDateStr
         aria-label="Footer"
         class="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 text-body-sm font-semibold"
       >
-        <RouterLink to="/reports/ty-2027" class="text-brand-600 underline">2027 assessment report</RouterLink>
+        <RouterLink :to="annualReportPath" class="text-brand-600 underline">{{ annualReportLabel }}</RouterLink>
         <RouterLink to="/findings" class="text-brand-600 underline">What we found</RouterLink>
         <RouterLink to="/methodology" class="text-brand-600 underline">How it works</RouterLink>
         <RouterLink to="/trust" class="text-brand-600 underline">Why trust these numbers</RouterLink>
