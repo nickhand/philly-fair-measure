@@ -133,6 +133,10 @@ uv run fair-measure catalog
 uv run fair-measure sql "SELECT ... FROM mart_assessment_screen LIMIT 5"
 ```
 
+The [Tax Year 2027 report notebook](notebooks/ty2027_report_reproduction.ipynb)
+rebuilds every published annual-report statistic, audits demographic and
+data-warning coverage, and runs the value-adjusted race sensitivity check.
+
 A `Justfile` wraps the common sequences (`just retrain-all`, `just gates`,
 `just fly-deploy`); run `just` to list recipes. `fm` is a shorthand alias for
 the `fair-measure` command. Snapshots land under

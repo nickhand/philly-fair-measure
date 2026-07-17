@@ -289,6 +289,37 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
     # shown (valuation 2026 -> Tax Year 2027 roll).
     tax_year = int(np.max(screen_df["valuation_date"].dt.year().to_numpy())) + 1
 
+    # Release-day annual report.  Unlike the historical ratio cards above,
+    # this compares the newly published roll with the last reassessment and
+    # asks whether values moved toward the current independent estimate.  It is
+    # explicitly provisional until post-effective-date sales exist.
+    from philly_fair_measure.diagnostics.acs_sensitivity import _acs_frame, join_tracts
+    from philly_fair_measure.diagnostics.annual_roll import (
+        AnnualRollConfig,
+        build_annual_roll_report,
+    )
+
+    locations = pl.read_parquet(
+        root / "marts" / "assessment_features.parquet",
+        columns=["parcel_id", "loc_lon", "loc_lat"],
+    )
+    race_context = join_tracts(locations, _acs_frame(root)).select(
+        "parcel_id", "acs_majority_race"
+    )
+
+    annual_report = build_annual_roll_report(
+        pl.read_parquet(root / "staged" / "assessments.parquet"),
+        screen_df,
+        AnnualRollConfig(
+            tax_year=tax_year,
+            comparison_year=2026,
+            effective_date="2027-01-01",
+            sales_cutoff="2025-06-30",
+        ),
+        locations=locations,
+        demographics=race_context,
+    )
+
     stats: dict[str, Any] = {
         "meta": {
             "generated_at": datetime.now(UTC).strftime("%Y-%m-%d"),
@@ -311,6 +342,7 @@ def export_web_stats(data_dir: Path | None = None, out_path: Path = DEFAULT_OUT)
         },
         "redistribution": redistribution,
         "tax_shift": tax_shift,
+        "annual_report": annual_report,
         "equity_robustness": robustness,
         "screen": screen,
         "results_table": results_table,

@@ -39,6 +39,17 @@ const router = createRouter({
       },
     },
     {
+      path: '/reports/ty-2027',
+      alias: '/report',
+      name: 'annual-report',
+      component: () => import('@/views/AnnualReportView.vue'),
+      meta: {
+        title: 'Tax Year 2027 assessment report',
+        description:
+          "How Philadelphia's 2027 assessments changed, why the gap widened between cheaper and more expensive homes, and how to check your own property.",
+      },
+    },
+    {
       path: '/findings',
       name: 'findings',
       component: () => import('@/views/FindingsView.vue'),
@@ -94,8 +105,10 @@ const router = createRouter({
       meta: { title: 'Page not found', noindex: true },
     },
   ],
-  scrollBehavior(_to, _from, saved) {
-    return saved ?? { top: 0 }
+  scrollBehavior(to, _from, saved) {
+    if (saved) return saved
+    if (to.hash) return { el: to.hash, top: 16, behavior: 'smooth' }
+    return { top: 0 }
   },
 })
 

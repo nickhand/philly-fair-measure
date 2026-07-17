@@ -11,6 +11,17 @@ export const SITE = {
     'https://www.phila.gov/departments/office-of-property-assessment/property-assessments/#first-level-review-flr',
   /** The Board of Revision of Taxes formal-appeal forms and documents. */
   appealFormsUrl: 'https://www.phila.gov/documents/property-assessment-appeal-documents-and-forms/',
+  propertyTaxReliefUrl:
+    'https://www.phila.gov/services/payments-assistance-taxes/taxes/property-and-real-estate-taxes/get-real-estate-tax-relief/',
+  ty2027ReleaseUrl:
+    'https://www.phila.gov/2026-06-30-city-of-philadelphia-to-mail-2027-property-assessments-and-launch-expanded-outreach-to-connect-homeowners-to-tax-relief/',
+  ty2027MethodologyUrl:
+    'https://www.phila.gov/media/20260629163818/opa-tax-year-2027-mass-appraisal-valuation-methodology-summary.pdf',
+  ty2027RatioStudiesUrl: 'https://www.phila.gov/documents/annual-ratio-studies/',
+  ty2027NotebookUrl:
+    'https://github.com/nickhand/philly-fair-measure/blob/main/notebooks/ty2027_report_reproduction.ipynb',
+  iaaoRatioStudyUrl:
+    'https://www.iaao.org/wp-content/uploads/2025_Ratio_Studies_Exposure_Draft.pdf',
   /** The assessment cycle currently shown. Update on each reassessment. */
   assessmentTaxYear: 2027,
   flrDeadlineText: 'September 1, 2026',
