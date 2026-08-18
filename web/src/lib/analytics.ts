@@ -10,7 +10,7 @@ const TOKEN = 'phc_xW4AqiFfnINktDcHGcS5Ugc14GZo0XICN9FhLGLPBJS'
 let ready = false
 
 export function initAnalytics(): void {
-  if (!import.meta.env.PROD) return
+  if (!import.meta.env.PROD || import.meta.env.VITE_ANALYTICS_ENABLED === 'false') return
   posthog.init(TOKEN, {
     api_host: 'https://us.i.posthog.com',
     persistence: 'localStorage', // no cookies — the footer promise holds

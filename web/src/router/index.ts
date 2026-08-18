@@ -5,7 +5,7 @@ import { annualReportNarrative } from '@/utils/annualReportNarrative'
 
 // Crawl-time defaults live in index.html; these keep the head in sync as the
 // SPA navigates (Google renders JS — social scrapers only see index.html).
-const SITE_URL = 'https://nickhand.dev/fair-measure'
+const SITE_URL = 'https://www.nickhand.dev/fair-measure'
 const DEFAULT_DESCRIPTION =
   "A free, independent check of Philadelphia property assessments. Enter your address, see if the city's value looks fair, and get the evidence to appeal."
 const ROBOTS_INDEX = 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'

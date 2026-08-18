@@ -74,7 +74,34 @@ Python side `uv run pytest tests/test_api.py`.
   report_printed, map_parcel_opened, map_filter_toggled); prod builds only.
   The footer says "no ads, no cookies, anonymous usage statistics".
 
-## Scaling / deploy path (not yet done)
+## Hosting and deployment
+
+The Vue bundle is hosted by the dedicated `philly-fair-measure` Cloudflare
+Worker. The Worker owns only `www.nickhand.dev/fair-measure/*`, strips that
+public prefix before reading Vite's `dist/` assets, and uses the root
+`index.html` as the history-mode fallback. The FastAPI service remains on Fly
+at `https://fair-measure-api.fly.dev`.
+
+```bash
+cd web
+npm run dry-run:cloudflare:staging
+npm run deploy:cloudflare:staging
+npm run dry-run:cloudflare:production
+npm run deploy:cloudflare:production
+```
+
+Staging runs at the `philly-fair-measure-staging` workers.dev hostname with
+analytics disabled and an edge-level `noindex, nofollow` policy. Production is
+indexable, sets the standard nickhand.dev security headers, revalidates HTML,
+and caches Vite's hashed assets immutably for one year. The main nickhand.dev
+Worker keeps the old Netlify proxy during the rollback window; removing the
+more-specific Fair Measure route makes traffic fall through to that proxy.
+
+`netlify.toml` is retained temporarily for rollback only. Do not remove the
+Netlify site or its fallback proxy until the Cloudflare deployment has remained
+healthy through at least one normal observation window.
+
+## Scaling follow-ups
 
 - **Vector tiles**: the bbox endpoint is fine for a single host; for static or
   high-traffic deploys, bake the screen to PMTiles

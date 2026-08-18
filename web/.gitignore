@@ -12,6 +12,7 @@ node_modules
 dist
 dist-ssr
 coverage
+.wrangler
 *.local
 
 # Editor directories and files

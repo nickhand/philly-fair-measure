@@ -132,20 +132,34 @@ fly-logs:
 fly-ssh:
 	flyctl ssh console
 
-# ---------------------------------------------------------------- deploy: web (Netlify)
+# ---------------------------------------------------------------- deploy: web (Cloudflare Workers)
 
-# Production build exactly as Netlify runs it (subpath base + Fly API URL)
+# Production build exactly as the Cloudflare Worker runs it.
 [group: "deploy-web"]
 web-build-prod:
-	cd web && VITE_PUBLIC_BASE="/fair-measure/" VITE_API_BASE="https://fair-measure-api.fly.dev" npm run build
+	cd web && npm run build:cloudflare:production
 
-# Deploy a preview to Netlify from the local prod build
+# Build and validate the noindex workers.dev canary without publishing it.
+[group: "deploy-web"]
+web-dry-run-staging:
+	cd web && npm run dry-run:cloudflare:staging
+
+# Publish the noindex workers.dev canary.
+[group: "deploy-web"]
+web-deploy-staging:
+	cd web && npm run deploy:cloudflare:staging
+
+# Publish the canonical /fair-measure/* route on www.nickhand.dev.
+[group: "deploy-web"]
+web-deploy-production:
+	cd web && npm run deploy:cloudflare:production
+
+# Legacy rollback preview. Keep until the Cloudflare observation window ends.
 [group: "deploy-web"]
 netlify-preview: web-build-prod
 	cd web && npx netlify deploy --dir=dist
 
-# Deploy the site to production. Pushes to main also auto-build once the
-# repo is linked in the Netlify UI; this is the manual path.
+# Legacy rollback production deploy. Do not use for the canonical cutover.
 [group: "deploy-web"]
 netlify-deploy: web-build-prod
 	cd web && npx netlify deploy --dir=dist --prod
