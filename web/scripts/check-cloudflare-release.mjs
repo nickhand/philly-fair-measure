@@ -58,6 +58,11 @@ export function assertProductionPage(page, { appBaseUrl, expectedIndexSha256, pa
     /(?:^|,\s*)public(?:,|$).*max-age=0.*must-revalidate/i,
     `invalid HTML cache policy: ${path}`,
   )
+  assert.match(
+    page.headers.get('cache-control') ?? '',
+    /(?:^|,\s*)no-transform(?:,|$)/i,
+    `HTML permits edge transformation: ${path}`,
+  )
   assert.equal(sha256(page.body), expectedIndexSha256, `wrong production artifact: ${path}`)
   return html
 }

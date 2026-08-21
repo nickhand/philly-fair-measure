@@ -20,7 +20,7 @@ function page(overrides = {}) {
     url: `${appBaseUrl}/map`,
     headers: new Headers({
       'content-type': 'text/html; charset=utf-8',
-      'cache-control': 'public, max-age=0, must-revalidate',
+      'cache-control': 'public, max-age=0, must-revalidate, no-transform',
       'strict-transport-security': 'max-age=31536000',
       'x-content-type-options': 'nosniff',
       'x-frame-options': 'DENY',
@@ -66,7 +66,7 @@ test('rejects a different artifact, noindex, and an escaped asset', () => {
     () => assertProductionPage(page({
       headers: new Headers({
         'content-type': 'text/html',
-        'cache-control': 'public, max-age=0, must-revalidate',
+        'cache-control': 'public, max-age=0, must-revalidate, no-transform',
         'strict-transport-security': 'max-age=31536000',
         'x-content-type-options': 'nosniff',
         'x-frame-options': 'DENY',

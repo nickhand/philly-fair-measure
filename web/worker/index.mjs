@@ -24,7 +24,7 @@ function addResponseHeaders(response, requestUrl, indexable) {
   ) {
     headers.set('Cache-Control', 'public, max-age=31536000, immutable')
   } else if (contentType.includes('text/html')) {
-    headers.set('Cache-Control', 'public, max-age=0, must-revalidate')
+    headers.set('Cache-Control', 'public, max-age=0, must-revalidate, no-transform')
   }
 
   return new Response(response.body, {

@@ -62,7 +62,10 @@ test('production HTML is revalidated and receives HSTS', async () => {
 
   assert.equal(response.headers.get('X-Robots-Tag'), null)
   assert.equal(response.headers.get('Strict-Transport-Security'), 'max-age=31536000')
-  assert.equal(response.headers.get('Cache-Control'), 'public, max-age=0, must-revalidate')
+  assert.equal(
+    response.headers.get('Cache-Control'),
+    'public, max-age=0, must-revalidate, no-transform',
+  )
 })
 
 test('rejects SPA fallback HTML for missing file requests', async () => {

@@ -91,7 +91,8 @@ npm run dry-run:cloudflare:production
 
 Staging runs at the `philly-fair-measure-staging` workers.dev hostname with
 analytics disabled and an edge-level `noindex, nofollow` policy. Production is
-indexable, sets the standard nickhand.dev security headers, revalidates HTML,
+indexable, sets the standard nickhand.dev security headers, revalidates HTML
+with `no-transform` so the verified shell cannot be rewritten at the edge,
 and caches Vite's hashed assets immutably for one year. Main-branch web changes
 are built and tested once in GitHub Actions, uploaded as an immutable Worker
 version, activated only after a guarded active-version read, and checked against
