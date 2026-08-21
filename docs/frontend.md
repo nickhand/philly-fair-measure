@@ -87,19 +87,20 @@ cd web
 npm run dry-run:cloudflare:staging
 npm run deploy:cloudflare:staging
 npm run dry-run:cloudflare:production
-npm run deploy:cloudflare:production
 ```
 
 Staging runs at the `philly-fair-measure-staging` workers.dev hostname with
 analytics disabled and an edge-level `noindex, nofollow` policy. Production is
 indexable, sets the standard nickhand.dev security headers, revalidates HTML,
-and caches Vite's hashed assets immutably for one year. The main nickhand.dev
-Worker keeps the old Netlify proxy during the rollback window; removing the
-more-specific Fair Measure route makes traffic fall through to that proxy.
-
-`netlify.toml` is retained temporarily for rollback only. Do not remove the
-Netlify site or its fallback proxy until the Cloudflare deployment has remained
-healthy through at least one normal observation window.
+and caches Vite's hashed assets immutably for one year. Main-branch web changes
+are built and tested once in GitHub Actions, uploaded as an immutable Worker
+version, activated only after a guarded active-version read, and checked against
+the exact artifact in HTTP and Chromium before the release is accepted. The
+Cloudflare API does not expose a conditional activation primitive, so terminal
+version attestation and removal of direct production deploy commands bound the
+remaining external-operator race. Rollback uses the originally captured
+Cloudflare Worker version; Netlify is not part of the production or rollback
+path.
 
 ## Scaling follow-ups
 

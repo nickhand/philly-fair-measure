@@ -18,6 +18,10 @@ assert.match(html, /https:\/\/www\.nickhand\.dev\/fair-measure\//)
 assert.doesNotMatch(html, /philly-fair-measure\.netlify\.app/)
 
 const config = JSON.parse(readFileSync(join(root, 'wrangler.jsonc'), 'utf8'))
+assert.equal(config.account_id, '8ee768918988df338ff5e82a233f9e32')
+assert.equal(config.name, 'philly-fair-measure')
+assert.equal(config.env.staging.name, 'philly-fair-measure-staging')
+assert.equal(config.env.production.name, 'philly-fair-measure-production')
 const productionRoutes = config.env.production.routes
 assert.deepEqual(productionRoutes, [
   {

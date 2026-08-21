@@ -8,15 +8,14 @@
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
-    "test:unit": "vitest",
-    "test:worker": "node --test tests/worker-routes.test.mjs",
+    "test:unit": "vitest --exclude 'tests/*.test.mjs'",
+    "test:worker": "node --test tests/*.test.mjs",
     "build-only": "vite build",
     "build:cloudflare:staging": "VITE_PUBLIC_BASE=/fair-measure/ VITE_API_BASE=https://fair-measure-api.fly.dev VITE_ANALYTICS_ENABLED=false vite build && node scripts/check-cloudflare-output.mjs staging",
     "build:cloudflare:production": "VITE_PUBLIC_BASE=/fair-measure/ VITE_API_BASE=https://fair-measure-api.fly.dev VITE_ANALYTICS_ENABLED=true vite build && node scripts/check-cloudflare-output.mjs production",
-    "dry-run:cloudflare:staging": "npm run build:cloudflare:staging && npx --yes wrangler@4.120.1 deploy --dry-run --env staging",
-    "dry-run:cloudflare:production": "npm run build:cloudflare:production && npx --yes wrangler@4.120.1 deploy --dry-run --env production",
-    "deploy:cloudflare:staging": "npm run build:cloudflare:staging && npx --yes wrangler@4.120.1 deploy --env staging",
-    "deploy:cloudflare:production": "npm run build:cloudflare:production && npx --yes wrangler@4.120.1 deploy --env production",
+    "dry-run:cloudflare:staging": "npm run build:cloudflare:staging && npx --no-install wrangler deploy --dry-run --env staging",
+    "dry-run:cloudflare:production": "npm run build:cloudflare:production && npx --no-install wrangler deploy --dry-run --env production",
+    "deploy:cloudflare:staging": "npm run build:cloudflare:staging && npx --no-install wrangler deploy --env staging",
     "type-check": "vue-tsc --build",
     "lint": "run-s \"lint:*\"",
     "lint:oxlint": "oxlint . --fix",
@@ -36,6 +35,7 @@
     "vue-router": "^5.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.0",
     "@tsconfig/node24": "^24.0.4",
     "@types/d3-array": "^3.2.2",
     "@types/d3-scale": "^4.0.9",
@@ -59,7 +59,8 @@
     "vite-plugin-vue-devtools": "^8.1.2",
     "vitest": "^4.1.9",
     "vue-eslint-parser": "^10.4.1",
-    "vue-tsc": "^3.3.5"
+    "vue-tsc": "^3.3.5",
+    "wrangler": "4.120.1"
   },
   "engines": {
     "node": "^22.18.0 || >=24.12.0"

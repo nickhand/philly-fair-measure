@@ -148,18 +148,3 @@ web-dry-run-staging:
 [group: "deploy-web"]
 web-deploy-staging:
 	cd web && npm run deploy:cloudflare:staging
-
-# Publish the canonical /fair-measure/* route on www.nickhand.dev.
-[group: "deploy-web"]
-web-deploy-production:
-	cd web && npm run deploy:cloudflare:production
-
-# Legacy rollback preview. Keep until the Cloudflare observation window ends.
-[group: "deploy-web"]
-netlify-preview: web-build-prod
-	cd web && npx netlify deploy --dir=dist
-
-# Legacy rollback production deploy. Do not use for the canonical cutover.
-[group: "deploy-web"]
-netlify-deploy: web-build-prod
-	cd web && npx netlify deploy --dir=dist --prod

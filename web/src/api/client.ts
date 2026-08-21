@@ -1,6 +1,6 @@
 /** Small typed fetch layer. Endpoints are `/api/*` — same-origin in dev (vite
  * proxies to the Python API), prefixed with VITE_API_BASE in production
- * builds (the Netlify site calls the Fly.io API cross-origin). Callers pass
+ * builds (the Cloudflare-hosted site calls the Fly.io API cross-origin). Callers pass
  * an AbortSignal to cancel stale requests (the address search does this on
  * every keystroke). */
 
