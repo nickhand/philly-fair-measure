@@ -148,8 +148,8 @@ export async function checkCloudflareRelease({
   appBaseUrl,
   expectedIndexSha256,
   artifactDirectory,
-  attempts = 12,
-  retryDelayMs = 3000,
+  attempts = 30,
+  retryDelayMs = 10_000,
 }) {
   assert.match(appBaseUrl, /^https:\/\/[^/?#]+\/[^?#]+$/i, 'app base URL must be an HTTPS origin and path')
   assert.match(expectedIndexSha256, /^[0-9a-f]{64}$/, 'expected index SHA-256 must be lowercase hexadecimal')
@@ -197,8 +197,8 @@ function parseArguments(argv) {
     appBaseUrl: values.get('app-base-url'),
     expectedIndexSha256: values.get('expected-index-sha256'),
     artifactDirectory: values.get('artifact-directory'),
-    attempts: values.has('attempts') ? Number(values.get('attempts')) : 12,
-    retryDelayMs: values.has('retry-delay-ms') ? Number(values.get('retry-delay-ms')) : 3000,
+    attempts: values.has('attempts') ? Number(values.get('attempts')) : 30,
+    retryDelayMs: values.has('retry-delay-ms') ? Number(values.get('retry-delay-ms')) : 10_000,
   }
 }
 
@@ -212,7 +212,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       `Cloudflare release check passed: pages=${PAGE_PATHS.length} artifacts=${result.artifactCount} asset=${result.assetUrl}`,
     )
   } catch (error) {
-    console.error(`Cloudflare release check failed: ${error instanceof Error ? error.message : String(error)}`)
+    const messages = []
+    let current = error
+    while (current instanceof Error && !messages.includes(current.message)) {
+      messages.push(current.message)
+      current = current.cause
+    }
+    console.error(`Cloudflare release check failed: ${messages.join(' <- ') || String(error)}`)
     process.exitCode = 1
   }
 }

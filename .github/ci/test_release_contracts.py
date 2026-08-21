@@ -36,6 +36,8 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_release_checks_exact_files_and_a_hydrated_browser(self) -> None:
         self.assertIn("--artifact-directory dist", WORKFLOW)
+        self.assertIn("--attempts 30", WORKFLOW)
+        self.assertIn("--retry-delay-ms 10000", WORKFLOW)
         self.assertIn("check-cloudflare-browser.mjs", WORKFLOW)
         self.assertIn("mcr.microsoft.com/playwright:v1.62.0-noble@sha256:", WORKFLOW)
 

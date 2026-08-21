@@ -545,7 +545,9 @@ jobs:
           node scripts/check-cloudflare-release.mjs \
             --app-base-url https://www.nickhand.dev/fair-measure \
             --expected-index-sha256 "${expected_index_sha}" \
-            --artifact-directory dist
+            --artifact-directory dist \
+            --attempts 30 \
+            --retry-delay-ms 10000
       - name: Verify the hydrated application and production API
         id: smoke
         if: steps.http-smoke.outcome == 'success'
