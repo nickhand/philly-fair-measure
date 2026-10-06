@@ -35,6 +35,8 @@ def load_annual_report_settings(path: Path = DEFAULT_ANNUAL_REPORT_CONFIG) -> di
     """Load and validate the externally sourced settings for one assessment cycle."""
 
     settings = json.loads(path.read_text())
+    if not isinstance(settings, dict):
+        raise ValueError("annual report config must be a JSON object")
     required = {
         "schema_version",
         "tax_year",

@@ -1,23 +1,24 @@
 <script setup lang="ts">
-/** Home — hero + search, three promise cards, citywide counters, honesty note.
- * Handoff SFC wired to real citywide figures from /api/stats (the mocks used
- * sample numbers; "1 in 5 may be over-assessed" did NOT survive contact with
- * the data and was replaced by the real flagged count). */
+/** Home — hero + search, citywide counters, and an honesty note.
+ * Published counts are pre-rendered, then refreshed from /api/stats. */
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AddressSearch from '@/components/search/AddressSearch.vue'
 import { api } from '@/api/client'
 import { num } from '@/utils/format'
 import type { SearchHit, Stats } from '@/api/types'
+import publishedStats from '@/data/siteStats.json'
 
 const router = useRouter()
-const stats = ref<Stats | null>(null)
+// Render the published snapshot without requiring the API during a build.
+// Refresh after mounting, preserving the snapshot if the API is unavailable.
+const stats = ref<Pick<Stats, 'properties' | 'over' | 'under' | 'watch'>>(publishedStats.screen)
 
 onMounted(async () => {
   try {
     stats.value = await api.stats()
   } catch {
-    stats.value = null // the hero still works without the counters
+    // Keep the published snapshot when the API is temporarily unavailable.
   }
 })
 
@@ -25,8 +26,7 @@ function goToProperty(hit: SearchHit) {
   router.push({ name: 'property', params: { parcelId: hit.parcel_id } })
 }
 
-/** Always renders — a null value shows a spinner until /api/stats responds,
- * so the layout never collapses when the API is slow or down. */
+/** The published snapshot keeps these visible while the API refreshes. */
 const counters = computed<{ value: string | null; label: string }[]>(() => {
   const s = stats.value
   return [

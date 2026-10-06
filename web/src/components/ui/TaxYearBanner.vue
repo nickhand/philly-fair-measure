@@ -3,6 +3,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import stats from '@/data/siteStats.json'
+import { SITE } from '@/config/site'
+import { useAppealDeadlines } from '@/composables/useAppealDeadlines'
 
 const route = useRoute()
 /** On a property report the route param IS the OPA account number, so carry it
@@ -17,17 +19,7 @@ const appealTo = computed(() =>
 const report = stats.annual_report
 const KEY = `fm-ty${report.tax_year}-banner-dismissed`
 const show = ref(false)
-const firstLevelReviewDeadline = formatDate(report.appeal_deadlines.first_level_review)
-const formalAppealDeadline = formatDate(report.appeal_deadlines.formal_appeal)
-
-function formatDate(value: string): string {
-  return new Date(`${value}T00:00:00Z`).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'UTC',
-  })
-}
+const { flrPassed, appealPassed, allPassed } = useAppealDeadlines()
 
 onMounted(() => {
   show.value = localStorage.getItem(KEY) !== '1'
@@ -41,7 +33,7 @@ function dismiss() {
 
 <template>
   <div
-    v-if="show"
+    v-if="show && !allPassed"
     role="region"
     aria-label="Assessment timing notice"
     class="border-b border-gold-tint-border bg-gold-tint"
@@ -50,8 +42,18 @@ function dismiss() {
       <p class="text-body-sm leading-relaxed text-body">
         <strong class="text-ink">The new Tax Year {{ report.tax_year }} assessments are
         out.</strong>
-        If yours looks wrong, free First Level Reviews are due by
-        {{ firstLevelReviewDeadline }}, and formal appeals by {{ formalAppealDeadline }}.
+        <template v-if="!flrPassed && !appealPassed">
+          If yours looks wrong, free First Level Reviews are due by
+          {{ SITE.flrDeadlineText }}, and formal appeals by {{ SITE.appealDeadlineText }}.
+        </template>
+        <template v-else-if="flrPassed">
+          The First Level Review deadline was {{ SITE.flrDeadlineText }}.
+          Formal appeals are due by {{ SITE.appealDeadlineText }}.
+        </template>
+        <template v-else>
+          The formal appeal deadline was {{ SITE.appealDeadlineText }}.
+          Free First Level Reviews are due by {{ SITE.flrDeadlineText }}.
+        </template>
         <RouterLink
           :to="appealTo"
           class="whitespace-nowrap font-bold text-brand-600 underline underline-offset-2 hover:text-brand-900"

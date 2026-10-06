@@ -50,7 +50,7 @@ export const VERDICTS: Record<Flag, Verdict> = {
     detail:
       "The city's value is above the highest value our model finds likely for this home. That can mean a higher tax bill than the home's real value supports.",
     nextStep:
-      'Check the facts below. If they support a lower value, you can appeal for free. See the steps at the end of this page.',
+      'Check the facts below. If they support a lower value, see the appeal steps and deadlines at the end of this page.',
     textClass: 'text-over',
     badgeClass: 'bg-over-soft text-over',
     hex: '#c2410c',

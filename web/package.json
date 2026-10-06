@@ -10,9 +10,9 @@
     "preview": "vite preview",
     "test:unit": "vitest --exclude 'tests/*.test.mjs'",
     "test:worker": "node --test tests/*.test.mjs",
-    "build-only": "vite build",
-    "build:cloudflare:staging": "VITE_PUBLIC_BASE=/fair-measure/ VITE_API_BASE=https://fair-measure-api.fly.dev VITE_ANALYTICS_ENABLED=false vite build && node scripts/check-cloudflare-output.mjs staging",
-    "build:cloudflare:production": "VITE_PUBLIC_BASE=/fair-measure/ VITE_API_BASE=https://fair-measure-api.fly.dev VITE_ANALYTICS_ENABLED=true vite build && node scripts/check-cloudflare-output.mjs production",
+    "build-only": "vite-ssg build && node scripts/check-prerender-output.mjs",
+    "build:cloudflare:staging": "VITE_PUBLIC_BASE=/fair-measure/ VITE_API_BASE=https://fair-measure-api.fly.dev VITE_ANALYTICS_ENABLED=false vite-ssg build && node scripts/check-prerender-output.mjs && node scripts/check-cloudflare-output.mjs staging",
+    "build:cloudflare:production": "VITE_PUBLIC_BASE=/fair-measure/ VITE_API_BASE=https://fair-measure-api.fly.dev VITE_ANALYTICS_ENABLED=true vite-ssg build && node scripts/check-prerender-output.mjs && node scripts/check-cloudflare-output.mjs production",
     "dry-run:cloudflare:staging": "npm run build:cloudflare:staging && npx --no-install wrangler deploy --dry-run --env staging",
     "dry-run:cloudflare:production": "npm run build:cloudflare:production && npx --no-install wrangler deploy --dry-run --env production",
     "deploy:cloudflare:staging": "npm run build:cloudflare:staging && npx --no-install wrangler deploy --env staging",
@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.2",
+    "@unhead/vue": "^2.1.17",
     "d3-array": "^3.2.4",
     "d3-scale": "^4.0.2",
     "d3-shape": "^3.2.0",
@@ -31,6 +32,7 @@
     "pmtiles": "^4.4.1",
     "posthog-js": "^1.396.6",
     "tailwindcss": "^4.3.2",
+    "vite-ssg": "^28.3.0",
     "vue": "^3.5.38",
     "vue-router": "^5.1.0"
   },

@@ -223,6 +223,11 @@ Base: `https://services.arcgis.com/fLeGjb7u4uXqeF9q/ArcGIS/rest/services/<name>/
 
 ## Verified-but-external (fetch via other APIs when needed)
 
+- **Philadelphia City Council legislative records (Legistar)**: the complete
+  audited archive (matters, histories, votes, meeting documents) and its
+  collectors live in the sibling `~/DataProjects/city-council-analysis`
+  project; join to parcels/assessments there when land-use legislation
+  context is needed.
 - **ACS 5-year tract estimates**, Census Bureau API; CCAO's feature list shows
   which tract aggregates earn their keep. Not yet probed; well-documented public API.
 - **PhilaDox deed documents**, document images/metadata behind `rtt_summary`;

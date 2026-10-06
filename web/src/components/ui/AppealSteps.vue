@@ -8,8 +8,10 @@
  * so they still go somewhere useful. */
 import { computed } from 'vue'
 import { cityPropertyUrl, opaInquiryUrl, SITE } from '@/config/site'
+import { useAppealDeadlines } from '@/composables/useAppealDeadlines'
 
 const props = defineProps<{ parcelId?: string | null }>()
+const { ready, flrPassed, appealPassed, allPassed } = useAppealDeadlines()
 
 const CITY_SEARCH = 'https://property.phila.gov'
 const cityLink = computed(() => (props.parcelId ? cityPropertyUrl(props.parcelId) : CITY_SEARCH))
@@ -19,7 +21,13 @@ const inquiryLink = computed(() => opaInquiryUrl(props.parcelId))
 
 <template>
   <div class="rounded-lg bg-brand-50 p-4 text-body-sm text-[#2c3a4d]">
-    <h3 class="text-body-sm font-extrabold text-brand-900">How to act on this (all free)</h3>
+    <h3 class="text-body-sm font-extrabold text-brand-900">
+      {{ !ready ? 'Check your record and review the deadlines' : allPassed ? 'Check your record and review past deadlines' : 'How to act on this (all free)' }}
+    </h3>
+    <p v-if="allPassed" class="mt-2">
+      The Tax Year {{ SITE.assessmentTaxYear }} review and appeal deadlines have passed.
+      Use the City’s links below for current guidance.
+    </p>
     <ol class="mt-2 list-decimal space-y-1.5 pl-5">
       <li>
         Check the facts on your record at
@@ -34,21 +42,44 @@ const inquiryLink = computed(() => opaInquiryUrl(props.parcelId))
         >.
       </li>
       <li>
-        Disagree with the value itself? Ask OPA for a
+        <template v-if="!ready">Tax Year {{ SITE.assessmentTaxYear }} deadline for a </template>
+        <template v-else-if="flrPassed">
+          The Tax Year {{ SITE.assessmentTaxYear }} deadline for a
+        </template>
+        <template v-else>Disagree with the value itself? Ask OPA for a </template>
         <a :href="SITE.flrUrl" rel="noopener" class="font-bold text-brand-600 underline"
           >First Level Review (FLR)</a
-        >. The form comes in the mail with your new assessment notice, or you can request one from
-        OPA.
+        ><template v-if="!ready">: {{ SITE.flrDeadlineText }}. Check the City’s current guidance.</template>
+        <template v-else-if="flrPassed"> was {{ SITE.flrDeadlineText }}.</template>
+        <template v-else>
+          by {{ SITE.flrDeadlineText }}. The form comes in the mail with your new assessment notice,
+          or you can request one from OPA.
+        </template>
       </li>
       <li>
-        Still disagree after the review? File a formal appeal with the
-        <strong>Board of Revision of Taxes (BRT)</strong>, due by {{ SITE.appealDeadlineText }}. Get
-        the
+        <template v-if="!ready">
+          Tax Year {{ SITE.assessmentTaxYear }} formal appeal deadline with the
+          <strong>Board of Revision of Taxes (BRT)</strong>: {{ SITE.appealDeadlineText }}.
+          See the
+        </template>
+        <template v-else-if="appealPassed">
+          The Tax Year {{ SITE.assessmentTaxYear }} deadline for a formal appeal to the
+          <strong>Board of Revision of Taxes (BRT)</strong> was {{ SITE.appealDeadlineText }}.
+          See the
+        </template>
+        <template v-else>
+          To challenge the value, file a formal appeal with the
+          <strong>Board of Revision of Taxes (BRT)</strong> by {{ SITE.appealDeadlineText }}.
+          You do not need to wait for a First Level Review. Get the
+        </template>
         <a :href="SITE.appealFormsUrl" rel="noopener" class="font-bold text-brand-600 underline"
           >BRT appeal forms and documents</a
         >.
       </li>
-      <li>Bring your report from this site, photos, and any repair estimates as evidence.</li>
+      <li>
+        {{ !ready || allPassed ? 'Keep' : 'Bring' }} your report from this site, photos, and any repair
+        estimates as evidence.
+      </li>
     </ol>
     <p class="no-print mt-3">
       Details:

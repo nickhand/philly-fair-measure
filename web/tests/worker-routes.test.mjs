@@ -26,6 +26,55 @@ test('maps the public subpath to the root of the static-assets binding', () => {
   assert.equal(resolveAssetRoute('https://www.nickhand.dev/fair-measured'), null)
 })
 
+test('resolves generated HTML and canonical redirects without losing the public prefix', () => {
+  for (const [path, asset] of [['/', '/index.html'], ['/appeal', '/appeal.html'], ['/reports/ty-2027', '/reports/ty-2027.html']]) {
+    const route = resolveAssetRoute(`https://example.com/fair-measure${path}?acct=123456789`)
+    assert.equal(route.url.pathname, asset)
+    assert.equal(route.url.search, '?acct=123456789')
+  }
+  for (const path of ['/appeal/', '/appeal.html']) {
+    const route = resolveAssetRoute(`https://example.com/fair-measure${path}?acct=123456789`)
+    assert.equal(route.kind, 'redirect')
+    assert.equal(route.url.href, 'https://example.com/fair-measure/appeal?acct=123456789')
+  }
+  assert.equal(resolveAssetRoute('https://example.com/fair-measure/spa.html'), null)
+})
+
+test('uses the empty SPA shell for dynamic routes and returns 404 for unknown pages', async () => {
+  for (const [path, status, noindex] of [
+    ['/map', 200, false], ['/property/123456789', 200, false],
+    ['/admin', 200, true], ['/leaderboards', 200, true], ['/missing-page', 404, true],
+  ]) {
+    const requests = []
+    const assets = { fetch: async (request) => {
+      const pathname = new URL(request.url).pathname
+      requests.push(pathname)
+      return pathname === '/spa.html'
+        ? new Response('<div id="app"></div>', { headers: { 'Content-Type': 'text/html' } })
+        : new Response('Not found', { status: 404 })
+    } }
+    const response = await worker.fetch(new Request(`https://www.nickhand.dev/fair-measure${path}`),
+      { ASSETS: assets, INDEXABLE: 'true' })
+    assert.equal(response.status, status, path)
+    assert.deepEqual(requests, [`${path}.html`, '/spa.html'])
+    assert.equal(await response.text(), '<div id="app"></div>')
+    assert.equal(response.headers.get('X-Robots-Tag'), noindex ? 'noindex, nofollow' : null)
+  }
+})
+
+test('serves a generated page without falling back to the SPA shell', async () => {
+  const requests = []
+  const assets = { fetch: async (request) => {
+    requests.push(new URL(request.url).pathname)
+    return new Response('<h1>Appeal your assessment</h1>', { headers: { 'Content-Type': 'text/html' } })
+  } }
+  const response = await worker.fetch(new Request('https://www.nickhand.dev/fair-measure/appeal'),
+    { ASSETS: assets, INDEXABLE: 'true' })
+  assert.deepEqual(requests, ['/appeal.html'])
+  assert.equal(response.status, 200)
+  assert.match(await response.text(), /Appeal your assessment/)
+})
+
 test('serves assets with the public security, cache, and crawler policy', async () => {
   let assetRequest
   const assets = {

@@ -51,6 +51,9 @@ build-backend = "uv_build"
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
+# Stored notebooks are executed artifacts; reformatting their cells would desync
+# the code from the captured outputs without re-execution.
+extend-exclude = ["*.ipynb"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]

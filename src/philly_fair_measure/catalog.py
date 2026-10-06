@@ -30,6 +30,7 @@ from philly_fair_measure.ingest.snapshots import DATA_FILENAME
 RAW_VIEW_PREFIX = "raw_"
 DERIVED_LAYERS = {"staged": "stg_", "marts": "mart_"}
 _INCOMPLETE_SUFFIX = ".incomplete"
+_MANAGED_VIEW_PREFIXES = (RAW_VIEW_PREFIX, *DERIVED_LAYERS.values())
 
 
 @dataclass(frozen=True)
@@ -85,6 +86,12 @@ def latest_snapshots(data_dir: Path | None = None) -> dict[str, SnapshotRef]:
     latest: dict[str, SnapshotRef] = {}
     for ref in list_snapshots(data_dir):
         current = latest.get(ref.dataset)
+        if current is not None and current.source != ref.source:
+            raise ValueError(
+                f"dataset {ref.dataset!r} is published by both "
+                f"{current.source!r} and {ref.source!r}; raw view names require "
+                "dataset names to be unique across sources"
+            )
         if current is None or ref.fetched_at > current.fetched_at:
             latest[ref.dataset] = ref
     return latest
@@ -118,6 +125,52 @@ def _quote_identifier(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
 
+def _quote_string(value: str) -> str:
+    """Return a DuckDB string literal without relying on Python ``repr`` rules."""
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _managed_views(con: duckdb.DuckDBPyConnection) -> set[str]:
+    rows = con.execute(
+        """
+        SELECT view_name
+        FROM duckdb_views()
+        WHERE NOT internal
+          AND database_name = current_database()
+          AND schema_name = current_schema()
+        """
+    ).fetchall()
+    return {str(row[0]) for row in rows if str(row[0]).startswith(_MANAGED_VIEW_PREFIXES)}
+
+
+def _refresh_views(
+    con: duckdb.DuckDBPyConnection,
+    data_dir: Path | None,
+) -> None:
+    """Atomically make catalog-managed views match the files currently on disk.
+
+    View prefixes documented by this module are reserved for generated views.
+    Removing stale views matters for persistent databases: otherwise a dataset
+    removed from the data lake remains queryable through an obsolete path.
+    """
+    bindings = {ref.view_name: ref.data_path for ref in latest_snapshots(data_dir).values()}
+    bindings.update({ref.view_name: ref.path for ref in list_derived(data_dir)})
+
+    con.execute("BEGIN TRANSACTION")
+    try:
+        for view_name in sorted(_managed_views(con) - bindings.keys()):
+            con.execute(f"DROP VIEW {_quote_identifier(view_name)}")
+        for view_name, path in sorted(bindings.items()):
+            con.execute(
+                f"CREATE OR REPLACE VIEW {_quote_identifier(view_name)} AS "
+                f"SELECT * FROM read_parquet({_quote_string(str(path.resolve()))})"
+            )
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+    con.execute("COMMIT")
+
+
 def connect(data_dir: Path | None = None, database: str = ":memory:") -> duckdb.DuckDBPyConnection:
     """Open DuckDB with views over the data lake.
 
@@ -125,11 +178,9 @@ def connect(data_dir: Path | None = None, database: str = ":memory:") -> duckdb.
     mart_<table> read staged and mart tables.
     """
     con = duckdb.connect(database)
-    views = [(ref.view_name, ref.data_path) for ref in latest_snapshots(data_dir).values()]
-    views += [(ref.view_name, ref.path) for ref in list_derived(data_dir)]
-    for view_name, path in views:
-        con.execute(
-            f"CREATE OR REPLACE VIEW {_quote_identifier(view_name)} AS "
-            f"SELECT * FROM read_parquet({str(path)!r})"
-        )
+    try:
+        _refresh_views(con, data_dir)
+    except Exception:
+        con.close()
+        raise
     return con

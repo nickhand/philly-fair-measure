@@ -30,5 +30,8 @@ assert.deepEqual(productionRoutes, [
   },
 ])
 assert.equal(config.env[environment].vars.INDEXABLE, environment === 'production' ? 'true' : 'false')
+assert.equal(config.assets.not_found_handling, 'none')
+assert.equal(config.assets.html_handling, 'none')
+assert.ok(existsSync(join(root, 'dist', 'spa.html')), 'Dynamic routes require a separate SPA shell.')
 
 console.log(`Cloudflare ${environment} output is scoped to /fair-measure/ and ready to deploy.`)

@@ -15,9 +15,11 @@ def test_committed_annual_report_settings_are_complete() -> None:
     assert settings["comparison_year"] == 2026
     assert settings["status"] == "provisional"
     assert settings["appeal_deadlines"] == {
-        "first_level_review": "2026-09-01",
+        "first_level_review": "2026-10-05",
         "formal_appeal": "2026-10-05",
     }
+    published = json.loads(Path("web/src/data/siteStats.json").read_text())
+    assert published["annual_report"]["appeal_deadlines"] == settings["appeal_deadlines"]
     assert set(settings["sources"]) == {
         "opa_methodology_url",
         "opa_ratio_studies_url",

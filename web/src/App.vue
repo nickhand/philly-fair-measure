@@ -5,8 +5,11 @@ import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { SITE } from '@/config/site'
 import TaxYearBanner from '@/components/ui/TaxYearBanner.vue'
 import stats from '@/data/siteStats.json'
+import { useHead } from '@unhead/vue'
+import { pageHead } from '@/utils/pageHead'
 
 const route = useRoute()
+useHead(() => pageHead(route))
 const mobileMenuOpen = ref(false)
 const annualReportPath = `/reports/ty-${stats.annual_report.tax_year}`
 const annualReportLabel = `${stats.annual_report.tax_year} assessment report`

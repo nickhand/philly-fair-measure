@@ -3,15 +3,20 @@
  * and the top nav without first looking up a home. Two steps deep-link by OPA
  * account number, so we take it as a `?acct=` query (the banner passes it
  * automatically from a report) or let the visitor type it in. */
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { SITE } from '@/config/site'
 import type { SearchHit } from '@/api/types'
 import AddressSearch from '@/components/search/AddressSearch.vue'
 import AppealSteps from '@/components/ui/AppealSteps.vue'
+import { useAppealDeadlines } from '@/composables/useAppealDeadlines'
 
 const route = useRoute()
-const acct = ref(typeof route.query.acct === 'string' ? route.query.acct : '')
+const { ready, flrPassed, appealPassed, allPassed } = useAppealDeadlines()
+const acct = ref('')
+onMounted(() => {
+  if (typeof route.query.acct === 'string') acct.value = route.query.acct
+})
 
 /** Pick up ?acct= when it arrives without a remount (e.g. the visitor is already
  * on this page and follows the banner link from a report). Typing is untouched:
@@ -50,11 +55,27 @@ const parcelId = computed(() => {
       Appeal your assessment
     </h1>
     <p class="mt-2.5 text-base leading-relaxed text-body">
-      If the city’s Tax Year {{ SITE.assessmentTaxYear }} value looks too high, you can challenge it
-      for free, in two stages. First, a First Level Review with the <strong>OPA</strong> (the Office
-      of Property Assessment), due by <strong>{{ SITE.flrDeadlineText }}</strong>. Still disagree
-      after that? A formal appeal to the <strong>BRT</strong> (the Board of Revision of Taxes), due by
-      <strong>{{ SITE.appealDeadlineText }}</strong>.
+      <template v-if="allPassed">
+        The Tax Year {{ SITE.assessmentTaxYear }} review and appeal deadlines have passed.
+        You can still check the facts on your property record and use the City’s links below
+        for current guidance.
+      </template>
+      <template v-else>
+        If the city’s Tax Year {{ SITE.assessmentTaxYear }} value looks too high, these are the
+        review and appeal deadlines.
+      </template>
+      <template v-if="!ready">
+        First Level Review deadline with <strong>OPA</strong> (the Office of Property Assessment):
+        <strong>{{ SITE.flrDeadlineText }}</strong>.
+        Formal appeal deadline with <strong>BRT</strong> (the Board of Revision of Taxes):
+        <strong>{{ SITE.appealDeadlineText }}</strong>. Confirm current options with the City.
+      </template>
+      <template v-else>
+        First Level Review with the <strong>OPA</strong> (the Office of Property Assessment)
+        {{ flrPassed ? 'was due by' : 'is due by' }} <strong>{{ SITE.flrDeadlineText }}</strong>.
+        A formal appeal to the <strong>BRT</strong> (the Board of Revision of Taxes)
+        {{ appealPassed ? 'was due by' : 'is due by' }} <strong>{{ SITE.appealDeadlineText }}</strong>.
+      </template>
     </p>
 
     <!-- point the guide at a home: address search fills the OPA account number,

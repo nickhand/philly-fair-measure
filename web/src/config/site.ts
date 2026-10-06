@@ -26,6 +26,8 @@ export const SITE = {
   /** Compatibility names used across the appeal flow; all come from the
    * generated annual-report contract rather than hand-entered frontend data. */
   assessmentTaxYear: stats.annual_report.tax_year,
+  flrDeadlineDate: stats.annual_report.appeal_deadlines.first_level_review,
+  appealDeadlineDate: stats.annual_report.appeal_deadlines.formal_appeal,
   flrDeadlineText: formatCycleDate(stats.annual_report.appeal_deadlines.first_level_review),
   appealDeadlineText: formatCycleDate(stats.annual_report.appeal_deadlines.formal_appeal),
 } as const

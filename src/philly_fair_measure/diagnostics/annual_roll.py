@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import polars as pl
@@ -245,7 +245,9 @@ def build_boundary_transect(
                 {
                     "distance_min_m": lower,
                     "distance_max_m": upper,
-                    "median_distance_m": round(float(selected["_boundary_distance_m"].median())),
+                    "median_distance_m": round(
+                        cast(float, selected["_boundary_distance_m"].median())
+                    ),
                 }
             )
             band_rows.append(summary)
@@ -526,21 +528,21 @@ def build_annual_roll_report(
         )
         rows_by_group = {str(row["acs_majority_race"]): row for row in by_race.to_dicts()}
         for group, label in RACE_CONTEXT_LABELS.items():
-            row = rows_by_group.get(group)
-            if row is None or int(row["n"]) < config.min_area_n:
+            group_row = rows_by_group.get(group)
+            if group_row is None or int(group_row["n"]) < config.min_area_n:
                 continue
-            group_n = int(row["n"])
+            group_n = int(group_row["n"])
             race_context.append(
                 {
                     "group": group,
                     "label": label,
                     "n": group_n,
-                    "median_change_pct": round(float(row["median_change"]) * 100, 1),
-                    "old_ratio_pct": round(float(row["old_ratio"]) * 100, 1),
-                    "new_ratio_pct": round(float(row["new_ratio"]) * 100, 1),
-                    "corrective_pct": _pct(int(row["n_corrective"]), group_n),
-                    "widening_pct": _pct(int(row["n_widening"]), group_n),
-                    "no_clear_pct": _pct(int(row["n_no_clear"]), group_n),
+                    "median_change_pct": round(float(group_row["median_change"]) * 100, 1),
+                    "old_ratio_pct": round(float(group_row["old_ratio"]) * 100, 1),
+                    "new_ratio_pct": round(float(group_row["new_ratio"]) * 100, 1),
+                    "corrective_pct": _pct(int(group_row["n_corrective"]), group_n),
+                    "widening_pct": _pct(int(group_row["n_widening"]), group_n),
+                    "no_clear_pct": _pct(int(group_row["n_no_clear"]), group_n),
                 }
             )
 

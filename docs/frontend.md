@@ -77,10 +77,22 @@ Python side `uv run pytest tests/test_api.py`.
 ## Hosting and deployment
 
 The Vue bundle is hosted by the dedicated `philly-fair-measure` Cloudflare
-Worker. The Worker owns only `www.nickhand.dev/fair-measure/*`, strips that
-public prefix before reading Vite's `dist/` assets, and uses the root
-`index.html` as the history-mode fallback. The FastAPI service remains on Fly
-at `https://fair-measure-api.fly.dev`.
+Worker. Vite SSG pre-renders Home, Findings, the annual report and its `/report`
+alias, Methodology, Trust, and Appeal. Each page includes its content and
+route-specific metadata before JavaScript runs. The Worker owns only
+`www.nickhand.dev/fair-measure/*`, maps clean URLs to generated HTML in `dist/`,
+and uses a separate empty `spa.html` for map, admin, and property routes.
+Unknown page URLs return 404 with the browser app's not-found view. Asset HTML
+rewrites are disabled in Wrangler because the Worker controls the public prefix
+and fallback explicitly. The FastAPI service remains on Fly at
+`https://fair-measure-api.fly.dev`.
+
+Unhead manages titles, descriptions, canonical URLs, and Open Graph/Twitter
+metadata during generation and client navigation. Homepage counts start with
+the exported screen snapshot and refresh from the API after mounting; builds
+do not fetch live API data. `meta.prerender` in the route records controls which
+pages are generated. Each build validates the generated HTML and SPA shell;
+unit tests also exercise hydration across deadline changes.
 
 ```bash
 cd web
@@ -179,6 +191,19 @@ that its tax year agrees with the current assessment screen, and copies the
 settings into `siteStats.json`. The page derives its headline and explanatory
 sentences from exported verdict fields, so reversed or mixed results cannot
 retain stale “widened” or “improved” prose.
+
+Deadline notices use the same exported cycle settings and check the current date
+in `America/New_York` through `useAppealDeadlines`. Each deadline stays current
+through its listed calendar date. Afterward, the appeal guide and property-report
+checklist use past tense; the site-wide banner disappears once both dates have
+passed. Open tabs refresh at minute boundaries and when brought back into focus,
+so the rollover does not require a new build. Generated HTML uses date-neutral
+deadline labels, and the clock activates only after mounting; the banner is
+absent from the generated HTML. This prevents a build made before a deadline
+from serving stale present-tense guidance or mismatching the client's first
+render. On October 5, 2026, the
+[City’s FLR instructions](https://www.phila.gov/departments/office-of-property-assessment/property-assessments/#first-level-review-flr)
+were verified to list October 5, 2026, replacing the earlier September 1 setting.
 
 `notebooks/ty2027_report_reproduction.ipynb` independently rebuilds the public
 figures, asserts agreement with `siteStats.json`, reports all omitted tract

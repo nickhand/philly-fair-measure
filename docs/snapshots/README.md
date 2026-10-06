@@ -7,8 +7,9 @@ without history), and `real_estate_tax_delinquencies`. Once the city edits a
 record, the old value is gone. The weekly snapshot program is the only
 mechanism by which "what did the city change?" stays answerable: enrollment
 growth in the homestead exemption, characteristic corrections during appeal
-season (FLR by Sept 1, BRT by Oct 5), past-year restatements, sheriff-sale
-flags.
+season (see the current deadlines in
+[`annual_report.json`](../../annual_report.json)), past-year restatements,
+sheriff-sale flags.
 
 ## How it works
 
