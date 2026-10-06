@@ -70,6 +70,7 @@
   "overrides": {
     "undici": "7.30.0",
     "postcss": "8.5.28",
-    "nanoid@^3": "3.3.19"
+    "nanoid@^3": "3.3.19",
+    "source-map-js": "1.2.2"
   }
 }
