@@ -11,13 +11,18 @@
  * accessible alternative to map interaction. */
 import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
-import maplibregl from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+// maplibre 6 locates its worker relative to its own module URL at runtime, which
+// bundlers cannot see; bundle the worker explicitly and point maplibre at it.
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { api, apiUrl } from '@/api/client'
 import { track } from '@/lib/analytics'
 import type { Attention, Flag, PropertyCore, SearchHit } from '@/api/types'
 import { applyFairMeasurePaint, dotLayers, flagColor, legend } from '@/map/fairMeasureMapStyle'
 import { verdictFor } from '@/utils/verdict'
+
+maplibregl.setWorkerUrl(maplibreWorkerUrl)
 import { money } from '@/utils/format'
 import AddressSearch from '@/components/search/AddressSearch.vue'
 import PropertySheet from '@/components/map/PropertySheet.vue'
