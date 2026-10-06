@@ -24,6 +24,23 @@ const REQUIRED_HEADERS = {
 }
 const ASSET_PATTERN = /(?:src|href)=["']([^"']*\/assets\/[^"']+\.(?:css|js))(?:\?[^"']*)?["']/i
 
+// Mirror worker/index.mjs: `/` serves index.html, a prerendered route serves its
+// own `<route>.html`, and any other client route is served by the spa.html shell.
+export const SPA_SHELL = 'spa.html'
+
+export function htmlArtifactForPath(path, artifactPaths) {
+  if (path === '/') return 'index.html'
+  const prerendered = `${path.replace(/^\//, '')}.html`
+  return artifactPaths.has(prerendered) ? prerendered : SPA_SHELL
+}
+
+// The clean URL that serves an HTML artifact, or null when it has no URL of its
+// own (index.html is checked at `/`; the SPA shell is checked via client routes).
+export function pagePathForHtmlArtifact(artifactPath) {
+  if (artifactPath === 'index.html' || artifactPath === SPA_SHELL) return null
+  return `/${artifactPath.replace(/\.html$/, '')}`
+}
+
 export function sha256(body) {
   return createHash('sha256').update(body).digest('hex')
 }
@@ -38,7 +55,7 @@ function assertCanonicalUrl(url, appBaseUrl, label) {
   )
 }
 
-export function assertProductionPage(page, { appBaseUrl, expectedIndexSha256, path }) {
+export function assertProductionPage(page, { appBaseUrl, expectedSha256, path }) {
   assert.equal(page.status, 200, `production page returned ${page.status}: ${path}`)
   assertCanonicalUrl(page.url, appBaseUrl, `production page ${path}`)
   const basePath = new URL(`${appBaseUrl.replace(/\/$/, '')}/`).pathname
@@ -63,7 +80,7 @@ export function assertProductionPage(page, { appBaseUrl, expectedIndexSha256, pa
     /(?:^|,\s*)no-transform(?:,|$)/i,
     `HTML permits edge transformation: ${path}`,
   )
-  assert.equal(sha256(page.body), expectedIndexSha256, `wrong production artifact: ${path}`)
+  assert.equal(sha256(page.body), expectedSha256, `wrong production artifact: ${path}`)
   return html
 }
 
@@ -108,22 +125,30 @@ async function artifactFiles(root) {
   return files.sort()
 }
 
-async function requireExactArtifacts({ appBaseUrl, artifactDirectory, expectedIndexSha256 }) {
+async function readArtifact(artifactDirectory, expectedIndexSha256) {
   const files = await artifactFiles(artifactDirectory)
   assert.ok(files.length >= 2, 'release artifact does not contain static assets')
+  const digests = new Map()
   for (const file of files) {
-    const artifactPath = relative(artifactDirectory, file)
-    const expectedBody = await readFile(file)
-    if (artifactPath === 'index.html') {
-      assert.equal(sha256(expectedBody), expectedIndexSha256, 'artifact index digest changed')
-      continue
+    digests.set(relative(artifactDirectory, file).split(sep).join('/'), sha256(await readFile(file)))
+  }
+  assert.equal(digests.get('index.html'), expectedIndexSha256, 'artifact index digest changed')
+  return digests
+}
+
+async function requireExactArtifacts({ appBaseUrl, artifactDirectory, digests }) {
+  for (const [artifactPath, expectedSha256] of digests) {
+    let encodedPath = artifactPath.split('/').map(encodeURIComponent).join('/')
+    if (artifactPath.endsWith('.html')) {
+      const pagePath = pagePathForHtmlArtifact(artifactPath)
+      if (!pagePath) continue
+      encodedPath = pagePath.slice(1).split('/').map(encodeURIComponent).join('/')
     }
-    const encodedPath = artifactPath.split(sep).map(encodeURIComponent).join('/')
     const expectedUrl = `${appBaseUrl.replace(/\/$/, '')}/${encodedPath}`
     const live = await fetchBounded(expectedUrl)
     assert.equal(live.status, 200, `artifact returned ${live.status}: ${artifactPath}`)
     assert.equal(live.url, expectedUrl, `artifact redirected: ${artifactPath}`)
-    assert.equal(sha256(live.body), sha256(expectedBody), `artifact digest mismatch: ${artifactPath}`)
+    assert.equal(sha256(live.body), expectedSha256, `artifact digest mismatch: ${artifactPath}`)
     if (!artifactPath.endsWith('.html')) {
       assert.doesNotMatch(
         live.headers.get('content-type') ?? '',
@@ -132,15 +157,15 @@ async function requireExactArtifacts({ appBaseUrl, artifactDirectory, expectedIn
       )
     }
   }
-  return files.length
+  return digests.size
 }
 
-async function waitForPage({ url, appBaseUrl, expectedIndexSha256, path, attempts, retryDelayMs }) {
+async function waitForPage({ url, appBaseUrl, expectedSha256, path, attempts, retryDelayMs }) {
   let lastError
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const page = await fetchBounded(`${url}${url.includes('?') ? '&' : '?'}deployment-audit=${Date.now()}`)
-      return { page, html: assertProductionPage(page, { appBaseUrl, expectedIndexSha256, path }) }
+      return { page, html: assertProductionPage(page, { appBaseUrl, expectedSha256, path }) }
     } catch (error) {
       lastError = error
       if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
@@ -163,12 +188,20 @@ export async function checkCloudflareRelease({
   assert.ok(Number.isInteger(retryDelayMs) && retryDelayMs >= 0, 'retry delay must be nonnegative')
 
   const base = appBaseUrl.replace(/\/$/, '')
+  const digests = await readArtifact(artifactDirectory, expectedIndexSha256)
+  const artifactPaths = new Set(digests.keys())
+  assert.ok(
+    PAGE_PATHS.some((path) => htmlArtifactForPath(path, artifactPaths) === SPA_SHELL),
+    'no checked page exercises the SPA shell',
+  )
   let homepageHtml = ''
   for (const path of PAGE_PATHS) {
+    const artifact = htmlArtifactForPath(path, artifactPaths)
+    assert.ok(digests.has(artifact), `release artifact is missing ${artifact} for ${path}`)
     const { html } = await waitForPage({
       url: `${base}${path}`,
       appBaseUrl: base,
-      expectedIndexSha256,
+      expectedSha256: digests.get(artifact),
       path,
       attempts,
       retryDelayMs,
@@ -185,7 +218,7 @@ export async function checkCloudflareRelease({
   const artifactCount = await requireExactArtifacts({
     appBaseUrl: base,
     artifactDirectory,
-    expectedIndexSha256,
+    digests,
   })
   return { assetUrl, artifactCount }
 }

@@ -4,8 +4,13 @@ import test from 'node:test'
 import {
   assertProductionPage,
   assetUrlFromHtml,
+  htmlArtifactForPath,
+  PAGE_PATHS,
+  pagePathForHtmlArtifact,
   sha256,
+  SPA_SHELL,
 } from '../scripts/check-cloudflare-release.mjs'
+import { resolveAssetRoute } from '../worker/index.mjs'
 
 const appBaseUrl = 'https://www.nickhand.dev/fair-measure'
 const html = Buffer.from(
@@ -34,7 +39,7 @@ test('accepts the exact production shell and its scoped hashed asset', () => {
   assert.match(
     assertProductionPage(page(), {
       appBaseUrl,
-      expectedIndexSha256: sha256(html),
+      expectedSha256: sha256(html),
       path: '/map',
     }),
     /Fair Measure/,
@@ -49,7 +54,7 @@ test('rejects a different artifact, noindex, and an escaped asset', () => {
   assert.throws(
     () => assertProductionPage(page({ url: `${appBaseUrl}/` }), {
       appBaseUrl,
-      expectedIndexSha256: sha256(html),
+      expectedSha256: sha256(html),
       path: '/map',
     }),
     /redirected/,
@@ -57,7 +62,7 @@ test('rejects a different artifact, noindex, and an escaped asset', () => {
   assert.throws(
     () => assertProductionPage(page(), {
       appBaseUrl,
-      expectedIndexSha256: '0'.repeat(64),
+      expectedSha256: '0'.repeat(64),
       path: '/map',
     }),
     /wrong production artifact/,
@@ -74,7 +79,7 @@ test('rejects a different artifact, noindex, and an escaped asset', () => {
       }),
     }), {
       appBaseUrl,
-      expectedIndexSha256: sha256(html),
+      expectedSha256: sha256(html),
       path: '/map',
     }),
     /noindex/,
@@ -86,4 +91,35 @@ test('rejects a different artifact, noindex, and an escaped asset', () => {
     ),
     /canonical origin/,
   )
+})
+
+const prerendered = new Set([
+  'index.html',
+  'findings.html',
+  'methodology.html',
+  'trust.html',
+  'appeal.html',
+  'report.html',
+  'reports/ty-2027.html',
+  SPA_SHELL,
+  'assets/app-abc123.js',
+])
+
+test('expects each page to be served by its own prerendered file or the SPA shell', () => {
+  assert.equal(htmlArtifactForPath('/', prerendered), 'index.html')
+  assert.equal(htmlArtifactForPath('/findings', prerendered), 'findings.html')
+  assert.equal(htmlArtifactForPath('/reports/ty-2027', prerendered), 'reports/ty-2027.html')
+  assert.equal(htmlArtifactForPath('/map', prerendered), SPA_SHELL)
+  assert.ok(PAGE_PATHS.some((path) => htmlArtifactForPath(path, prerendered) === SPA_SHELL))
+})
+
+test('verifies prerendered HTML at the clean URL the worker serves it from', () => {
+  assert.equal(pagePathForHtmlArtifact('index.html'), null)
+  assert.equal(pagePathForHtmlArtifact(SPA_SHELL), null)
+  for (const artifact of ['findings.html', 'report.html', 'reports/ty-2027.html']) {
+    const path = pagePathForHtmlArtifact(artifact)
+    const route = resolveAssetRoute(`${appBaseUrl}${path}`)
+    assert.equal(route.kind, 'asset', `${path} must not redirect`)
+    assert.equal(route.url.pathname, `/${artifact}`)
+  }
 })
