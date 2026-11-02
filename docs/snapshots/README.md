@@ -71,6 +71,12 @@ Directories ending in `.incomplete` are excluded from uploads and previous
 snapshot selection. An empty S3 prefix is a valid first run; S3 access errors
 still fail the job.
 
+CARTO can also return HTTP 400 with `query_wait_timeout` when a query cannot
+obtain a database connection (observed in the
+[2026-11-02 verification run](https://github.com/nickhand/philly-fair-measure/actions/runs/41458154798)).
+The downloader retries that exact error with its existing five-attempt
+exponential backoff. Permission and SQL errors remain immediate failures.
+
 The committed summary is the point of the program: a small, greppable record
 of what changed, reviewed like any other diff. It also keeps the schedule
 alive: GitHub disables cron workflows in public repos after 60 days without

@@ -4,12 +4,14 @@ import httpx
 import pyarrow as pa
 import pytest
 import respx
+from tenacity import wait_none
 
 from philly_fair_measure.sources.carto import (
     PHL_CARTO_URL,
     CartoClient,
     CartoColumn,
     CartoError,
+    CartoQueryWaitTimeout,
     arrow_schema,
     rows_to_table,
 )
@@ -91,6 +93,49 @@ def test_query_retries_on_503():
     with CartoClient() as client:
         assert client.query("SELECT 1")["rows"] == [{"n": 1}]
     assert route.call_count == 2
+
+
+@pytest.mark.parametrize("error", [["query_wait_timeout"], "query_wait_timeout"])
+@respx.mock
+def test_pagination_retries_query_wait_timeout_without_skipping_rows(monkeypatch, error):
+    monkeypatch.setattr(CartoClient.query.retry, "wait", wait_none())
+    route = respx.get(PHL_CARTO_URL)
+    route.side_effect = [
+        httpx.Response(200, json=_payload([{"cartodb_id": 1}, {"cartodb_id": 2}])),
+        httpx.Response(400, json={"error": error}),
+        httpx.Response(200, json=_payload([{"cartodb_id": 3}])),
+    ]
+    with CartoClient() as client:
+        pages = list(client.iter_pages("t", columns=["cartodb_id"], page_size=2))
+    assert [row["cartodb_id"] for page in pages for row in page] == [1, 2, 3]
+    assert route.call_count == 3
+    assert route.calls[1].request.url == route.calls[2].request.url
+
+
+@respx.mock
+def test_query_wait_timeout_stops_after_five_attempts(monkeypatch):
+    monkeypatch.setattr(CartoClient.query.retry, "wait", wait_none())
+    route = respx.get(PHL_CARTO_URL).respond(400, json={"error": ["query_wait_timeout"]})
+    with CartoClient() as client, pytest.raises(CartoQueryWaitTimeout, match="query_wait_timeout"):
+        client.query("SELECT 1")
+    assert route.call_count == 5
+
+
+@pytest.mark.parametrize(
+    ("status", "error"),
+    [
+        (403, ["permission denied for table real_estate_tax_delinquencies"]),
+        (400, ['relation "query_wait_timeout" does not exist']),
+        (400, ["query_wait_timeout", "permission denied for table t"]),
+    ],
+)
+@respx.mock
+def test_query_does_not_retry_permanent_errors(monkeypatch, status, error):
+    monkeypatch.setattr(CartoClient.query.retry, "wait", wait_none())
+    route = respx.get(PHL_CARTO_URL).respond(status, json={"error": error})
+    with CartoClient() as client, pytest.raises(CartoError):
+        client.query("SELECT 1")
+    assert route.call_count == 1
 
 
 @respx.mock

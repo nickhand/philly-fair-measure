@@ -55,6 +55,10 @@ class CartoError(RuntimeError):
     """The CARTO SQL API returned an error response."""
 
 
+class CartoQueryWaitTimeout(CartoError):
+    """CARTO could not assign the query a database connection in time."""
+
+
 @dataclass(frozen=True)
 class CartoColumn:
     name: str
@@ -83,7 +87,7 @@ def rows_to_table(rows: list[dict[str, Any]], schema: pa.Schema) -> pa.Table:
 
 
 def _is_retryable(exc: BaseException) -> bool:
-    if isinstance(exc, httpx.TransportError):
+    if isinstance(exc, httpx.TransportError | CartoQueryWaitTimeout):
         return True
     return isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in _RETRYABLE_STATUS
 
@@ -118,6 +122,13 @@ class CartoClient:
             response.raise_for_status()
             raise CartoError(f"non-JSON response for {sql!r}") from None
         if "error" in payload:
+            # CARTO reports this temporary connection-pool timeout as HTTP 400.
+            # Match the whole error, so SQL/permission failures still fail fast.
+            if response.status_code == 400 and payload["error"] in (
+                ["query_wait_timeout"],
+                "query_wait_timeout",
+            ):
+                raise CartoQueryWaitTimeout(f"CARTO error for {sql!r}: {payload['error']}")
             raise CartoError(f"CARTO error for {sql!r}: {payload['error']}")
         response.raise_for_status()
         return cast(dict[str, Any], payload)
