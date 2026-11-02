@@ -50,8 +50,9 @@ test:
 # see docs/snapshots/README.md).
 [group: "pipeline"]
 snapshot-current:
-	uv run fair-measure snapshot-all --tables assessments opa_properties_public real_estate_tax_delinquencies
-	uv run fair-measure snapshot-diff
+	@echo "Tax delinquency snapshots are paused (CARTO permission denied); see docs/snapshots/README.md."
+	uv run fair-measure snapshot-all --tables assessments opa_properties_public
+	uv run fair-measure snapshot-diff --datasets assessments opa_properties_public
 
 # Full coherent retrain: sale validity -> features -> every model -> screen ->
 # site stats -> docs. Any feature/mart rebuild REQUIRES retraining every model

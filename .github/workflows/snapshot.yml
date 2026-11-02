@@ -22,7 +22,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  TABLES: opa_properties_public assessments real_estate_tax_delinquencies
+  # Parcel-level delinquencies have returned permission denied since 2026-09-21.
+  # Keep historical snapshots; see docs/snapshots/README.md before re-enabling.
+  TABLES: opa_properties_public assessments
 
 jobs:
   snapshot:
@@ -30,6 +32,11 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+
+      - name: Report paused source
+        run: |
+          echo "::warning title=Delinquency snapshots paused::real_estate_tax_delinquencies is no longer publicly readable on CARTO (HTTP 403, verified 2026-11-02). Historical snapshots remain in S3. See docs/snapshots/README.md."
+          echo "Parcel-level tax delinquency snapshots are paused: CARTO returns permission denied. Last successful scheduled capture: 2026-09-14. See docs/snapshots/README.md." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -50,10 +57,12 @@ jobs:
 
       - name: Pull previous snapshots from S3 (latest per dataset)
         run: |
+          set -euo pipefail
           for ds in $TABLES; do
             prefix="raw/source=carto/dataset=$ds/"
             latest=$(aws s3 ls "s3://${{ vars.SNAPSHOT_BUCKET }}/$prefix" \
-              | awk '{print $2}' | grep '^fetched_at=' | sort | tail -1)
+              | awk '$2 ~ /^fetched_at=/ && $2 !~ /\.incomplete\// {print $2}' \
+              | sort | tail -1)
             if [ -n "$latest" ]; then
               echo "previous $ds: $latest"
               aws s3 sync --no-progress \
@@ -65,16 +74,22 @@ jobs:
           done
 
       - name: Fetch fresh snapshots
+        id: fetch
         run: uv run fair-measure snapshot-all --tables $TABLES
 
-      - name: Upload to S3
+      - name: Upload completed snapshots to S3
+        # snapshot-all continues after a failed table. Preserve its successes,
+        # but leave the job failed and never publish a partial snapshot.
+        if: ${{ !cancelled() && (steps.fetch.outcome == 'success' || steps.fetch.outcome == 'failure') }}
         run: |
           aws s3 sync --no-progress --size-only data/raw \
-            "s3://${{ vars.SNAPSHOT_BUCKET }}/raw"
+            "s3://${{ vars.SNAPSHOT_BUCKET }}/raw" \
+            --exclude "*.incomplete/*"
 
       - name: Diff against the previous snapshots
         run: |
           uv run fair-measure snapshot-diff \
+            --datasets $TABLES \
             --out "docs/snapshots/$(date -u +%F).md"
 
       - name: Commit the summary (self-keepalive)

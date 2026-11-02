@@ -1,15 +1,56 @@
 # The snapshot program
 
-Three of our sources are current-state tables the city overwrites in place:
-`opa_properties_public` (every characteristic: livable area, condition,
-exemptions), `assessments` (whether past years get restated is unknowable
-without history), and `real_estate_tax_delinquencies`. Once the city edits a
-record, the old value is gone. The weekly snapshot program is the only
+The city overwrites `opa_properties_public` (every characteristic: livable
+area, condition, exemptions) and `assessments` in place; whether past
+assessment years get restated is unknowable without history. The program
+also captured the legacy `real_estate_tax_delinquencies` table, now paused
+and confirmed to have been labeled historical-only before our captures.
+Once the city edits a record, the old value is gone. The weekly snapshot program is the only
 mechanism by which "what did the city change?" stays answerable: enrollment
 growth in the homestead exemption, characteristic corrections during appeal
 season (see the current deadlines in
 [`annual_report.json`](../../annual_report.json)), past-year restatements,
 sheriff-sale flags.
+
+## Source availability (verified 2026-11-02)
+
+The scheduled job currently captures `opa_properties_public` and `assessments`.
+Parcel-level `real_estate_tax_delinquencies` captures are **paused**: a live
+`SELECT * FROM "real_estate_tax_delinquencies" LIMIT 0` against
+<https://phl.carto.com/api/v2/sql> returns HTTP 403 with
+`permission denied for table real_estate_tax_delinquencies`. The city has not
+provided a reason in that response; do not assume the restriction is permanent.
+
+The publication history provides context, not a confirmed cause for the 403:
+OpenDataPhilly [replaced the parcel-level listing on 2024-07-10](https://github.com/opendataphilly/opendataphilly-jkan/pull/250/files).
+The removed entry already said the data was not receiving updates and labeled
+its downloads historical-only. Revenue's
+[2024-09-23 announcement](https://www.phila.gov/2024-09-23-philly-releases-open-data-on-property-tax-delinquencies/)
+describes the newer geographic aggregates and cites taxpayer privacy.
+Neither source explains the September 2026 permission change. Successful
+2026 downloads of the old table demonstrate accessibility, not current data.
+
+The [2026-09-14 run](https://github.com/nickhand/philly-fair-measure/actions/runs/34806693492)
+was the last successful scheduled capture. All seven weekly runs from
+[2026-09-21](https://github.com/nickhand/philly-fair-measure/actions/runs/35561694241)
+through [2026-11-02](https://github.com/nickhand/philly-fair-measure/actions/runs/41388461828)
+failed; the first and last logs show this permission error. Although OPA and
+assessments downloaded successfully, the failed fetch step prevented uploads
+for those runs too. The November 2 log confirms that S3 still supplied
+September 14 as the previous snapshot for all three tables. These missed
+current-state captures cannot be reconstructed from a new fetch.
+
+The current [OpenDataPhilly tax listing](https://opendataphilly.org/datasets/real-estate-tax-balances/)
+links balances aggregated by ZIP, council district, and census tract. These
+are not a parcel-level replacement. Preserve the existing raw delinquency
+snapshots and their original timestamps; do not treat them as fresh or replace
+missing updates with zero balances. The explicit `snapshot-all` command still
+attempts the registered source and reports failure if it remains unavailable.
+
+Each scheduled run records this pause as a warning and in its job summary.
+Before resuming, verify public API access and the parcel-level schema, then
+restore the table to `TABLES` in the workflow and the `snapshot-current` recipe
+and remove the pause warning. A different source needs its own provenance.
 
 ## How it works
 
@@ -23,6 +64,12 @@ at 04:23 UTC every Monday (plus on demand via
    `data/raw/`),
 4. run `fair-measure snapshot-diff` and commit the summary to this directory
    as `YYYY-MM-DD.md`.
+
+If one active source fails, completed snapshots from the other sources are
+still uploaded, but the job remains failed and no diff summary is committed.
+Directories ending in `.incomplete` are excluded from uploads and previous
+snapshot selection. An empty S3 prefix is a valid first run; S3 access errors
+still fail the job.
 
 The committed summary is the point of the program: a small, greppable record
 of what changed, reviewed like any other diff. It also keeps the schedule

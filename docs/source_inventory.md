@@ -185,8 +185,30 @@ Live-profiled before ingestion (schemas, taxonomies, OPA linkage ~99%):
 | `case_investigations` | 2,080,982 | Inspection events (`investigationtype`): PRECOURT 142k = court-escalation severity ladder; HCEU INSP 678k. |
 | `business_licenses` | 431,952 | Rental licenses (288k): tenure spans via initial/inactive dates, `owneroccupied`, `numberofunits` → `ten_` features (17.2% of arms-length sales investor-held at sale). |
 | `appeals` | 43,149 | L&I + ZBA appeals with decisions. **Decision vocabulary splits by system generation**: legacy rows say GRANTED with a NULL appealtype; new ZBA rows say "Granted" (and often just "Complete"), match grants case-insensitively across boards. *Not* assessment appeals. |
-| `real_estate_tax_delinquencies` | ~54k | Current-only delinquency status per OPA account (total due, years owed, sheriff-sale flag) → `dist_tax_*`/`dist_sheriff_sale` features and a screen evidence column. `opa_number` is numeric at source; staging restores the leading zeros. The table carries a `year_month` vintage and holds still between monthly refreshes (the 2026-07-11 snapshot diff found zero changes vs 07-03). |
+| `real_estate_tax_delinquencies` | ~54k | **Historical-only; unavailable as of 2026-11-02:** CARTO returns HTTP 403, `permission denied for table real_estate_tax_delinquencies`; scheduled capture paused. Existing snapshots contain legacy delinquency status per OPA account (total due, years owed, sheriff-sale flag), used by `dist_tax_*`/`dist_sheriff_sale` features and a screen evidence column. `opa_number` is numeric at source; staging restores the leading zeros. The table carries a `year_month` vintage; the 2026-07-11 snapshot diff found zero changes vs 07-03, which does not establish a monthly refresh schedule. See the availability note below. |
 | `demolitions` | ~30k | City demolition events (start/completed dates) → `evt_n_demolitions_before`/`evt_demo_days_since` as-of features, and the aerial-change pilot's ground-truth set. |
+
+**Delinquency availability, rechecked 2026-11-02:**
+`SELECT * FROM "real_estate_tax_delinquencies" LIMIT 0` at
+<https://phl.carto.com/api/v2/sql> returns the permission error above; no current
+schema or row count is available from this endpoint. The last successful
+scheduled snapshot is from 2026-09-14. The current
+[OpenDataPhilly listing](https://opendataphilly.org/datasets/real-estate-tax-balances/)
+provides ZIP-, council-district-, and tract-level tax balances, not a verified
+parcel-level replacement. Existing delinquency records retain their recorded
+vintage and must not be described as current. See
+[snapshot operations](snapshots/README.md#source-availability-verified-2026-11-02)
+for the failure evidence and resumption procedure.
+
+**Correction to the earlier freshness claim:** the
+[2024-07-10 OpenDataPhilly change](https://github.com/opendataphilly/opendataphilly-jkan/pull/250/files)
+removed the old parcel-level listing, which already described the source as
+not receiving updates and its downloads as historical-only. Revenue's
+[2024-09-23 announcement](https://www.phila.gov/2024-09-23-philly-releases-open-data-on-property-tax-delinquencies/)
+cites taxpayer privacy for the newer geographic aggregates. This is consistent
+with retirement of the legacy feed, but does not confirm why CARTO permissions
+changed in September 2026. The 2026 fetch dates do not establish the underlying
+records' effective dates or make the legacy distress features current.
 
 ## Remaining secondary (existence + row count verified; not ingested)
 
@@ -197,7 +219,7 @@ Live-profiled before ingestion (schemas, taxonomies, OPA linkage ~99%):
 | `li_court_appeals` | 460 | Tiny |
 | `trade_licenses` | 49,961 | Contractor licensing; not parcel events |
 | `public_cases_fc` | 5,840,358 | 311 tickets; the L&I `complaints` table is the curated, OPA-linked property subset (carries `ticket_num_311`) |
-| `real_estate_tax_balances` | 683,926 | **DEAD: tax periods end 2016** (probed 2026-07-03); delinquencies is the live table |
+| `real_estate_tax_balances` | 683,926 | **DEAD: tax periods end 2016** (probed 2026-07-03); not a replacement for the now-inaccessible parcel-level delinquencies table |
 | `opa_properties_public_pde` | 583,711 | Variant of the OPA table | 
 
 Probed and **not present** on CARTO (do not reference): `vacant_indicators_points`,
