@@ -1,5 +1,7 @@
 import polars as pl
+import pytest
 
+from philly_fair_measure.staging import runner
 from philly_fair_measure.staging.tables import (
     stg_assessments,
     stg_building_footprints,
@@ -7,6 +9,26 @@ from philly_fair_measure.staging.tables import (
     stg_opa_properties,
 )
 from philly_fair_measure.staging.temporal import with_parsed_timestamp, with_parsed_year
+from tests.test_catalog import _write_snapshot
+
+
+def test_default_stage_builds_without_a_delinquency_snapshot(tmp_path, monkeypatch):
+    _write_snapshot(tmp_path, "assessments", "20260101T000000Z", {"parcel_number": ["1"]})
+    monkeypatch.setattr(
+        runner,
+        "BUILDERS",
+        {
+            "assessments": (lambda raw: raw, ("assessments",)),
+            "delinquencies": runner.BUILDERS["delinquencies"],
+        },
+    )
+
+    results = runner.build_all(tmp_path)
+
+    assert [result.table for result in results] == ["assessments"]
+    assert not (tmp_path / "staged" / "delinquencies.parquet").exists()
+    with pytest.raises(FileNotFoundError, match="real_estate_tax_delinquencies"):
+        runner.build_all(tmp_path, only=["delinquencies"])
 
 
 def test_with_parsed_timestamp_statuses():
