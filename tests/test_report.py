@@ -215,13 +215,18 @@ def test_leaderboards_rank_by_confidence_and_uniformity(tmp_path):
     from philly_fair_measure.ingest.manifests import InputRef
     from philly_fair_measure.report import leaderboards
 
-    def row(pid, addr, opa, model, ratio, z, pi_lo, pi_hi, flag, twin_n=6, twin_med=1.0):
+    def row(
+        pid, addr, opa, model, ratio, z, pi_lo, pi_hi, flag, twin_n=6, twin_med=1.0, shown=None
+    ):
+        shown = ratio if shown is None else shown  # OPA / the displayed estimate
         return {
             "parcel_id": pid,
             "address": addr,
             "opa_market_value": opa,
             "model_median": model,
             "opa_vs_model_ratio": ratio,
+            "display_median": opa / shown,
+            "display_ratio": shown,
             "screen_z": z,
             "model_pi_low_90": pi_lo,
             "model_pi_high_90": pi_hi,
@@ -280,6 +285,19 @@ def test_leaderboards_rank_by_confidence_and_uniformity(tmp_path):
             400_000.0,
             "over_assessed_candidate",
         ),
+        # modest by the Bayesian median, the biggest gap against the shown estimate
+        row(
+            "over_shown",
+            "3 HIGH ST",
+            240_000.0,
+            200_000.0,
+            1.2,
+            1.5,
+            150_000.0,
+            260_000.0,
+            "over_assessed_candidate",
+            shown=20.0,
+        ),
         row(
             "under_x",
             "1 LOW ST",
@@ -320,8 +338,11 @@ def test_leaderboards_rank_by_confidence_and_uniformity(tmp_path):
     assert boards["under_assessed"]["parcel_id"][0] == "under_x"  # most negative screen_z
     assert boards["non_uniform_block"]["parcel_id"][0] == "odd_twin"  # biggest twin gap
 
+    assert boards["over_assessed"]["display_median"][0] == 300_000.0 / 3.0  # the shown estimate
+
     extremes = leaderboards(tmp_path, n=5, plausible=False)
-    assert extremes["over_assessed"]["parcel_id"][0] == "over_blindspot"  # raw biggest ratio
+    # raw biggest gaps against the shown estimate, blind spots included
+    assert extremes["over_assessed"]["parcel_id"].to_list()[:2] == ["over_shown", "over_blindspot"]
 
 
 def test_render_html_minimal_condo():
