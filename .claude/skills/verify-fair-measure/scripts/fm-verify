@@ -143,7 +143,7 @@ fetch() {
 
 # The flags of each command `cli` runs, spelled in full. out: an output path that must resolve
 # inside the evidence folder; value: takes one argument; flag: takes none, or a list nothing reads.
-# Any other flag, including an argparse prefix abbreviation such as --rep for --reports, is refused.
+# Any other flag, including an argparse prefix abbreviation such as --no-sav for --no-save, is refused.
 cli_flags() {
   case $1 in
     catalog) echo "--data-dir:value" ;;
@@ -153,7 +153,6 @@ cli_flags() {
     leaderboard) echo "--kind:value --n:value --extremes:flag --data-dir:value" ;;
     screen-audit) echo "--no-save:flag --data-dir:value" ;;
     sync-docs) echo "--check:flag" ;;
-    report) echo "--out:out --data-dir:value" ;;
     export-web-stats) echo "--out:out --data-dir:value --annual-report-config:value" ;;
     snapshot-diff) echo "--datasets:flag --out:out --json-out:out --data-dir:value" ;;
     *) return 1 ;;
@@ -204,7 +203,7 @@ cli_refusal() {
   case $sub in
     screen-audit) [[ $seen == *" --no-save "* ]] || echo "needs --no-save" ;;
     sync-docs) [[ $seen == *" --check "* ]] || echo "needs --check" ;;
-    report | export-web-stats) [[ $seen == *" --out "* ]] || echo "needs --out into the evidence folder" ;;
+    export-web-stats) [[ $seen == *" --out "* ]] || echo "needs --out into the evidence folder" ;;
     sql)
       ((${#positional[@]} == 1)) || { echo "sql takes exactly one query"; return 0; }
       [[ ${positional[0]} =~ ^[[:space:]]*([A-Za-z]+) ]] && first=$(tr '[:upper:]' '[:lower:]' <<<"${BASH_REMATCH[1]}")

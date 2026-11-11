@@ -117,7 +117,7 @@ It rebuilds the worktree's `.venv-serve` from the `serve` and `serve-smoke` grou
 
 ### Site
 
-Prerendered pages: `web/dist/index.html`, `findings.html`, `methodology.html`, `trust.html`, `appeal.html`, `reports/ty-2027.html` and its alias `report.html`. `/map`, `/property/<id>` and `/leaderboards` have no HTML of their own; the browser renders them from `spa.html`. build-site already ran `web/scripts/check-prerender-output.mjs` (its last line is in `logs/site-build.log`). Prove copy on the served page:
+Prerendered pages: `web/dist/index.html`, `findings.html`, `methodology.html`, `trust.html`, `appeal.html`, `reports/ty-2027.html` and its alias `report.html`. `/map` and `/property/<id>` have no HTML of their own; the browser renders them from `spa.html`. build-site already ran `web/scripts/check-prerender-output.mjs` (its last line is in `logs/site-build.log`). Prove copy on the served page:
 
 ```bash
 $S page <slug> findings /findings
@@ -148,7 +148,7 @@ Never write to the lake while verifying. Run CLI checks through
 $S cli <slug> <name> <fair-measure args>
 ```
 
-which runs `uv run fair-measure <args>` in the current checkout and saves `cli/<name>.txt` with the command and exit code. It allows `--help` or `-h` on any command and refuses anything else outside this table. It accepts each command's flags only when spelled in full, because argparse would read `--rep` as `--reports`. Every output path (`--out`, `--json-out`) must resolve inside the evidence folder. `sql` takes one `SELECT` or `WITH` statement with no `COPY`, `EXPORT`, `ATTACH`, `INSTALL`, `LOAD`, `CREATE`, `INSERT`, `UPDATE`, `DELETE` or `PRAGMA` in it.
+which runs `uv run fair-measure <args>` in the current checkout and saves `cli/<name>.txt` with the command and exit code. It allows `--help` or `-h` on any command and refuses anything else outside this table. It accepts each command's flags only when spelled in full, because argparse would read a prefix such as `--no-sav` as `--no-save`. Every output path (`--out`, `--json-out`) must resolve inside the evidence folder. `sql` takes one `SELECT` or `WITH` statement with no `COPY`, `EXPORT`, `ATTACH`, `INSTALL`, `LOAD`, `CREATE`, `INSERT`, `UPDATE`, `DELETE` or `PRAGMA` in it.
 
 | Command | Proves |
 |---|---|
@@ -156,8 +156,7 @@ which runs `uv run fair-measure <args>` in the current checkout and saves `cli/<
 | `catalog` | every raw, staged and mart view with rows and build time, from manifests |
 | `sql "SELECT ..."` | ad hoc SQL over in-memory DuckDB views `raw_<dataset>`, `stg_<table>`, `mart_<table>` |
 | `comps "108 ELFRETHS"` | one property's comps |
-| `leaderboard --kind over` | the most over-assessed list (refused with `--reports`) |
-| `report 052174500 --out <evidence>/reports` | the static appeal packet |
+| `leaderboard --kind over` | the most over-assessed list |
 | `export-web-stats --out <evidence>/siteStats.json` | every site statistic recomputed; diff it against `web/src/data/siteStats.json`, where only `meta.generated_at` should differ |
 | `sync-docs --check` | the generated README.md and docs/model.md blocks match `siteStats.json` |
 | `freshness`, `snapshot-diff [--out <evidence>/<file>]` | snapshot ages and changes |

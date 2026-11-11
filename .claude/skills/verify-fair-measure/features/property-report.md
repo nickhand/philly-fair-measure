@@ -42,4 +42,3 @@ Preconditions:
 - In the browser pane, options have no accessible name; `find "option"` and click the ref.
 - Comps take about a second on the API; the button shows a skeleton first. Wait for the table.
 - The verdict wording comes from `web/src/utils/verdict.ts` and depends on flag plus attention tier; assert the heading the snapshot shows, then confirm the flag with `$S get`.
-- `fair-measure report <query>` is a different feature (a static HTML packet). Without `--out` it writes into `data/reports/`.
