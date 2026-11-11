@@ -7,7 +7,9 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { Map as MLMap } from 'maplibre-gl'
 import { describe, expect, it } from 'vitest'
+import { applyFairMeasurePaint } from '@/map/fairMeasureMapStyle'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 const css = readFileSync(join(SRC, 'assets', 'main.css'), 'utf8')
@@ -54,5 +56,18 @@ describe('text contrast', () => {
       }
     }
     expect(offenders, `\n${offenders.join('\n')}\n`).toEqual([])
+  })
+
+  it('basemap labels clear 4.5:1 on their halo', () => {
+    const paint: Record<string, string> = {}
+    const map = {
+      getStyle: () => ({ layers: [{ id: 'label_city', type: 'symbol' }] }),
+      setPaintProperty: (_id: string, property: string, value: string) => {
+        paint[property] = value
+      },
+    } as unknown as MLMap
+    applyFairMeasurePaint(map)
+    const ratio = contrast(paint['text-color']!, paint['text-halo-color']!)
+    expect(ratio, `${paint['text-color']} on ${paint['text-halo-color']}`).toBeGreaterThanOrEqual(4.5)
   })
 })
