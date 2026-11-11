@@ -434,3 +434,87 @@ def test_screen_refuses_stale_runs(tmp_path):
     _require_coherent(run_dir, stale_marts, allow_stale=True)
     # a run newer than the mart passes silently
     _require_coherent(run_dir, (("sale_features", datetime(2025, 12, 1)),), allow_stale=False)
+
+
+RUN_BUILT = datetime(2026, 7, 14, 19)
+MART_BEFORE_RUN = datetime(2026, 7, 10)
+MART_AFTER_RUN = datetime(2026, 7, 15)
+SCREEN_MARTS = (
+    "sale_features",
+    "sale_validity",
+    "market_areas",
+    "price_index",
+    "proximity",
+    "characteristic_quality",
+)
+CONDO_SCREEN_MARTS = (
+    "condo_sale_features",
+    "sale_features",
+    "sale_validity",
+    "market_areas",
+    "price_index",
+    "proximity",
+)
+
+
+def _gate_lake(root, mart_built):
+    """Manifests and empty data files: enough for the stale-run gate, which
+    runs before the screen reads any data."""
+    from philly_fair_measure.ingest.manifests import DerivedManifest, write_derived_manifest
+
+    def table(layer, name, built_at, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+        manifest = DerivedManifest(
+            layer=layer,
+            table=name,
+            built_at=built_at,
+            row_count=0,
+            inputs=[],
+            package_version="0",
+        )
+        write_derived_manifest(manifest, path)
+
+    for name in ("opa_properties", "permits", "violations"):
+        table("staged", name, MART_BEFORE_RUN, root / "staged" / f"{name}.parquet")
+    for name, built_at in mart_built.items():
+        table("marts", name, built_at, root / "marts" / f"{name}.parquet")
+    for kind in ("baseline", "bayesian", "condo"):
+        run_dir = root / "models" / f"run_id=20260714T190000Z-{kind}"
+        table("models", kind, RUN_BUILT, run_dir / "run.parquet")
+
+
+@pytest.mark.parametrize(
+    ("newer", "absent"),
+    [
+        *(pytest.param(name, (), id=name) for name in SCREEN_MARTS),
+        pytest.param(
+            "sale_validity",
+            ("proximity", "characteristic_quality"),
+            id="optional-marts-absent",
+        ),
+    ],
+)
+def test_screen_refuses_a_run_older_than_any_mart_it_reads(tmp_path, newer, absent):
+    from philly_fair_measure.validation.opa import StaleRunError, build_assessment_screen
+
+    built = {name: MART_BEFORE_RUN for name in SCREEN_MARTS if name not in absent}
+    _gate_lake(tmp_path, built | {newer: MART_AFTER_RUN})
+    with pytest.raises(StaleRunError, match=f"current {newer} mart"):
+        build_assessment_screen(tmp_path)
+
+
+@pytest.mark.parametrize("newer", CONDO_SCREEN_MARTS)
+def test_condo_screen_refuses_a_run_older_than_any_mart_it_reads(tmp_path, newer):
+    from philly_fair_measure.validation.opa import StaleRunError, _condo_screen_frame
+
+    built = dict.fromkeys(CONDO_SCREEN_MARTS, MART_BEFORE_RUN) | {newer: MART_AFTER_RUN}
+    _gate_lake(tmp_path, built)
+    paths = {
+        "opa": tmp_path / "staged" / "opa_properties.parquet",
+        "sales": tmp_path / "marts" / "sale_validity.parquet",
+        "market_areas": tmp_path / "marts" / "market_areas.parquet",
+        "price_index": tmp_path / "marts" / "price_index.parquet",
+    }
+    with pytest.raises(StaleRunError, match=f"current {newer} mart"):
+        _condo_screen_frame(tmp_path, tmp_path, VALUATION_DATE, paths, built["sale_features"])
