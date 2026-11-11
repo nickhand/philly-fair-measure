@@ -79,7 +79,7 @@ refuse_busy_port() {
   fi
 }
 
-started_at() { ps -o lstart= -p "$1" 2>/dev/null | sed 's/^ *//; s/ *$//'; }
+started_at() { ps -o lstart= -p "$1" 2>/dev/null | sed 's/^ *//; s/ *$//' || true; }
 
 # Start a command in its own process group so stop can kill the whole tree. The record holds the
 # group id and its leader's start time, so a reused pid is never mistaken for ours.
@@ -376,7 +376,7 @@ case $cmd in
         echo "$name: pid $pgid is a process started $now, not the one launched ${started:-(no start time recorded)}; left alone"
       elif kill -0 -- "-$pgid" 2>/dev/null; then
         echo "$name: leader $pgid exited but process group $pgid lives on; left alone:"
-        ps -A -o pid=,pgid=,command= | awk -v g="$pgid" '$2 == g' | head -5
+        ps -A -o pid=,pgid=,command= | awk -v g="$pgid" '$2 == g' | head -5 || true
       else
         echo "$name (process group $pgid) was not running"
       fi
