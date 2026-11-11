@@ -351,8 +351,9 @@ Guards keep the flags honest where the record, not the value, is the problem:
 - **Attention tier** ("worth a look"): properties inside the displayed 90%
   band but in its outer tenth, on the far side of the estimate, roughly the
   model's 90th percentile, are labeled high/low attention rather than
-  flagged, so the strong flags stay reserved for cases the two methods place
-  outside the band entirely. The tier is measured on the band the site
+  flagged, so the strong flags stay reserved for cases outside the band
+  entirely (outside both methods' bands for houses, outside the one conformal
+  band for condos). The tier is measured on the band the site
   actually draws (not the Bayesian `screen_z`, which still ranks every row),
   so the "near the top/bottom of our range" copy is always true of the chart
   beside it.
