@@ -4,7 +4,7 @@ The maintained list of what a Fair Measure user touches and how to prove each pa
 
 ## Baseline preconditions
 
-- The worktree has the `data`, `deploy` and `web/node_modules` links (`$S setup <slug>`).
+- Commands run from the root of the checkout under test. It has the `data`, `deploy` and `web/node_modules` links (`$S setup <slug>`), or exports `PHILLY_DATA_DIR` in place of the `data` link.
 - The lake is the 2026-07-14 build. `marts/assessment_screen.parquet` has 496,975 rows from runs `20260714T190028Z-baseline`, `20260714T193149Z-bayesian` and `20260714T194046Z-condo`. A rebuilt lake changes the counts quoted below; re-measure them with `remeasure_screen.py` instead of trusting these.
 - Seed parcels: `052174500` (108 ELFRETHS ALY, residential, within range), `591073500` (1154 E PRICE ST, residential, over-assessed), `888520502` (3600 CONSHOHOCKEN AVE #1001, condo).
 - The API runs from `$S start-api <slug>`; the site is `$S build-site <slug>` then `$S start-preview <slug>`.
@@ -15,7 +15,7 @@ The maintained list of what a Fair Measure user touches and how to prove each pa
 
 - Start from a fresh build of the branch under test. `just gates` and `npm run build:cloudflare:*` overwrite `web/dist`; rebuild with `$S build-site` after them.
 - Locate by ARIA role and accessible name, as `$S browse` does. The handles below come from the `.vue` templates and the ARIA snapshots of a real run.
-- Every request goes through `$S get`, `$S page` or `$S browse` so it lands in `commands.log` and the evidence folder.
+- Every request goes through `$S get`, `$S page`, `$S browse`, `$S cli`, `$S remeasure` or `$S ci` so it lands in `commands.log` and the evidence folder.
 - Never run a command that writes the lake (`data/`) or the deploy bundle (`deploy/data`) except into `data/verify/`.
 
 ## Proof and skip reporting
@@ -42,3 +42,4 @@ Each feature file has an H1, one paragraph on the user-visible behavior, then fo
 - [Published pages and numbers](./published-numbers.md) covers the prerendered pages and the counts and statistics they print.
 - [API report and comps](./api-report-and-comps.md) covers the JSON endpoints behind the report, the map and the home counters, and the serve-only smoke test.
 - [Screen numbers and lineage](./screen-numbers.md) covers the assessment screen mart, the model runs it came from, and the read-only CLI views of it.
+- [CI and workflow changes](./ci-workflows.md) covers change routing, the release contract tests, the job commands, and what only a GitHub run proves.

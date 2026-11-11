@@ -5,13 +5,13 @@ description: Prove a Fair Measure change on the real artifact. Covers the FastAP
 
 # Verify Fair Measure
 
-Run everything from the worktree root. The helper is
+Run everything from the root of the checkout under test. The helper is
 
 ```bash
 S=.claude/skills/verify-fair-measure/scripts/fm-verify
 ```
 
-`$S` with no arguments lists its commands. Each takes a `<slug>` naming the change, such as `fix-search-trim`. The slug keys the evidence folder and the processes the run owns. Use a new slug per run; a reused slug appends to its earlier folder. Pass the same `FM_*` port variables to every call of one run.
+The helpers act on the checkout of the current directory, wherever they live: its code, its `.venv`, its `web/`, and its `data` link or `PHILLY_DATA_DIR`. A checkout that predates this skill can call them by absolute path from one that has it. `$S` with no arguments lists its commands. Each takes a `<slug>` naming the change, such as `fix-search-trim`. The slug keys the evidence folder and the processes the run owns. Use a new slug per run; a reused slug appends to its earlier folder. Pass the same `FM_*` port variables to every call of one run.
 
 ## What counts as proof
 
@@ -19,9 +19,9 @@ S=.claude/skills/verify-fair-measure/scripts/fm-verify
 |---|---|
 | Site copy, layout, a page | The built page a visitor gets: `web/dist/<page>.html` after `$S build-site`, and the page driven in a browser against `$S start-preview`. The `.vue` source is not proof. |
 | API (`api.py`, scoring, comps, the deploy bundle) | `just api-smoke`, plus requests against a running instance with `$S get`. |
-| A published number | Re-measure it from the mart (`remeasure_screen.py` or a polars query) and compare with `web/src/data/siteStats.json` and every page or endpoint that shows it. |
-| CLI | `uv run fair-measure <cmd> --help`, plus a read-only run whose output goes to the evidence folder. |
-| CI or workflow | The contract tests and a routing dry run (see Pipeline and CI). Scheduled runs, the production deploy job, Cloudflare publishing, Fly deploys and the S3 snapshot job cannot run locally; list them as unverified. |
+| A published number | Re-measure it from the mart (`$S remeasure` or a polars query) and compare with `web/src/data/siteStats.json` and every page or endpoint that shows it. |
+| CLI | `$S cli` with `--help`, plus a read-only run of the command. |
+| CI or workflow | `$S ci` (contract tests, routing, YAML parse) and the changed job's commands. Scheduled runs, the production deploy job, Cloudflare publishing, Fly deploys and the S3 snapshot job cannot run locally; list them as unverified. |
 | Anything, before a PR | `just gates`. It rebuilds `web/dist` with analytics on, so run `$S build-site` again before driving the preview. |
 
 Drive the path a user takes (the search box, a URL, the request a client sends), not internal functions. Capture the action and the resulting state. Check side effects with a second view: the stored value read back, a recount from the mart.
@@ -34,11 +34,11 @@ A worktree needs three links into the main checkout: `data` (the lake: `marts/*.
 $S setup <slug>
 ```
 
-creates the missing ones as absolute symlinks and warns when the main checkout's `.git/info/exclude` lacks `/data` or `/deploy` (`web/.gitignore` already ignores `node_modules`). Never `git add` them; check `git status` before each commit. Instead of the `data` link you may export `PHILLY_DATA_DIR=<main checkout>/data`, which `config.data_dir()` reads, and pass it to `$S start-api` as `FM_DATA_DIR`. `just api-smoke` still needs the `deploy` link, because `scripts/smoke_api.py` reads `deploy/data` relative to the working directory.
+creates the missing ones as absolute symlinks and warns when the main checkout's `.git/info/exclude` lacks `/data` or `/deploy` (`web/.gitignore` already ignores `node_modules`). Never `git add` them; check `git status` before each commit. Instead of the `data` link you may export `PHILLY_DATA_DIR=<main checkout>/data`; `config.data_dir()`, `$S start-api`, the doctor and remeasure all read it. `just api-smoke` still needs the `deploy` link, because `scripts/smoke_api.py` reads `deploy/data` relative to the working directory.
 
 `uv run` builds the worktree's own `.venv` on first use (about 10 s).
 
-The `web/node_modules` link shares more than packages. `vue-tsc --build` writes `web/node_modules/.tmp/*.tsbuildinfo`, which lands in the main checkout. Do not build in a worktree while the main checkout builds. For a fully separate tree, replace the link with `npm --prefix web ci`.
+The `web/node_modules` link shares more than packages. `vue-tsc --build` writes `web/node_modules/.tmp/*.tsbuildinfo`, which lands in the main checkout. Do not build in a worktree while the main checkout builds. When the main checkout's install is emptied or reinstalled, every linked worktree loses it at once; `vite: command not found` or `Cannot find module 'playwright'` means the shared install is gone (seen on 2026-11-11). Ask the owner before reinstalling in the main checkout, or give the worktree its own with `npm --prefix web ci`.
 
 ## Evidence
 
@@ -76,10 +76,10 @@ $S doctor <slug>
 
 Read-only. It appends to `doctor.txt` and exits 1 on a hard failure. It reports:
 
-- the worktree's links, the lake's screen (rows, build date, model runs) and the run in `siteStats.json`;
+- the checkout, its lake (the `data` link or `PHILLY_DATA_DIR`; missing fails) with the screen's rows, build date and model runs, the run in `siteStats.json`, and the `deploy` and `web/node_modules` links (missing warns and names what needs them);
 - for each port, the listening PID, its command and working directory, and whether this slug started it;
 - for the API, `/health` and `/api/stats`, and whether their rows and build date match the data directory that process serves;
-- for the site, whether `web/dist` has analytics compiled in and which API base it calls.
+- for the site, whether `web/dist` has analytics compiled in and calls the API port in use (a hard failure only while a preview serves it), and whether the dev server's proxy reaches the API.
 
 Run it after launch and whenever a result looks wrong.
 
@@ -139,41 +139,50 @@ Cloudflare checks:
 - Against the live site, read-only: `node web/scripts/check-cloudflare-browser.mjs https://www.nickhand.dev/fair-measure` and `node web/scripts/check-cloudflare-release.mjs --app-base-url <url> --expected-index-sha256 <sha>` (CI runs it after a deploy). They prove what is deployed, not your branch. The browser check needs Playwright's own Chromium build, which this machine lacks; `(cd web && npx playwright install chromium)` is a download, so ask first.
 - Not runnable here: `dry-run:cloudflare:*` and `deploy:cloudflare:staging` call wrangler. The production deploy runs only in the protected GitHub environment.
 
-### Pipeline and CI
+### Pipeline and CLI
 
-Never write to the lake while verifying. These are read-only, or write only where `--out` points:
+Never write to the lake while verifying. Run CLI checks through
+
+```bash
+$S cli <slug> <name> <fair-measure args>
+```
+
+which runs `uv run fair-measure <args>` in the current checkout, saves `cli/<name>.txt` with the command and exit code, and refuses anything outside this table except `--help`:
 
 | Command | Proves |
 |---|---|
-| `uv run python .claude/skills/verify-fair-measure/scripts/remeasure_screen.py --api http://127.0.0.1:8000 --html web/dist/index.html --out <evidence>/remeasure.json` | recounts the screen flags from `marts/assessment_screen.parquet` and compares the manifest, `siteStats.json`, `/api/stats` and the built home page; `--api` and `--html` are optional |
-| `uv run fair-measure screen-audit --no-save` | screen invariants and counts |
-| `uv run fair-measure catalog` | every raw, staged and mart view with rows and build time, from manifests |
-| `uv run fair-measure sql "SELECT ..."` | ad hoc SQL over in-memory DuckDB views `raw_<dataset>`, `stg_<table>`, `mart_<table>` |
-| `uv run fair-measure comps "108 ELFRETHS"` | one property's comps |
-| `uv run fair-measure report 052174500 --out <evidence>/reports` | the static appeal packet |
-| `uv run fair-measure export-web-stats --out <evidence>/siteStats.json` | every site statistic recomputed; diff it against `web/src/data/siteStats.json`, where only `meta.generated_at` should differ |
-| `uv run fair-measure sync-docs --check` | the generated README.md and docs/model.md blocks match `siteStats.json` |
-| `uv run fair-measure <cmd> --help` | a changed command's arguments |
+| `screen-audit --no-save` | screen invariants and counts |
+| `catalog` | every raw, staged and mart view with rows and build time, from manifests |
+| `sql "SELECT ..."` | ad hoc SQL over in-memory DuckDB views `raw_<dataset>`, `stg_<table>`, `mart_<table>` |
+| `comps "108 ELFRETHS"` | one property's comps |
+| `leaderboard --kind over` | the most over-assessed list (refused with `--reports`) |
+| `report 052174500 --out <evidence>/reports` | the static appeal packet |
+| `export-web-stats --out <evidence>/siteStats.json` | every site statistic recomputed; diff it against `web/src/data/siteStats.json`, where only `meta.generated_at` should differ |
+| `sync-docs --check` | the generated README.md and docs/model.md blocks match `siteStats.json` |
+| `freshness`, `snapshot-diff ... --out <file>` | snapshot ages and changes |
+| `<any command> --help` | a changed command's arguments |
 
-Commands that write the lake (`snapshot*`, `stage`, `validate-sales`, `build-*`, `train-*`, `screen-assessments`, `review-queue`, `aerial-*`, `leaderboard --reports`, `report` and `screen-audit` without their flags above) are pipeline runs, not checks.
+The recount of the published screen numbers:
 
-`data/marts/assessment_screen.manifest.json` lists the `models/<run_id>` inputs (baseline, bayesian, condo) the screen was built from, and each `data/models/run_id=<id>/run.manifest.json` lists what that run trained on. `siteStats.json` `meta.model_run_id` and `meta.interval_run_id` must appear among the screen's inputs; `remeasure_screen.py` checks it.
+```bash
+$S remeasure <slug> --api http://127.0.0.1:8000 --html web/dist/index.html
+```
 
-A polars recount for any other number:
+runs `scripts/remeasure_screen.py`, which recounts the flags from `marts/assessment_screen.parquet` with polars and compares the manifest, `siteStats.json`, `/api/stats` and the built home page. `--api` and `--html` are optional. It saves `remeasure.json` and `remeasure.txt` and exits 1 on any difference.
+
+`data/marts/assessment_screen.manifest.json` lists the `models/<run_id>` inputs (baseline, bayesian, condo) the screen was built from, and each `data/models/run_id=<id>/run.manifest.json` lists what that run trained on. `siteStats.json` `meta.model_run_id` and `meta.interval_run_id` must appear among the screen's inputs; remeasure checks it. For any other number, write the polars query and `tee` it into the evidence folder:
 
 ```bash
 uv run python -c "import polars as pl; s = pl.scan_parquet('data/marts/assessment_screen.parquet'); print(s.group_by('model_family', 'assessment_flag').len().collect())"
 ```
 
-CI and workflow changes:
+### CI and workflows
 
 ```bash
-python3 -m unittest discover .github/ci -p 'test_*.py'        # release contracts and path routing
-git diff --name-only origin/main...HEAD | python3 .github/ci/scope.py   # python=, web=, release= for this branch's commits
-uv run python -c "import sys, yaml; [yaml.safe_load(open(f)) for f in sys.argv[1:]]; print('yaml ok')" .github/workflows/*.yml
+$S ci <slug> [base, default origin/main]
 ```
 
-An empty diff (nothing committed yet) makes `scope.py` answer true for all three, so commit first or pipe the paths by hand. The YAML load only proves the files parse. actionlint is not installed, and GitHub expressions, `needs` wiring, environments and secrets are checked only by a real GitHub run.
+runs the `.github/ci` contract tests, pipes every changed path (committed, staged, unstaged, untracked) through `.github/ci/scope.py` to show the `python=`, `web=`, `release=` routing CI would pick, and parses `.github/workflows/*.yml`. It saves `ci.txt`. [`features/ci-workflows.md`](features/ci-workflows.md) covers the job commands and what only a real GitHub run proves.
 
 ## Cleanup
 

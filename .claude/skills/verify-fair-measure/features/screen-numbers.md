@@ -23,12 +23,12 @@ Preconditions:
 - The worktree's `data` link resolves (`$S doctor <slug>` passes the checkout section).
 - No pipeline command is running against the lake.
 
-- **Recount.** Run `uv run python .claude/skills/verify-fair-measure/scripts/remeasure_screen.py --out "$($S evidence <slug>)/remeasure.json"`. Exit 0 and `remeasure: OK`; on the 2026-07-14 lake, 496,975 properties, 970 over, 6,465 under, 40,200 watch, 19,020 insufficient, and both siteStats run ids found among the screen inputs.
+- **Recount.** Run `$S remeasure <slug>`. Exit 0 and `remeasure: OK`; on the 2026-07-14 lake, 496,975 properties, 970 over, 6,465 under, 40,200 watch, 19,020 insufficient, and both siteStats run ids found among the screen inputs.
 - **Ad hoc recount.** For a number the script does not cover, write the query: `uv run python -c "import polars as pl; s = pl.scan_parquet('data/marts/assessment_screen.parquet'); print(s.group_by('model_family', 'assessment_flag').len().sort('model_family', 'assessment_flag').collect())" | tee "$($S evidence <slug>)/recount.txt"`.
 - **Lineage.** Run `python3 -c "import json; m = json.load(open('data/marts/assessment_screen.manifest.json')); print(m['built_at'], m['row_count']); [print(i['dataset'], i['fetched_at']) for i in m['inputs']]"`. The `models/...` inputs are the runs the screen used; `cat data/models/run_id=<id>/run.manifest.json` shows what each run trained on.
-- **Invariants.** Run `uv run fair-measure screen-audit --no-save | tee "$($S evidence <slug>)/screen-audit.txt"`. Exit 0 with `invariants: OK`.
-- **Catalog.** Run `uv run fair-measure catalog | tee "$($S evidence <slug>)/catalog.txt"`. `mart_assessment_screen` shows 496,975 rows built `20260714T194235Z`.
-- **CLI surface.** For a changed command run `uv run fair-measure <command> --help`, then a read-only invocation that writes only to the evidence folder, such as `uv run fair-measure comps "108 ELFRETHS" --k 5` or `uv run fair-measure report 052174500 --out "$($S evidence <slug>)/reports"`.
+- **Invariants.** Run `$S cli <slug> screen-audit screen-audit --no-save`. Exit 0, and `cli/screen-audit.txt` has `invariants: OK`.
+- **Catalog.** Run `$S cli <slug> catalog catalog`. `mart_assessment_screen` shows 496,975 rows built `20260714T194235Z`.
+- **CLI surface.** For a changed command run `$S cli <slug> <command>-help <command> --help`, then a read-only invocation such as `$S cli <slug> comps comps "108 ELFRETHS" --k 5` or `$S cli <slug> report report 052174500 --out "$($S evidence <slug>)/reports"`. A refusal (`refusing fair-measure ...`, exit 2) means the command writes the lake or the repo.
 
 ## Gotchas
 
