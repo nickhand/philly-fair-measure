@@ -206,9 +206,10 @@ const fullCard = [
           because it never sees it. Otherwise the comparison would be circular.
         </li>
         <li>
-          <strong>Two methods must agree before we flag your home.</strong> A property is only
-          marked “may be too high” when two independent statistical methods both put the city’s
-          value outside the likely range.
+          <strong>For houses, two methods must agree before we flag.</strong> A house is only
+          flagged when two independent statistical methods both put the city’s value outside the
+          likely range, on the same side. Condos have their own model, built for condo units, and
+          a condo is flagged when the city’s value falls outside that one model’s range.
         </li>
         <li>
           <strong>No people-data, ever.</strong> Race, income, and anything about who lives in a
