@@ -925,7 +925,7 @@ def _cmd_leaderboard(args: argparse.Namespace) -> int:
             else:
                 print(
                     f"  {r['parcel_id']}  {addr:<34} OPA ${r['opa_market_value']:>10,.0f}  "
-                    f"model ${r['model_median']:>10,.0f}  {r['opa_vs_model_ratio']:.1f}x  "
+                    f"model ${r['display_median']:>10,.0f}  {r['display_ratio']:.1f}x  "
                     f"z {r['screen_z']:+.1f}"
                 )
 
@@ -974,9 +974,13 @@ def _cmd_comps(args: argparse.Namespace) -> int:
         if row.height:
             r = row.to_dicts()[0]
             print(
-                f"  model: ${r['model_median']:,.0f} "
-                f"(90% PI ${r['model_pi_low_90']:,.0f} - ${r['model_pi_high_90']:,.0f}, "
-                f"{r['interval_method']}) -> {r['assessment_flag']}"
+                f"  model: ${r['display_median']:,.0f} "
+                f"(90% range ${r['display_pi_low_90']:,.0f} - ${r['display_pi_high_90']:,.0f})"
+                f" -> {r['assessment_flag']}"
+            )
+            print(
+                f"  flag judged on the {r['interval_method']} 90% PI "
+                f"${r['model_pi_low_90']:,.0f} - ${r['model_pi_high_90']:,.0f}"
             )
 
     print(f"\ntop {result.comps.height} comparable arms-length sales:")

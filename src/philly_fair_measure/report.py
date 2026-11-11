@@ -664,7 +664,10 @@ def leaderboards(
     spots don't crowd out — and its confidence isn't ignored on — ordinary appeal
     targets. Pass plausible=False for the raw biggest-ratio extremes (blind spots
     included). Verify any single row against its report, which surfaces data
-    errors."""
+    errors. Rows show the displayed estimate (display_median, display_ratio),
+    the number the property page shows, and the extremes rank by that ratio; the
+    blind-spot filter and screen_z stay on the Bayesian machine that gates the
+    flags."""
     root = data_dir if data_dir is not None else config.data_dir()
     s = (
         pl.read_parquet(root / "marts" / "assessment_screen.parquet")
@@ -677,8 +680,8 @@ def leaderboards(
         "parcel_id",
         "address",
         "opa_market_value",
-        "model_median",
-        "opa_vs_model_ratio",
+        "display_median",
+        "display_ratio",
         "screen_z",
     ]
     over_flagged = s.filter(pl.col("assessment_flag") == AssessmentFlag.OVER)
@@ -688,8 +691,8 @@ def leaderboards(
         over_flagged = over_flagged.filter(keep).sort("screen_z", descending=True)
         under_flagged = under_flagged.filter(keep).sort("screen_z")
     else:  # raw biggest-disagreement extremes, blind spots included
-        over_flagged = over_flagged.sort("opa_vs_model_ratio", descending=True)
-        under_flagged = under_flagged.sort("opa_vs_model_ratio")
+        over_flagged = over_flagged.sort("display_ratio", descending=True)
+        under_flagged = under_flagged.sort("display_ratio")
     over = over_flagged.head(n).select(cols)
     under = under_flagged.head(n).select(cols)
     non_uniform = (
@@ -701,7 +704,7 @@ def leaderboards(
             "parcel_id",
             "address",
             "opa_market_value",
-            "model_median",
+            "display_median",
             "twin_n",
             "opa_vs_twin_median",
         )
