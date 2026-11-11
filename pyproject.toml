@@ -45,6 +45,26 @@ dev = [
     "ruff>=0.5",
     "ty>=0.0.97",
 ]
+# Serve-time dependencies: the ONLY third-party packages the API may import.
+# The Docker image and the smoke venv (`just api-smoke`) install this group
+# straight from uv.lock (`uv sync --frozen --only-group serve`), so they run
+# the exact versions the project is locked and tested on, and a training-only
+# import leaking into the serve path fails the smoke gate instead of
+# production. Versions come from `dependencies` above; list names only here.
+serve = [
+    # the point estimate is a LightGBM+CatBoost stack: score_point and the
+    # report's blended-SHAP drivers load both models per run
+    "catboost",
+    "fastapi",
+    "lightgbm",
+    "numpy",
+    "polars",
+    "pydantic",
+    "uvicorn[standard]",
+]
+# The smoke script's test client; installed beside `serve` in the smoke venv
+# only, never in the image.
+serve-smoke = ["httpx"]
 
 [build-system]
 requires = ["uv_build>=0.11,<0.12"]

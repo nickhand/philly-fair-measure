@@ -12,22 +12,29 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-# serve-time dependencies only — the same pinned list `just api-smoke` tests
-# against, so the smoke gate proves the image's import surface
-COPY requirements.serve.txt ./
-RUN uv pip install --system --no-cache -r requirements.serve.txt
+# Use the image's Python; never let uv fetch its own.
+ENV UV_PYTHON_DOWNLOADS=never \
+    UV_LINK_MODE=copy
 
-COPY pyproject.toml README.md LICENSE ./
+# Serve-time dependencies only: the `serve` dependency group, installed from
+# uv.lock into /app/.venv. `--frozen` uses the locked versions and hashes as
+# they are, so the image runs exactly what `just api-smoke` tested.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-cache --only-group serve
+
+# The package itself, without dependencies (the group above supplies them).
+COPY README.md LICENSE ./
 COPY src ./src
-RUN uv pip install --system --no-cache --no-deps .
+RUN uv pip install --python .venv/bin/python --no-cache --no-deps .
 
 COPY deploy/data ./data
 
-ENV PHILLY_DATA_DIR=/app/data \
+ENV PATH="/app/.venv/bin:$PATH" \
+    PHILLY_DATA_DIR=/app/data \
     PHILLY_ENV=prod \
     PORT=8080
 
