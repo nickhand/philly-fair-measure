@@ -22,6 +22,7 @@ The helpers act on the checkout of the current directory, wherever they live: it
 | A published number | Re-measure it from the mart (`$S remeasure` or a polars query) and compare with `web/src/data/siteStats.json` and every page or endpoint that shows it. |
 | CLI | `$S cli` with `--help`, plus a read-only run of the command. |
 | CI or workflow | `$S ci` (contract tests, routing, YAML parse) and the changed job's commands. Scheduled runs, the production deploy job, Cloudflare publishing, Fly deploys and the S3 snapshot job cannot run locally; list them as unverified. |
+| Any of these | A helper's exit 0 is not the proof. Assert the value the change is about (a field, a count, visible text) and save the assertion in the evidence folder. Recomputing a number with the code under test proves it reproduces, not that it is right, so a changed formula needs an independent polars recount from the mart. |
 | Anything, before a PR | `just gates`. It rebuilds `web/dist` with analytics on, so run `$S build-site` again before driving the preview. |
 
 Drive the path a user takes (the search box, a URL, the request a client sends), not internal functions. Capture the action and the resulting state. Check side effects with a second view: the stored value read back, a recount from the mart.
