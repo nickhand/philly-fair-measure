@@ -5,6 +5,8 @@ import polars as pl
 import pytest
 import respx
 
+from philly_fair_measure import catalog
+from philly_fair_measure.ingest.manifests import read_manifest
 from philly_fair_measure.ingest.snapshots import snapshot_arcgis_layer
 from philly_fair_measure.sources.arcgis import PHL_ARCGIS_BASE, ArcGISClient, ArcGISError
 
@@ -95,3 +97,34 @@ def test_snapshot_arcgis_layer_end_to_end(tmp_path):
     assert table["num_brt"].dtype == pl.Int64
     assert table["gross_area"].dtype == pl.Float64
     assert json.loads(table["geometry_geojson"][0])["type"] == "Polygon"
+
+
+@respx.mock
+def test_limited_arcgis_snapshot_never_becomes_latest(tmp_path):
+    respx.get(f"{LAYER_URL}/query").mock(side_effect=_handler)
+    respx.get(LAYER_URL).mock(return_value=httpx.Response(200, json=FIELDS_META))
+
+    result = snapshot_arcgis_layer("TEST_SVC", data_dir=tmp_path, limit=2)
+
+    assert "test_svc" not in catalog.latest_snapshots(tmp_path)
+    assert pl.read_parquet(result.directory / "data.parquet").height == 2
+    assert read_manifest(result.directory).row_limit == 2
+
+
+@respx.mock
+def test_arcgis_count_mismatch_fails_and_is_never_published(tmp_path):
+    def counts_four(request: httpx.Request) -> httpx.Response:
+        if request.url.params.get("returnCountOnly") == "true":
+            return httpx.Response(200, json={"count": 4})
+        return _handler(request)
+
+    respx.get(f"{LAYER_URL}/query").mock(side_effect=counts_four)
+    respx.get(LAYER_URL).mock(return_value=httpx.Response(200, json=FIELDS_META))
+
+    with pytest.raises(RuntimeError):
+        snapshot_arcgis_layer("TEST_SVC", data_dir=tmp_path)
+
+    assert "test_svc" not in catalog.latest_snapshots(tmp_path)
+    (kept,) = (tmp_path / "raw" / "source=arcgis" / "dataset=test_svc").glob("*.incomplete")
+    manifest = read_manifest(kept)
+    assert (manifest.source_row_count, manifest.row_count) == (4, 3)
