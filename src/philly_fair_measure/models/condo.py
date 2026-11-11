@@ -168,10 +168,14 @@ def train_condo(
     )
 
     test_adj = test_df["time_adj_log"].to_numpy() if time_adjusted else np.zeros(test_df.height)
-    pred_ref = booster.predict(x["test"], num_iteration=booster.best_iteration)
+    pred_ref = np.asarray(
+        booster.predict(x["test"], num_iteration=booster.best_iteration), dtype=np.float64
+    )
     calibration = None
     if vertical_calibration:
-        val_pred = booster.predict(x["val"], num_iteration=booster.best_iteration)
+        val_pred = np.asarray(
+            booster.predict(x["val"], num_iteration=booster.best_iteration), dtype=np.float64
+        )
         calibration = fit_vertical_calibration(val_pred, y["val"])
         pred_ref = apply_vertical_calibration(pred_ref, calibration)
     pred = np.exp(pred_ref - test_adj)

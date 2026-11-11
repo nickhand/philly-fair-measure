@@ -62,6 +62,31 @@ test('uses the empty SPA shell for dynamic routes and returns 404 for unknown pa
   }
 })
 
+test('serves the full SPA shell when a reload sends a conditional request', async () => {
+  const assets = { fetch: async (request) => {
+    if (new URL(request.url).pathname !== '/spa.html') {
+      return new Response('Not found', { status: 404 })
+    }
+    // What the static-assets binding does when the validator matches.
+    if (request.headers.get('If-None-Match') || request.headers.get('If-Modified-Since')) {
+      return new Response(null, { status: 304, headers: { ETag: '"shell"' } })
+    }
+    return new Response('<div id="app"></div>', {
+      headers: { 'Content-Type': 'text/html', ETag: '"shell"' },
+    })
+  } }
+  for (const path of ['/map', '/property/123456789']) {
+    const response = await worker.fetch(
+      new Request(`https://www.nickhand.dev/fair-measure${path}`, {
+        headers: { 'If-None-Match': '"shell"', 'If-Modified-Since': 'Wed, 01 Jul 2026 00:00:00 GMT' },
+      }),
+      { ASSETS: assets, INDEXABLE: 'true' },
+    )
+    assert.equal(response.status, 200, path)
+    assert.equal(await response.text(), '<div id="app"></div>')
+  }
+})
+
 test('serves a generated page without falling back to the SPA shell', async () => {
   const requests = []
   const assets = { fetch: async (request) => {

@@ -102,7 +102,7 @@ def join_tracts(df: pl.DataFrame, acs: pl.DataFrame) -> pl.DataFrame:
             for c in acs_cols.columns
         ]
     )
-    return pl.concat([df, joined], how="horizontal")
+    return pl.concat([df, joined], how="horizontal", strict=True)
 
 
 def run_acs_sensitivity(
@@ -172,10 +172,13 @@ def run_acs_sensitivity(
             valid_sets=[train_set.create_valid(x_val, label=y_val)],
             callbacks=[lgb.early_stopping(early_stopping_rounds, verbose=False)],
         )
-        pred_ref = booster.predict(x_test, num_iteration=booster.best_iteration)
-        calibration = fit_vertical_calibration(
-            booster.predict(x_val, num_iteration=booster.best_iteration), y_val
+        pred_ref = np.asarray(
+            booster.predict(x_test, num_iteration=booster.best_iteration), dtype=np.float64
         )
+        val_pred = np.asarray(
+            booster.predict(x_val, num_iteration=booster.best_iteration), dtype=np.float64
+        )
+        calibration = fit_vertical_calibration(val_pred, y_val)
         pred_ref = apply_vertical_calibration(pred_ref, calibration)
         estimates[name] = np.exp(pred_ref - test_adj)
         if name == "with_acs":

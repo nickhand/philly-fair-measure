@@ -131,7 +131,7 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
     <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
       <h2 class="text-title font-bold text-ink">How our estimates hold up</h2>
       <p class="mt-1 text-caption text-muted">
-        Checked against {{ nTest.toLocaleString() }} real sales the model never saw (out-of-time
+        Checked against {{ nTest.toLocaleString('en-US') }} real sales the model never saw (out-of-time
         test, {{ stats.meta.generated_at.slice(0, 4) }}).
       </p>
       <table class="mt-3 w-full text-left text-body-sm">

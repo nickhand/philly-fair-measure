@@ -148,7 +148,7 @@ def with_cluster_building_id(units: pl.DataFrame) -> pl.DataFrame:
         while parent[a] != a:
             parent[a] = parent[parent[a]]
             a = parent[a]
-        return a
+        return int(a)
 
     pairs = cKDTree(xy).query_pairs(CLUSTER_RADIUS_M, output_type="ndarray")
     for a, b in pairs:

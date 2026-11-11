@@ -327,7 +327,9 @@ def crossfit_characteristic_quality(
     # A continuous score is safer for later ablations than a hand-tuned all-or-
     # nothing warning.  Three area sigmas maps to 1; expected 3 beds/1.5 baths
     # with zeros also maps to roughly 1.
-    characteristic_score = np.maximum.reduce(
+    # fmax, not maximum: a parcel with no living area has a NaN area z-score,
+    # and that must not erase its bed/bath conflict
+    characteristic_score = np.fmax.reduce(
         [
             np.abs(area_z) / 3.0,
             bed_conflict / 3.0,
@@ -345,16 +347,17 @@ def crossfit_characteristic_quality(
         pl.Series("quality_expected_livable_area", expected_area),
         pl.Series("quality_area_reference_low_90", expected_area * np.exp(residual_q05)),
         pl.Series("quality_area_reference_high_90", expected_area * np.exp(residual_q95)),
-        pl.Series("quality_area_ratio_to_expected", area / expected_area),
-        pl.Series("quality_area_log_residual", residual),
-        pl.Series("quality_area_disagreement_z", area_z),
+        # NaN is not null in polars: store "no living area" as a real null
+        pl.Series("quality_area_ratio_to_expected", area / expected_area).fill_nan(None),
+        pl.Series("quality_area_log_residual", residual).fill_nan(None),
+        pl.Series("quality_area_disagreement_z", area_z).fill_nan(None),
         pl.Series("quality_area_outlier", np.abs(area_z) > outlier_z),
         pl.Series("quality_expected_beds", counts["char_beds"]),
         pl.Series("quality_expected_baths", counts["char_baths"]),
         pl.Series("quality_bed_zero_conflict", bed_conflict),
         pl.Series("quality_bath_zero_conflict", bath_conflict),
         pl.Series("quality_zero_bed_bath_conflict", zero_pair_conflict),
-        pl.Series("quality_characteristic_conflict_score", characteristic_score),
+        pl.Series("quality_characteristic_conflict_score", characteristic_score).fill_nan(None),
         pl.Series(
             "quality_characteristic_outlier",
             characteristic_score >= score_outlier_threshold,

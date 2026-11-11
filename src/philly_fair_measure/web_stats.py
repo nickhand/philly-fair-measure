@@ -23,6 +23,7 @@ import polars as pl
 from philly_fair_measure import config
 from philly_fair_measure.models.metrics import evaluate_estimates
 from philly_fair_measure.models.scoring import latest_run_dir
+from philly_fair_measure.scalars import as_float
 
 logger = logging.getLogger(__name__)
 
@@ -273,7 +274,7 @@ def export_web_stats(
         c = d.filter(pl.col("fin_cash_sale") == 1.0)["sale_price"]
         f = d.filter(pl.col("fin_cash_sale") == 0.0)["sale_price"]
         if c.len() >= 50 and f.len() >= 50:
-            gaps.append(float(c.median()) / float(f.median()) - 1.0)  # type: ignore[arg-type]
+            gaps.append(as_float(c.median()) / as_float(f.median()) - 1.0)
     discount_pct = round(float(np.median(gaps)) * 100) if gaps else None
 
     # Historical redistribution (the Findings bar chart) — financed benchmark.
@@ -324,7 +325,7 @@ def export_web_stats(
 
     screen_df = pl.read_parquet(root / "marts" / "assessment_screen.parquet")
     audit = audit_screen(screen_df)
-    flags = audit["flags"]
+    flags: dict[str, int] = audit["flags"]
 
     def _flag_total(flag: str) -> int:
         return sum(count for key, count in flags.items() if key.endswith(f"/{flag}"))

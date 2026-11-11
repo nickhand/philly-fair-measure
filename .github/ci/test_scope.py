@@ -30,6 +30,12 @@ class ScopeTests(unittest.TestCase):
             {"python": True, "web": False, "release": False},
         )
 
+    def test_site_stats_change_also_runs_the_python_docs_check(self) -> None:
+        self.assertEqual(
+            SCOPE.classify(["web/src/data/siteStats.json"]),
+            {"python": True, "web": True, "release": True},
+        )
+
     def test_mixed_change_runs_both_and_releases(self) -> None:
         self.assertEqual(
             SCOPE.classify(["pyproject.toml", "web/wrangler.jsonc"]),

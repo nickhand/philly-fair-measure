@@ -35,10 +35,11 @@ Two model families share the mart, distinguished by `model_family` +
 Residential rows also carry `conformal_pi_low_90`/`conformal_pi_high_90` —
 the second uncertainty machine: spatially weighted CQR around the LightGBM
 quantile heads (models/cqr.py; fixed-offset conformal for runs predating the
-heads) — and every row a `display_pi_low_90`/`display_pi_high_90`: the range
-both machines support (Bayesian ∩ second machine for residential when that
-intersection also contains the median, the native band elsewhere). Surfaces
-should show the display band. Residential over/under flags require BOTH
+heads) — and every row a `display_median` with `display_pi_low_90`/
+`display_pi_high_90`: the calibrated stacked point and its own CQR band (the
+native band for condo rows), widened where needed so the range extends at
+least 10% past the shown estimate on each side. Surfaces should show the
+display pair. Residential over/under flags require BOTH
 machines to put OPA outside on the same side (the agreement gate in
 finalize_screen); `screen_z` stays anchored to `model_pi_*`.
 
@@ -243,16 +244,6 @@ def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
         .alias("screen_z")
     )
     unpriceable_null = pl.when(insufficient).then(pl.lit(None, dtype=pl.Float64))
-    # Display band: the range BOTH uncertainty machines support. For
-    # residential that's the Bayesian posterior ∩ conformal-knn intersection;
-    # condo rows (and fixtures without conformal columns) keep their native
-    # band. The intersection must also CONTAIN the displayed median — an
-    # intersection that excludes it reads as "estimate $996k, range
-    # $711k–$797k" (measured 2026-07-06: 28,837 rows). When the intersection
-    # fails, two coherent candidates exist: the native posterior band, and the
-    # conformal band minimally expanded to include the median. Neither
-    # dominates — the posterior's parametric sigma blows up on rare covariate
-    # combos (115x on 3416 Sansom St), while expanding the conformal band
     # Display = ROLE SEPARATION (Stage 5, measured 2026-07-06): the shown
     # estimate is the calibrated stacked point — the machine the drivers and
     # comps panels explain — and the shown band is its own CQR band. One
@@ -424,8 +415,17 @@ def build_assessment_screen(
     except FileNotFoundError:
         retail_run = None
     mart_built = read_derived_manifest(root / "marts" / "sale_features.parquet").built_at
+    # market areas and the price index are read straight from their own marts
+    # below, so a run has to postdate those as well as the sale mart
+    marts = (
+        ("sale_features", mart_built),
+        *(
+            (name, read_derived_manifest(paths[name]).built_at)
+            for name in ("market_areas", "price_index")
+        ),
+    )
     for run_dir in (baseline_run, bayesian_run, *([retail_run] if retail_run else [])):
-        _require_coherent(run_dir, (("sale_features", mart_built),), allow_stale=allow_stale)
+        _require_coherent(run_dir, marts, allow_stale=allow_stale)
 
     optional = {}
     for name in (
@@ -512,9 +512,9 @@ def build_assessment_screen(
     # (model.md §5.7): ~6% narrower than fixed-offset conformal at equal
     # coverage, 12% narrower in q4/q5, best by-district floor. The Bayesian
     # band keeps anchoring flags and z; this band's job is the agreement gate
-    # and display honesty — the shown range is their intersection
-    # (finalize_screen). Runs that predate the quantile heads fall back to the
-    # fixed-offset conformal band (models/conformal.py).
+    # and the displayed range (finalize_screen). Runs that predate the
+    # quantile heads fall back to the fixed-offset conformal band
+    # (models/conformal.py).
     from philly_fair_measure.models.cqr import cqr_band_for_frame
 
     second_machine = "cqr_knn"
@@ -627,7 +627,7 @@ def build_assessment_screen(
             pl.Series("cash_market_value", cash_market_value(retail, edges)),
         )
 
-    # aerial change evidence (diagnostics/aerial_change.py, `philly
+    # aerial change evidence (diagnostics/aerial_change.py, `fair-measure
     # aerial-score`): joined when present; scores describe the parcel between
     # two flights, so they stay valid across screen rebuilds
     aerial_path = root / "diagnostics" / "aerial_change_scores.parquet"
@@ -733,6 +733,10 @@ def _condo_screen_frame(
     marts = (
         ("condo_sale_features", read_derived_manifest(condo_mart).built_at),
         ("sale_features", residential_mart_built),
+        *(
+            (name, read_derived_manifest(root / "marts" / f"{name}.parquet").built_at)
+            for name in ("market_areas", "price_index")
+        ),
     )
     _require_coherent(condo_run, marts, allow_stale=allow_stale)
 

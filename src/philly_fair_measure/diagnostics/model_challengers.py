@@ -324,7 +324,8 @@ def model_challenger_check(data_dir: Path | None = None, *, seed: int = 42) -> C
     )
     for challenger, (numeric_extra, categorical_extra) in CHALLENGERS.items():
         numeric = [*base_numeric, *[c for c in numeric_extra if c not in NUMERIC_FEATURES]]
-        categorical = [*base_categorical, *categorical_extra]
+        # a promoted challenger's categoricals are already in the base list
+        categorical = list(dict.fromkeys([*base_categorical, *categorical_extra]))
         predictions[challenger], iterations[challenger] = _fit_challenger(
             fit, val, test, numeric, categorical, seed=seed
         )

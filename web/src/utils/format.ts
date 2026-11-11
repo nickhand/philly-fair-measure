@@ -17,7 +17,8 @@ export function moneyCompact(value: number | null | undefined): string {
   if (value == null) return NO_DATA
   const sign = value < 0 ? '−' : ''
   const abs = Math.abs(value)
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  // 999,500 already rounds to 1000k, so it belongs in the M branch
+  if (abs >= 999_500) return `${sign}$${(abs / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
   if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`
   return `${sign}${usd.format(abs)}`
 }

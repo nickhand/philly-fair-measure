@@ -166,7 +166,8 @@ def _owner_links(frame: pl.DataFrame, geoms: npt.NDArray[np.object_]) -> pl.Data
 
     owner = frame["owner_norm"].fill_null("").to_numpy()
     counts = frame.group_by("owner_norm").len().rename({"len": "owner_parcels"})
-    frame_counts = frame.join(counts, on="owner_norm", how="left")
+    # row order must match `owner` and `geoms`, which are used positionally below
+    frame_counts = frame.join(counts, on="owner_norm", how="left", maintain_order="left")
     linkable = (
         (frame_counts["owner_parcels"].fill_null(0) <= MAX_OWNER_PARCELS).to_numpy()
         & (owner != "")  # null owners can't join their group count; excluded here
@@ -200,7 +201,8 @@ def stg_parcels(raw: pl.LazyFrame, raw_opa: pl.LazyFrame) -> pl.LazyFrame:
 
     frame = raw.select(
         "parcelid",
-        "brt_id",
+        # a few PWD rows carry a trailing space, which breaks every OPA join
+        pl.col("brt_id").str.strip_chars(),
         "num_brt",
         "num_accounts",
         "gross_area",
@@ -228,7 +230,7 @@ def stg_parcels(raw: pl.LazyFrame, raw_opa: pl.LazyFrame) -> pl.LazyFrame:
     )
     geoms = _tangent_project(geoms)
 
-    frame = pl.concat([frame.drop("geometry_geojson"), shapes], how="horizontal")
+    frame = pl.concat([frame.drop("geometry_geojson"), shapes], how="horizontal", strict=True)
     frame = _owner_links(frame, geoms)
     out = (
         frame.filter(pl.col("brt_id").is_not_null() & (pl.col("brt_id") != ""))

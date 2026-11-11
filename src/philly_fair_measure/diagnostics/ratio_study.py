@@ -156,8 +156,10 @@ def iaao_bridge(data_dir: Path | None = None) -> pl.DataFrame:
     y_val = np.log(val_df["sale_price"].to_numpy())
     if params.get("time_adjusted"):
         y_val = y_val + val_df["time_adj_log"].cast(pl.Float64).fill_null(0.0).to_numpy()
-    calibration = fit_vertical_calibration(booster.predict(x_val), y_val)
-    pred_in_ref = apply_vertical_calibration(booster.predict(x_test), calibration)
+    val_pred = np.asarray(booster.predict(x_val), dtype=np.float64)
+    test_pred = np.asarray(booster.predict(x_test), dtype=np.float64)
+    calibration = fit_vertical_calibration(val_pred, y_val)
+    pred_in_ref = apply_vertical_calibration(test_pred, calibration)
 
     # the roll Keene actually studied: the FRESH reassessment (latest published
     # tax year), which was fit with these very sales available — the OPA analog

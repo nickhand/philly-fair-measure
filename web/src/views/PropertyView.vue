@@ -75,7 +75,7 @@ const isQualityWarning = computed(
 )
 const isHighModelRisk = computed(() => core.value?.prediction_risk_tier === 'high')
 
-/** The ordinary UI shows the overlap supported by both uncertainty methods.
+/** The ordinary UI shows the displayed estimate's own band (display_pi_*).
  * A suspect-record estimate instead shows the Bayesian band because its
  * variance model explicitly widens for measurement risk. */
 const bandLo = computed(() =>

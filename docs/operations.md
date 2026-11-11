@@ -64,8 +64,9 @@ uv run fair-measure validate-sales
 ## Full model refresh (coherence chain)
 
 Relearning market areas relabels geography, and any mart rebuild can shift
-training rows, so models must retrain before re-screening (the screen warns
-when a run predates its mart). The full order:
+training rows, so models must retrain before re-screening (the screen refuses
+to build when a run predates its marts, unless `--allow-stale` is passed). The
+full order:
 
 ```bash
 uv run fair-measure stage

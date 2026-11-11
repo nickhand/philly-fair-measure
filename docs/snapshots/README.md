@@ -194,7 +194,7 @@ Setup, once, with `<ACCOUNT_ID>` and a bucket name of your choosing:
 The same commands work against the local lake, no AWS involved:
 
 ```bash
-just snapshot-current      # fetch the three tables + print the diff
+just snapshot-current      # fetch the two active tables + print the diff
 uv run fair-measure snapshot-diff --datasets assessments   # one dataset
 ```
 

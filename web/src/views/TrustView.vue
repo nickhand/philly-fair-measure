@@ -355,7 +355,7 @@ const fullCard = [
 
       <p class="mt-4 text-caption text-faint">
         Source: out-of-time test slice of model run {{ meta.model_run_id }}, n =
-        {{ meta.n_test.toLocaleString() }} arms-length Philadelphia sales (regenerated
+        {{ meta.n_test.toLocaleString('en-US') }} arms-length Philadelphia sales (regenerated
         {{ meta.generated_at }} via <code>fair-measure export-web-stats</code>); the sale-chasing check
         uses the assesspy implementation across TY2025–2026. Every figure is reproducible from the
         <a :href="SITE.githubUrl" rel="noopener" class="font-semibold text-brand-600 underline"

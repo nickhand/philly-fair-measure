@@ -27,15 +27,17 @@ web:
 
 # ---------------------------------------------------------------- quality
 
-# Every gate: ruff (check + format), mypy, pytest, web tests, typed build
+# Every gate: ruff (check + format), ty, pytest, web tests, typed build
 [group: "quality"]
 gates:
 	uv run ruff format --check src tests
 	uv run ruff check src tests
-	uv run mypy src
+	uv run ty check
 	uv run fair-measure sync-docs --check
 	uv run pytest -q
+	python3 -m unittest discover .github/ci -p 'test_*.py'
 	cd web && npm run test:unit -- --run
+	cd web && npm run test:worker
 	cd web && npm run build
 
 # Python tests only
@@ -74,12 +76,14 @@ retrain-all:
 	uv run fair-measure export-web-stats
 	uv run fair-measure sync-docs
 
-# Rebuild the screen + regenerate the site's stats (models unchanged)
+# Rebuild the screen + regenerate the site's stats and the generated doc
+# blocks (models unchanged)
 [group: "pipeline"]
 rescreen:
 	uv run fair-measure screen-assessments
 	uv run fair-measure review-queue --limit 2000
 	uv run fair-measure export-web-stats
+	uv run fair-measure sync-docs
 
 # Regenerate web/src/data/siteStats.json from the latest runs
 [group: "pipeline"]
@@ -119,7 +123,7 @@ fly-launch:
 # Set the admin token secret (generate one first, e.g. `openssl rand -hex 24`)
 [group: "deploy-api"]
 fly-secrets:
-	flyctl secrets set PHILLY_ADMIN_TOKEN="{{ env('PHILLY_ADMIN_TOKEN') }}"
+	@flyctl secrets set PHILLY_ADMIN_TOKEN="{{ env('PHILLY_ADMIN_TOKEN') }}"
 
 [group: "deploy-api"]
 fly-status:

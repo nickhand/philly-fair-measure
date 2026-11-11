@@ -186,7 +186,7 @@ Live-profiled before ingestion (schemas, taxonomies, OPA linkage ~99%):
 | `business_licenses` | 431,952 | Rental licenses (288k): tenure spans via initial/inactive dates, `owneroccupied`, `numberofunits` → `ten_` features (17.2% of arms-length sales investor-held at sale). |
 | `appeals` | 43,149 | L&I + ZBA appeals with decisions. **Decision vocabulary splits by system generation**: legacy rows say GRANTED with a NULL appealtype; new ZBA rows say "Granted" (and often just "Complete"), match grants case-insensitively across boards. *Not* assessment appeals. |
 | `real_estate_tax_delinquencies` | ~54k | **Historical-only; unavailable as of 2026-11-02:** CARTO returns HTTP 403, `permission denied for table real_estate_tax_delinquencies`; scheduled capture paused. Existing snapshots contain legacy delinquency status per OPA account (total due, years owed, sheriff-sale flag), used by `dist_tax_*`/`dist_sheriff_sale` features and a screen evidence column. `opa_number` is numeric at source; staging restores the leading zeros. The table carries a `year_month` vintage; the 2026-07-11 snapshot diff found zero changes vs 07-03, which does not establish a monthly refresh schedule. See the availability note below. |
-| `demolitions` | ~30k | City demolition events (start/completed dates) → `evt_n_demolitions_before`/`evt_demo_days_since` as-of features, and the aerial-change pilot's ground-truth set. |
+| `demolitions` | ~14k | City demolition events (start/completed dates) → `evt_n_demolitions_before`/`evt_demo_days_since` as-of features, and the aerial-change pilot's ground-truth set. |
 
 **Delinquency availability, rechecked 2026-11-02:**
 `SELECT * FROM "real_estate_tax_delinquencies" LIMIT 0` at

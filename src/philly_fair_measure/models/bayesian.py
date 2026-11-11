@@ -589,7 +589,7 @@ def _fit_posterior(
         # nutpie: Rust NUTS, several-fold faster than the default sampler and
         # runs parallel chains as in-process threads — which also sidesteps the
         # macOS fork/segfault issue that forced sequential chains previously
-        sampler_kwargs: dict[str, str | int]
+        sampler_kwargs: dict[str, Any]
         try:
             import nutpie  # noqa: F401
 
@@ -829,9 +829,10 @@ def train_bayesian(
 
     # reference date for the per-area time slopes: the training window's end,
     # so slopes are identified in-sample and the roll scores at t_c ≈ 0
-    time_ref: date = train_df["sale_date"].max()  # type: ignore[assignment]
-    if isinstance(time_ref, datetime):
-        time_ref = time_ref.date()
+    latest_sale = train_df["sale_date"].max()
+    if not isinstance(latest_sale, date):
+        raise TypeError(f"expected a sale date in the training frame, got {latest_sale!r}")
+    time_ref = latest_sale.date() if isinstance(latest_sale, datetime) else latest_sale
 
     x_train = encoder.transform(train_df)
     area_train, district_train = geo.indices(train_df)
