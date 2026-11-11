@@ -190,6 +190,44 @@ def test_parcels_bbox_says_when_the_limit_drops_homes(tmp_path):
     assert len(exact["features"]) == in_view and exact["truncated"] is False
 
 
+def test_parcels_bbox_keeps_highlighted_homes_under_the_limit(tmp_path):
+    def home(pid: str, i: int, flag: str, attention: str | None = None) -> dict:
+        return {
+            **_screen_rows()[3],
+            "parcel_id": pid,
+            "address": f"{200 + i} MARKET ST",
+            "_lon": -75.15 + i * 1e-4,
+            "assessment_flag": flag,
+            "attention": attention,
+        }
+
+    # the mart lists the homes the map highlights after the quiet majority
+    screen = [
+        *(home(f"r{i}", i, "within_range") for i in range(6)),
+        home("d2", 6, "insufficient_record"),
+        home("d1", 7, "insufficient_record"),
+        home("w2", 8, "within_range", "high"),
+        home("w1", 9, "within_range", "low"),
+        home("u1", 10, "under_assessed_candidate"),
+        home("o1", 11, "over_assessed_candidate"),
+    ]
+    box = {"minx": -75.16, "miny": 39.94, "maxx": -75.14, "maxy": 39.96}
+
+    def served(rows: list[dict], name: str, limit: int) -> set[str]:
+        c = _client(tmp_path / name, rows)
+        fc = c.get("/api/parcels", params={**box, "limit": limit}).json()
+        assert fc["truncated"] is True
+        return {f["properties"]["id"] for f in fc["features"]}
+
+    # flagged first, then the watch tier, then data warnings, then the rest
+    assert served(screen, "a", 2) == {"u1", "o1"}
+    assert served(screen, "b", 4) == {"u1", "o1", "w1", "w2"}
+    assert served(screen, "c", 6) == {"u1", "o1", "w1", "w2", "d1", "d2"}
+    # a cut inside one group keeps the same homes whatever the mart's row order
+    assert served(screen, "d", 3) == served(screen[::-1], "e", 3)
+    assert served(screen, "f", 5) == served(screen[::-1], "g", 5)
+
+
 def test_report_degrades_without_model_artifacts(tmp_path):
     c = _client(tmp_path)
     body = c.get("/api/property/p1/report").json()
