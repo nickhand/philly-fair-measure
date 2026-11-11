@@ -295,24 +295,74 @@ def test_check_fails_when_a_block_loses_its_markers(tmp_path, monkeypatch, capsy
     assert "999,999" in (root / "README.md").read_text()
 
 
+def _condo_stats(model: tuple[float, float, float], opa: tuple[float, float, float]) -> dict:
+    """STATS with the condo card's (rmse_log, cod, prd) replaced."""
+    keys = ("rmse_log", "cod", "prd")
+    return {
+        **STATS,
+        "condo_card": {
+            "model": dict(zip(keys, model, strict=True)),
+            "opa": dict(zip(keys, opa, strict=True)),
+        },
+    }
+
+
+def _verdicts(bullet: str) -> set[str]:
+    return {v for v in ("beats", "trails", "matches") if v in bullet}
+
+
 @pytest.mark.parametrize(
     ("model", "opa", "verdicts"),
     [
-        ((0.243, 17.5), (0.278, 18.8), {"beats"}),
-        ((0.278, 18.8), (0.243, 17.5), {"trails"}),
-        ((0.243, 18.8), (0.278, 17.5), {"beats", "trails"}),
-        ((0.2431, 17.54), (0.2429, 17.46), {"matches"}),
+        ((0.243, 17.5, 1.010), (0.278, 18.8, 1.050), {"beats"}),
+        ((0.278, 18.8, 1.050), (0.243, 17.5, 1.010), {"trails"}),
+        ((0.243, 18.8, 1.010), (0.278, 17.5, 1.050), {"beats", "trails"}),
+        ((0.2431, 17.54, 1.0301), (0.2429, 17.46, 1.0299), {"matches"}),
     ],
     ids=["model-ahead", "opa-ahead", "split", "tie-at-printed-precision"],
 )
 def test_condo_verdict_follows_the_printed_numbers(model, opa, verdicts):
-    stats = {
-        **STATS,
-        "condo_card": {
-            "model": {"rmse_log": model[0], "cod": model[1]},
-            "opa": {"rmse_log": opa[0], "cod": opa[1]},
-        },
-    }
-    bullet = condo_bullet(stats)
-    assert {v for v in ("beats", "trails", "matches") if v in bullet} == verdicts
+    bullet = " ".join(condo_bullet(_condo_stats(model, opa)).split())
+    assert _verdicts(bullet) == verdicts
     assert ("closed the last gap" in bullet) == (verdicts == {"beats"})
+
+
+def test_condo_bullet_on_the_july_numbers_names_the_vertical_equity_gap():
+    bullet = condo_bullet(_condo_stats((0.240, 17.3, 1.060), (0.278, 18.8, 1.032)))
+    assert " ".join(bullet.split()) == (
+        "- Condo accuracy: the model beats OPA on error (rmse 0.240 vs 0.278) and "
+        "uniformity (COD 17.3 vs 18.8) but trails it on vertical equity "
+        "(PRD 1.060 vs 1.032)."
+    )
+
+
+# IAAO: a PRD inside 0.98-1.03 beats one outside it; otherwise the one closer
+# to 1.00 is better. Error and uniformity tie here, so the only other verdict
+# in the bullet is the vertical-equity one.
+@pytest.mark.parametrize(
+    ("model_prd", "opa_prd", "verdict"),
+    [
+        (1.040, 1.060, "beats"),
+        (1.060, 1.032, "trails"),
+        (1.005, 1.025, "beats"),
+        (1.025, 1.005, "trails"),
+        (0.990, 1.010, "matches"),
+        (1.028, 0.975, "beats"),
+        (0.975, 1.028, "trails"),
+        (1.030, 0.979, "beats"),
+    ],
+    ids=[
+        "both-outside-model-closer",
+        "both-outside-opa-closer",
+        "both-inside-model-closer",
+        "both-inside-opa-closer",
+        "equal-distance-either-side",
+        "inside-beats-closer-outside",
+        "outside-trails-farther-inside",
+        "upper-bound-is-inside",
+    ],
+)
+def test_prd_verdict_follows_the_iaao_standard(model_prd, opa_prd, verdict):
+    bullet = condo_bullet(_condo_stats((0.25, 18.0, model_prd), (0.25, 18.0, opa_prd)))
+    assert f"(PRD {model_prd:.3f} vs {opa_prd:.3f})" in " ".join(bullet.split())
+    assert _verdicts(bullet) == {"matches", verdict}
