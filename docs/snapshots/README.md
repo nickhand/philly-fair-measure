@@ -14,7 +14,9 @@ sheriff-sale flags.
 
 ## Source availability (verified 2026-11-02)
 
-The scheduled job currently captures `opa_properties_public` and `assessments`.
+The scheduled job captures the tables in `SCHEDULED_CARTO_TABLES`
+(`config.py`): the current-only `opa_properties_public` and `assessments`, and
+`rtt_summary`, `permits` and `violations`.
 Parcel-level `real_estate_tax_delinquencies` captures are **paused**: a live
 `SELECT * FROM "real_estate_tax_delinquencies" LIMIT 0` against
 <https://phl.carto.com/api/v2/sql> returns HTTP 403 with
@@ -57,9 +59,9 @@ trained with the copy captured on 2026-07-03, whose records carry a June 2022
 
 Each scheduled run records this pause as a warning and in its job summary.
 Before resuming, verify public API access and the parcel-level schema, then
-remove the table from `PAUSED_CARTO_TABLES`, restore it to `TABLES` in the
-workflow and the `snapshot-current` recipe, and remove the pause warning. A
-different source needs its own provenance.
+remove the table from `PAUSED_CARTO_TABLES`, add it to `SCHEDULED_CARTO_TABLES`,
+restore it to `TABLES` in the workflow and the `snapshot-current` recipe, and
+remove the pause warning. A different source needs its own provenance.
 
 ## How it works
 
@@ -67,12 +69,19 @@ different source needs its own provenance.
 at 04:23 UTC every Monday (plus on demand via
 `gh workflow run snapshot`):
 
-1. pull the latest previous snapshot per dataset from S3,
-2. fetch fresh copies via `fair-measure snapshot-all --tables ...`,
+1. pull the latest previous snapshot of each current-only table from S3,
+2. fetch fresh copies of the scheduled tables via
+   `fair-measure snapshot-all --tables $TABLES $EVENT_TABLES`,
 3. upload the new parquet to S3 (`s3://<bucket>/raw/`, same layout as
    `data/raw/`),
-4. run `fair-measure snapshot-diff` and commit the summary to this directory
-   as `YYYY-MM-DD.md`.
+4. run `fair-measure snapshot-diff` on the current-only tables and commit the
+   summary to this directory as `YYYY-MM-DD.md`.
+
+`snapshot-diff` covers only `opa_properties_public` and `assessments`. The
+event tables (`rtt_summary`, `permits`, `violations`) have no diff spec, so the
+job captures and uploads them without a summary. `fair-measure freshness`
+checks only the scheduled tables, and `.github/ci/test_snapshot_tables.py`
+fails when the workflow or `just snapshot-current` fetches a different set.
 
 If one active source fails, completed snapshots from the other sources are
 still uploaded, but the job remains failed and no diff summary is committed.
@@ -92,8 +101,9 @@ alive: GitHub disables cron workflows in public repos after 60 days without
 repository activity, and the weekly bot commit resets that clock. Failure
 emails go to the workflow author (GitHub's default for scheduled runs).
 
-Raw parquet is never committed; it lives in S3 (~165 MB/run, ~8.5 GB/year,
-pennies per month at standard rates).
+Raw parquet is never committed; it lives in S3. The July 2026 manifests put a
+run at ~830 MB (~165 MB for the current-only tables), so a year adds ~43 GB,
+about $1 a month at the S3 Standard list price.
 
 ## One-time AWS setup
 
