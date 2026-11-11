@@ -236,8 +236,10 @@ calling the current model ground truth.
   (`_require_admin` in api.py; `just fly-secrets` sets it in production). The
   `/admin` view's client-side passphrase remains a convenience gate only, the
   server-side token is the real access control.
-- CORS uses an allowlist from `PHILLY_CORS_ORIGINS` (api.py); dev uses the
-  Vite proxy.
+- CORS allows any origin for `GET` requests without credentials. `api.py`
+  reads a comma-separated allowlist from `PHILLY_CORS_ORIGINS` and falls back
+  to `*` when it is unset. `fly.toml` does not set it, and production answers
+  `access-control-allow-origin: *`. Dev uses the Vite proxy.
 
 ## Known limitations
 

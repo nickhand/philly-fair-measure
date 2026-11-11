@@ -56,14 +56,39 @@ snapshot-current:
 	uv run fair-measure snapshot-all --tables assessments opa_properties_public
 	uv run fair-measure snapshot-diff --datasets assessments opa_properties_public
 
-# Full coherent retrain: sale validity -> features -> every model -> screen ->
-# site stats -> docs. Any feature/mart rebuild REQUIRES retraining every model
-# (the screen refuses stale runs) — this is the one command that keeps it all
-# coherent, including the validity mart upstream and the generated docs
-# downstream (a retrain without sync-docs leaves `just gates` failing).
+# The ArcGIS layers are parcels, building footprints, the proximity layers and
+# the annual report's tract demographics. A clean checkout needs all of them
+# before `just retrain-all`. They change rarely, so refresh them occasionally
+# rather than weekly.
+# Capture the CARTO core tables and the ArcGIS layers that the rebuild reads
+[group: "pipeline"]
+snapshot-sources:
+	uv run fair-measure snapshot-all
+	uv run fair-measure snapshot arcgis PWD_PARCELS --dataset pwd_parcels
+	uv run fair-measure snapshot arcgis LI_BUILDING_FOOTPRINTS --dataset building_footprints
+	uv run fair-measure snapshot arcgis PPR_Properties --dataset ppr_properties
+	uv run fair-measure snapshot arcgis Street_Centerline --dataset street_centerline
+	uv run fair-measure snapshot arcgis _Philadelphia_Bike_Network_2024 --dataset bike_network
+	uv run fair-measure snapshot arcgis Philadelphia_Census_Tracts_ACS_2022_Select_Demographics --dataset acs_tract_demographics
+	uv run fair-measure snapshot arcgis Broad_Street_Line_Stations --dataset septa_bsl_stations --org septa
+	uv run fair-measure snapshot arcgis Market_Frankford_Line_Stations --dataset septa_mfl_stations --org septa
+	uv run fair-measure snapshot arcgis Regional_Rail_Stations --dataset septa_regional_rail --org septa
+	uv run fair-measure snapshot arcgis "Fall_2023_Stop_Summary_(Bus)" --dataset septa_bus_stops --org septa
+
+# The canonical rebuild: staging -> sale validity -> market areas + price
+# index -> proximity + characteristic quality -> features -> every model ->
+# screen -> site stats -> docs. Each step reads what the steps above it wrote
+# (tests/test_pipeline_sequence.py checks the order). Any mart rebuild REQUIRES
+# retraining every model (the screen refuses stale runs), and a retrain without
+# sync-docs leaves `just gates` failing.
+# Rebuild staged tables, marts, models, the screen, site stats and docs from the latest raw snapshots
 [group: "pipeline"]
 retrain-all:
+	uv run fair-measure stage
 	uv run fair-measure validate-sales
+	uv run fair-measure build-market-areas
+	uv run fair-measure build-price-index
+	uv run fair-measure build-proximity
 	uv run fair-measure build-characteristic-quality
 	uv run fair-measure build-features
 	uv run fair-measure build-condo-features

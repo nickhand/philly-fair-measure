@@ -42,10 +42,11 @@ BUILDERS: dict[str, tuple[Callable[..., pl.LazyFrame], tuple[str, ...]]] = {
     "appeals": (tables.stg_appeals, ("appeals",)),
 }
 
-# Large geospatial snapshots are refreshed separately from the weekly CARTO
-# capture. A default ``stage`` should still build the core tables when one has
-# never been fetched; explicitly requesting an optional table remains strict.
-OPTIONAL_BUILDERS = {"building_footprints"}
+# A default ``stage`` still builds the core tables when one of these has no
+# snapshot: building footprints are a large ArcGIS capture refreshed separately,
+# and a clean checkout has no delinquency snapshot because the source is paused
+# (config.PAUSED_CARTO_TABLES). Explicitly requesting one remains strict.
+OPTIONAL_BUILDERS = {"building_footprints", "delinquencies"}
 
 
 @dataclass(frozen=True)

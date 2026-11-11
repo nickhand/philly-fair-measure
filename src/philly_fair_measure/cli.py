@@ -998,10 +998,15 @@ def _cmd_comps(args: argparse.Namespace) -> int:
 
 
 def _cmd_snapshot_all(args: argparse.Namespace) -> int:
+    selected = args.tables
+    if selected is None:
+        selected = [t for t in config.CORE_CARTO_TABLES if t not in config.PAUSED_CARTO_TABLES]
+        for table, reason in config.PAUSED_CARTO_TABLES.items():
+            print(f"skipped {table} (paused): {reason}")
     tables = {
         table: page_size
         for table, page_size in config.CORE_CARTO_TABLES.items()
-        if args.tables is None or table in args.tables
+        if table in selected
     }
     failures = []
     for table, page_size in tables.items():
@@ -1533,13 +1538,13 @@ def main(argv: list[str] | None = None) -> int:
     comps.set_defaults(func=_cmd_comps)
 
     snapshot_all = subparsers.add_parser(
-        "snapshot-all", help="snapshot every core table (the recurring snapshot job)"
+        "snapshot-all", help="snapshot every core table except the paused ones"
     )
     snapshot_all.add_argument(
         "--tables",
         nargs="+",
         choices=sorted(config.CORE_CARTO_TABLES),
-        help="snapshot only these core tables (default: all)",
+        help="snapshot only these core tables, paused ones included (default: all active)",
     )
     snapshot_all.add_argument("--data-dir", type=Path)
     snapshot_all.set_defaults(func=_cmd_snapshot_all)
