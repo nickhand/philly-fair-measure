@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { JSDOM } from 'jsdom'
 
 const dist = new URL('../dist/', import.meta.url)
@@ -57,4 +57,15 @@ assert.equal(shell.querySelector('link[rel="canonical"]'), null, 'Do not pin Hom
 for (const path of ['map.html', 'admin.html', 'leaderboards.html', 'property']) {
   assert.equal(existsSync(new URL(path, dist)), false, `Unexpected pre-rendered dynamic route: ${path}`)
 }
-console.log('Verified 6 pre-rendered pages, the report alias, per-page metadata, neutral deadlines, and SPA fallback.')
+// Only hashed files under assets/ get the Worker's immutable cache; anything else is revalidated on every load.
+const css = readdirSync(new URL('assets/', dist))
+  .filter((file) => file.endsWith('.css'))
+  .map((file) => readFileSync(new URL(`assets/${file}`, dist), 'utf8'))
+  .join('\n')
+const fonts = [...css.matchAll(/url\(["']?([^"')]+\.woff2)["']?\)/g)].map((match) => match[1])
+assert.ok(fonts.length > 0, 'Built CSS references no web fonts')
+for (const font of fonts) {
+  assert.match(font, /\/assets\/[\w.-]+-[\w-]{8}\.woff2$/, `Web font is not a hashed asset: ${font}`)
+  assert.ok(existsSync(new URL(font.slice(font.lastIndexOf('assets/')), dist)), `Missing web font: ${font}`)
+}
+console.log('Verified 6 pre-rendered pages, the report alias, per-page metadata, neutral deadlines, SPA fallback, and hashed web fonts.')
