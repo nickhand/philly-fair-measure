@@ -100,13 +100,14 @@ bundle-data:
 	uv run python scripts/bundle_deploy_data.py
 
 # Boot the API against the deploy bundle and exercise every endpoint, in a
-# venv holding ONLY the serve deps (mirrors the Docker image) — catches both
-# missing bundle files and training-only imports leaking into the serve path
+# venv holding ONLY the `serve` dependency group at its uv.lock versions (the
+# same install the Docker image does, plus the smoke script's test client) —
+# catches missing bundle files, training-only imports leaking into the serve
+# path, and version drift between the lock and the image
 [group: "deploy-api"]
 api-smoke:
 	rm -rf .venv-serve
-	uv venv .venv-serve
-	uv pip install --python .venv-serve/bin/python -r requirements.serve.txt httpx
+	UV_PROJECT_ENVIRONMENT=.venv-serve uv sync --frozen --only-group serve --only-group serve-smoke
 	uv pip install --python .venv-serve/bin/python --no-deps .
 	.venv-serve/bin/python scripts/smoke_api.py
 

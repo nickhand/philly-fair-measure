@@ -99,7 +99,7 @@ def fit_metrics(estimate: npt.ArrayLike, sale_price: npt.ArrayLike) -> FitMetric
 
 def ratio_metrics(estimate: npt.ArrayLike, sale_price: npt.ArrayLike) -> RatioMetrics:
     # deferred: assesspy is a training-only dependency, absent from the serve
-    # image (requirements.serve.txt) whose API imports this module transitively
+    # image (the `serve` dependency group) whose API imports this module transitively
     import assesspy
 
     est, sale = _clean(estimate, sale_price)

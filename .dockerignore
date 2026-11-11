@@ -1,7 +1,7 @@
 # Only the package source + the curated deploy bundle enter the image.
 *
 !pyproject.toml
-!requirements.serve.txt
+!uv.lock
 !README.md
 !src
 !deploy/data
