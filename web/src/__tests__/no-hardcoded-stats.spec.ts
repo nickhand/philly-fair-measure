@@ -130,4 +130,20 @@ describe('frontend does not hardcode run-dependent stats', () => {
 
     expect(offenders, `\n${offenders.join('\n')}\n`).toEqual([])
   })
+
+  it('takes the tax year in index.html, the sitemap and the deploy checks from siteStats', () => {
+    // The post-deploy checks roll a release back when they ask for a report page the build no longer has.
+    const year = String(stats.annual_report.tax_year)
+    const files = [
+      'index.html',
+      'public/sitemap.xml',
+      'scripts/check-cloudflare-release.mjs',
+      'scripts/check-cloudflare-browser.mjs',
+    ]
+    const offenders = files
+      .filter((file) => new RegExp(`\\b${year}\\b`).test(read(join(SRC, '..', file))))
+      .map((file) => `${file}: pinned tax year ${year}`)
+
+    expect(offenders, `\n${offenders.join('\n')}\n`).toEqual([])
+  })
 })
