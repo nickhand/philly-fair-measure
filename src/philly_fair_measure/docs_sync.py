@@ -13,9 +13,10 @@ mechanical, so `sync-docs --check` in CI fails the moment a doc goes stale:
   `fair-measure sync-docs`. Everything outside markers is hand-written prose
   and never touched.
 - `fair-measure sync-docs --check` exits non-zero when the docs disagree with
-  the JSON — wired into `just gates` and CI. Because the source is committed,
-  CI can verify the docs without the data lake; JSON-vs-data consistency is
-  guaranteed by export-web-stats being the file's only writer.
+  the JSON or a doc has lost a block's markers — wired into `just gates` and
+  CI. Because the source is committed, CI can verify the docs without the data
+  lake; JSON-vs-data consistency is guaranteed by export-web-stats being the
+  file's only writer.
 
 Workflow after a retrain: screen-assessments → export-web-stats → sync-docs
 (`just export-stats` chains the last two) → commit.
@@ -275,16 +276,36 @@ def veq_robustness(stats: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _versus(model: str, opa: str) -> str:
+    """How the model compares with OPA on a lower-is-better statistic."""
+    if float(model) < float(opa):
+        return "beats"
+    if float(model) > float(opa):
+        return "trails"
+    return "matches"
+
+
 def condo_bullet(stats: dict[str, Any]) -> str:
-    """The condo accuracy line, shared by README limitations and model.md §6."""
+    """The condo accuracy line, shared by README limitations and model.md §6.
+
+    The verdict compares the printed values, so it never contradicts them.
+    """
     c, o = stats["condo_card"]["model"], stats["condo_card"]["opa"]
-    return (
-        f"- Condo accuracy: the model beats OPA on error (rmse {c['rmse_log']:.3f} vs "
-        f"{o['rmse_log']:.3f}) and on\n"
-        f"  uniformity (COD {c['cod']:.1f} vs {o['cod']:.1f}). Condos were long OPA's strongest "
-        f"segment; the\n"
-        f"  market-area price index closed the last gap.\n"
+    rmse = (f"{c['rmse_log']:.3f}", f"{o['rmse_log']:.3f}")
+    cod = (f"{c['cod']:.1f}", f"{o['cod']:.1f}")
+    error, uniformity = _versus(*rmse), _versus(*cod)
+    joiner = "and on" if error == uniformity else f"but {uniformity} it on"
+    bullet = (
+        f"- Condo accuracy: the model {error} OPA on error (rmse {rmse[0]} vs {rmse[1]}) "
+        f"{joiner}\n"
+        f"  uniformity (COD {cod[0]} vs {cod[1]})."
     )
+    if error == uniformity == "beats":
+        bullet += (
+            " Condos were long OPA's strongest segment; the\n"
+            "  market-area price index closed the last gap."
+        )
+    return bullet + "\n"
 
 
 BLOCKS: dict[str, Any] = {
@@ -299,17 +320,25 @@ BLOCKS: dict[str, Any] = {
     "condo-card": condo_bullet,
 }
 
-DOC_FILES = (
-    Path("README.md"),
-    Path("docs/model.md"),
-    Path("docs/vertical-equity-report-card.md"),
-)
+# The blocks each doc must carry. Deleting a block's markers takes it out of
+# the drift check, so a missing block fails the check instead.
+DOC_BLOCKS: dict[Path, tuple[str, ...]] = {
+    Path("README.md"): ("readme-screen-counts", "readme-results-tables", "condo-card"),
+    Path("docs/model.md"): ("model-results-table", "condo-card", "model-screen-counts"),
+    Path("docs/vertical-equity-report-card.md"): (
+        "veq-meta",
+        "veq-card-iaao",
+        "veq-card-full",
+        "veq-robustness",
+    ),
+}
 
 
 @dataclass(frozen=True)
 class SyncResult:
     changed: list[str]  # "file:block" identifiers that were (or would be) rewritten
     unknown: list[str]  # marker names with no registered builder
+    missing: list[str]  # "file:block" identifiers from DOC_BLOCKS with no markers in the file
 
 
 def sync_docs(repo_root: Path | None = None, *, check: bool = False) -> SyncResult:
@@ -317,9 +346,12 @@ def sync_docs(repo_root: Path | None = None, *, check: bool = False) -> SyncResu
     stats = json.loads((root / STATS_PATH).read_text())
     changed: list[str] = []
     unknown: list[str] = []
-    for rel in DOC_FILES:
+    missing: list[str] = []
+    for rel, owned in DOC_BLOCKS.items():
         path = root / rel
         text = path.read_text()
+        present = {match.group("name") for match in _MARKER.finditer(text)}
+        missing.extend(f"{rel}:{name}" for name in owned if name not in present)
 
         def replace(match: re.Match[str], rel: Path = rel) -> str:
             name = match.group("name")
@@ -335,4 +367,4 @@ def sync_docs(repo_root: Path | None = None, *, check: bool = False) -> SyncResu
         new_text = _MARKER.sub(replace, text)
         if not check and new_text != text:
             path.write_text(new_text)
-    return SyncResult(changed=changed, unknown=unknown)
+    return SyncResult(changed=changed, unknown=unknown, missing=missing)

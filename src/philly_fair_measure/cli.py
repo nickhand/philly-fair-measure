@@ -220,12 +220,16 @@ def _cmd_sync_docs(args: argparse.Namespace) -> int:
     result = sync_docs(check=args.check)
     for name in result.unknown:
         print(f"WARNING: no builder registered for marker {name}")
+    for name in result.missing:
+        print(f"MISSING: no generated markers for {name}; restore them from git history")
     if args.check:
         if result.changed:
             print("docs out of sync with web/src/data/siteStats.json:")
             for name in result.changed:
                 print(f"  {name}")
             print("run `fair-measure sync-docs` and commit the result")
+            return 1
+        if result.missing:
             return 1
         print("docs in sync with siteStats.json")
         return 0
@@ -234,7 +238,7 @@ def _cmd_sync_docs(args: argparse.Namespace) -> int:
             print(f"rewrote {name}")
     else:
         print("docs already in sync")
-    return 0
+    return 1 if result.missing else 0
 
 
 def _cmd_screen_audit(args: argparse.Namespace) -> int:
