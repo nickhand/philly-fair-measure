@@ -182,7 +182,7 @@ uv run python -c "import polars as pl; s = pl.scan_parquet('data/marts/assessmen
 $S ci <slug> [base, default origin/main]
 ```
 
-runs the `.github/ci` contract tests, pipes every changed path (committed, staged, unstaged, untracked) through `.github/ci/scope.py` to show the `python=`, `web=`, `release=` routing CI would pick, and parses `.github/workflows/*.yml`. It saves `ci.txt`. [`features/ci-workflows.md`](features/ci-workflows.md) covers the job commands and what only a real GitHub run proves.
+runs the `.github/ci` contract tests, lists the changed paths with the diff `ci.yml` runs (`git diff --name-only --no-renames <base>`, against the working tree instead of a pushed head, plus untracked files), pipes them through `.github/ci/scope.py` to show the `python=`, `web=`, `release=` routing CI would pick, and parses `.github/workflows/*.yml`. It saves `ci.txt`, refuses a base that is not a commit, and exits 1 when the tests, the path listing, `scope.py` or the parse fail. CI's base is the pull request's base commit, so pass the tip of the target branch (`origin/main` after a fetch). [`features/ci-workflows.md`](features/ci-workflows.md) covers the job commands and what only a real GitHub run proves.
 
 ## Cleanup
 

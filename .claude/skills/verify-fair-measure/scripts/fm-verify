@@ -311,23 +311,30 @@ case $cmd in
     ;;
   ci)
     base=${1:-origin/main}
+    git -C "$ROOT" rev-parse --verify --quiet "$base^{commit}" >/dev/null || { echo "ci: $base is not a commit" >&2; exit 2; }
     set +e
     (
       cd "$ROOT" || exit 1
       echo "\$ python3 -m unittest discover .github/ci -p 'test_*.py'"
       python3 -m unittest discover .github/ci -p 'test_*.py' 2>&1
       echo "exit $?"
-      echo "\$ paths changed vs $base (committed, staged, unstaged, untracked) | python3 .github/ci/scope.py"
-      paths=$({ git diff --name-only "$base"...HEAD; git diff --name-only HEAD; git ls-files --others --exclude-standard; } | sort -u)
+      # ci.yml runs `git diff --name-only --no-renames <base> <head>`; the working tree stands in
+      # for the head so uncommitted and untracked paths route as they will once committed.
+      echo "\$ { git diff --name-only --no-renames $base; git ls-files --others --exclude-standard; } | python3 .github/ci/scope.py"
+      paths=$(git diff --name-only --no-renames "$base" && git ls-files --others --exclude-standard) || echo "exit 1 listing changed paths"
+      paths=$(sort -u <<<"$paths")
       echo "${paths:-  (none)}" | sed 's/^/  /'
-      echo "$paths" | python3 .github/ci/scope.py
+      python3 .github/ci/scope.py <<<"$paths"
+      echo "exit $?"
       echo "\$ yaml.safe_load .github/workflows/*.yml"
       uv run --quiet python -c "import sys, yaml; [yaml.safe_load(open(f)) for f in sys.argv[1:]]; print('parsed', *sys.argv[1:])" .github/workflows/*.yml 2>&1
       echo "exit $?"
     ) | tee "$EV/ci.txt"
     set -e
-    log "ci vs $base"
-    ! grep -q '^exit [1-9]' "$EV/ci.txt"
+    code=0
+    ! grep -q '^exit [1-9]' "$EV/ci.txt" || code=1
+    log "ci vs $base (exit $code)"
+    exit "$code"
     ;;
   doctor)
     {

@@ -20,7 +20,7 @@ Two GitHub workflows run this repository. `.github/workflows/ci.yml` routes each
 
 Preconditions:
 
-- Run from the checkout under test. Commit the change, or leave it in the working tree; `$S ci` includes committed, staged, unstaged and untracked paths.
+- Run from the checkout under test. Commit the change, or leave it in the working tree; `$S ci` diffs the base against the working tree and adds untracked paths, so it routes the change as CI will once it is committed.
 
 - **Contracts, routing, syntax.** Run `$S ci <slug>` (or `$S ci <slug> <base>` for a branch not based on `origin/main`). It saves `ci.txt` and exits 0 when the `.github/ci` unittest run passes (11 tests at `ae7a681`), prints the changed paths with the `python=`, `web=`, `release=` routing CI would choose, and parses every file in `.github/workflows/` with PyYAML. Check the routing matches your intent: a `web/src` change must say `release=true`; a docs-only web change (`web/README.md`, `web/tests/`) must say `release=false`.
 - **Routing rule change.** When `scope.py` changes, add or update a case in `.github/ci/test_scope.py` and pipe sample paths by hand: `printf 'web/src/App.vue\ndocs/frontend.md\n' | python3 .github/ci/scope.py`.
@@ -32,7 +32,7 @@ What only a real GitHub run proves: `${{ }}` expression evaluation and `if:` con
 
 ## Gotchas
 
-- `scope.py` answers true for all three on empty input. `$S ci` avoids that by including the working tree; a bare `git diff origin/main...HEAD | python3 .github/ci/scope.py` before the first commit does not.
+- `scope.py` answers true for all three on empty input. `$S ci` avoids that by including the working tree; a bare `git diff --name-only --no-renames origin/main HEAD | python3 .github/ci/scope.py` before the first commit does not.
 - The contract tests assert literal strings in `ci.yml` and `web/package.json`. Renaming a step or a script breaks them on purpose; update the test with the change, never delete the assertion to pass.
 - actionlint is not installed here. A YAML parse catches indentation and quoting errors only.
 - `just snapshot-current` and `fair-measure snapshot-all` write new raw snapshots into the shared lake. They are pipeline runs, not checks.
