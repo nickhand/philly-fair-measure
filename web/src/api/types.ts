@@ -187,4 +187,7 @@ export interface ParcelFeature {
 export interface ParcelCollection {
   type: 'FeatureCollection'
   features: ParcelFeature[]
+  /** /api/parcels only: the viewport held more homes than the API returns.
+   * Absent from APIs deployed before the flag existed. */
+  truncated?: boolean
 }
