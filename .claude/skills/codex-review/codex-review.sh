@@ -17,29 +17,53 @@ main_checkout() {
   dirname "$common"
 }
 
+# A brief is exactly the lines `## Material`, `## Question` and optionally `## Constraints`, each
+# followed by text. Any other heading (ATX at any level or indent, or a setext underline) and any
+# text before the first section is refused, so the lead's findings have nowhere to go.
 check_brief() {
-  local brief="$1" bad
-  grep -qx '## Material' "$brief" || die "$brief has no '## Material' section (copy $HERE/template.md)"
-  grep -qx '## Question' "$brief" || die "$brief has no '## Question' section (copy $HERE/template.md)"
-  bad="$(grep -E '^## ' "$brief" | grep -vxE '## (Material|Question|Constraints)' || true)"
-  [[ -z "$bad" ]] || die "$brief has sections Codex must not get: $bad. A brief holds only Material, Question and Constraints, never the lead's findings or conclusion."
+  local brief="$1" problems
+  problems="$(awk '
+    /^[ \t]*#+([ \t]|$)/ {
+      if ($0 == "## Material" || $0 == "## Question" || $0 == "## Constraints") {
+        section = substr($0, 4); seen[section]++; prev = ""; next
+      }
+      print "line " NR " is a heading Codex must not get: " $0; prev = ""; next
+    }
+    /^[ \t]*(=+|-+)[ \t]*$/ && prev ~ /[^ \t]/ { print "line " NR " underlines \"" prev "\" as a heading" }
+    /[^ \t]/ {
+      if (section == "") print "line " NR " comes before the first section: " $0
+      else text[section] = 1
+    }
+    { prev = $0 }
+    END {
+      for (s in seen) if (!(s in text)) print "## " s " is empty"
+      if (seen["Material"] != 1) print "## Material appears " seen["Material"] + 0 " times, not once"
+      if (seen["Question"] != 1) print "## Question appears " seen["Question"] + 0 " times, not once"
+      if (seen["Constraints"] > 1) print "## Constraints appears " seen["Constraints"] " times"
+    }
+  ' "$brief")"
+  [[ -z "$problems" ]] || die "$brief is not a brief (copy $HERE/template.md). A brief holds only Material, Question and Constraints, never the lead's findings or conclusion:
+$problems"
 }
 
 cmd_start() {
-  local brief="${1:-}" slug="${2:-}"
+  (( $# == 2 )) || die "usage: codex-review.sh start <brief.md> <slug>"
+  local brief="$1" slug="$2"
   [[ -f "$brief" ]] || die "usage: codex-review.sh start <brief.md> <slug>"
   [[ "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "slug must be lowercase letters, digits and hyphens"
   command -v codex >/dev/null || die "codex CLI not on PATH"
   check_brief "$brief"
 
-  local repo main sha branch run python
+  local repo main sha branch runs run python
   repo="$(git rev-parse --show-toplevel)"
   main="$(main_checkout)"
   sha="$(git -C "$repo" rev-parse HEAD)"
   branch="$(git -C "$repo" rev-parse --abbrev-ref HEAD)"
-  run="${CODEX_REVIEW_DIR:-$main/data/reviews/codex}/$(date -u +%Y%m%dT%H%M%SZ)-$slug"
+  runs="${CODEX_REVIEW_DIR:-$main/data/reviews/codex}"
+  run="$runs/$(date -u +%Y%m%dT%H%M%SZ)-$slug"
   python="$main/.venv/bin/python"
-  mkdir -p "$run"
+  mkdir -p "$runs"
+  mkdir "$run" || die "$run already exists; start again in a second"
   cp "$brief" "$run/brief.md"
 
   cat > "$run/prompt.md" <<EOF
@@ -74,27 +98,42 @@ EOF
 
   nohup sh -c 'codex exec -m "$1" -s read-only -C "$2" -o "$3/review.md" - < "$3/prompt.md" > "$3/codex.log" 2>&1; echo $? > "$3/exit.code"' \
     sh "$MODEL" "$repo" "$run" > /dev/null 2>&1 &
+  echo $! > "$run/pid"
+  sleep 5
+  if ! kill -0 "$(cat "$run/pid")" 2>/dev/null && [[ "$(cat "$run/exit.code" 2>/dev/null)" != 0 ]]; then
+    echo "codex-review: codex stopped within 5 s (exit $(cat "$run/exit.code" 2>/dev/null || echo unknown)); $run/codex.log ends:" >&2
+    tail -n 20 "$run/codex.log" >&2 || true
+    exit 1
+  fi
   echo "$run"
+}
+
+run_folder() {
+  [[ -f "${1:-}/meta.json" ]] || die "${1:-(none)} is not a codex-review run folder (no meta.json); usage: codex-review.sh $2"
 }
 
 cmd_wait() {
   local run="${1:-}" minutes="${2:-90}" waited=0
-  [[ -d "$run" ]] || die "usage: codex-review.sh wait <run-folder> [minutes]"
+  run_folder "$run" "wait <run-folder> [minutes]"
+  [[ "$minutes" =~ ^[1-9][0-9]*$ ]] || die "minutes must be a positive whole number, not '$minutes'"
   until [[ -f "$run/exit.code" ]]; do
     (( waited < minutes * 60 )) || die "no result after $minutes min; see $run/codex.log"
+    if [[ -f "$run/pid" ]] && ! kill -0 "$(cat "$run/pid")" 2>/dev/null && [[ ! -f "$run/exit.code" ]]; then
+      die "codex is gone and left no exit code; see $run/codex.log"
+    fi
     sleep 30
     waited=$((waited + 30))
   done
   local code
   code="$(cat "$run/exit.code")"
   [[ "$code" == 0 ]] || die "codex exited $code; see $run/codex.log"
-  [[ -s "$run/review.md" ]] || die "codex exited 0 but wrote no review; see $run/codex.log"
+  grep -q '[^[:space:]]' "$run/review.md" 2>/dev/null || die "codex exited 0 but wrote no review; see $run/codex.log"
   echo "done after ${waited}s of waiting: $run/review.md ($(wc -l < "$run/review.md") lines)"
 }
 
 cmd_status() {
   local run="${1:-}"
-  [[ -d "$run" ]] || die "usage: codex-review.sh status <run-folder>"
+  run_folder "$run" "status <run-folder>"
   if [[ -f "$run/exit.code" ]]; then
     echo "finished, exit $(cat "$run/exit.code")"
   else
