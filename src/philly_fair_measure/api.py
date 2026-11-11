@@ -17,14 +17,16 @@ history) to `web/`. Design notes:
 
 from __future__ import annotations
 
+import hashlib
 import hmac
+import json
 import logging
 import math
 from pathlib import Path
 from typing import Any
 
 import polars as pl
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from philly_fair_measure import config
@@ -35,6 +37,10 @@ logger = logging.getLogger(__name__)
 
 _SEARCH_LIMIT = 10
 _BBOX_LIMIT = 4000
+# The flagged payload changes only when a deploy loads new data. Five minutes
+# bounds how long a browser keeps showing the old dots after one; the ETag
+# turns each later check into a bodyless 304.
+_FLAGGED_MAX_AGE = 300
 _HIST_BINS = 24
 _HIST_LO, _HIST_HI = 0.4, 1.6
 _VALUE_BAND = 1.5  # mirrors equity_context peer rule
@@ -247,6 +253,15 @@ def _load_frame(root: Path) -> tuple[pl.DataFrame, str | None]:
         built = None
     logger.info("api loaded %s screen rows", f"{screen.height:,}")
     return screen, built
+
+
+def _etag_matches(if_none_match: str, etag: str) -> bool:
+    """The weak comparison RFC 9110 prescribes for If-None-Match."""
+    opaque = etag.removeprefix("W/")
+    return any(
+        tag == "*" or tag.removeprefix("W/") == opaque
+        for tag in (t.strip() for t in if_none_match.split(","))
+    )
 
 
 def _row(frame: pl.DataFrame, parcel_id: str) -> dict[str, Any]:
@@ -521,7 +536,7 @@ def _histories(root: Path, parcel_id: str) -> tuple[list[YearValue], list[SaleRo
 def create_app(data_dir: Path | None = None) -> FastAPI:
     import os
 
-    from fastapi import Request, Response
+    from fastapi import Request
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.middleware.gzip import GZipMiddleware
     from fastapi.responses import JSONResponse
@@ -617,10 +632,13 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
         maxy: float,
         limit: int = Query(default=_BBOX_LIMIT, ge=1, le=_BBOX_LIMIT),
     ) -> dict[str, Any]:
-        """GeoJSON points in a map viewport (client gates to high zoom)."""
+        """GeoJSON points in a map viewport (client gates to high zoom).
+        `truncated` is true when the viewport holds more than `limit` homes."""
         sub = frame.filter(
             pl.col("loc_lon").is_between(minx, maxx) & pl.col("loc_lat").is_between(miny, maxy)
-        ).head(limit)
+        ).head(limit + 1)
+        truncated = sub.height > limit
+        sub = sub.head(limit)
         features = [
             {
                 "type": "Feature",
@@ -650,12 +668,12 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
             ).to_dicts()
             if r["loc_lon"] is not None
         ]
-        return {"type": "FeatureCollection", "features": features}
+        return {"type": "FeatureCollection", "features": features, "truncated": truncated}
 
     flagged_cache: dict[str, Any] = {}
 
     @app.get("/api/parcels/flagged")
-    def parcels_flagged() -> dict[str, Any]:
+    def parcels_flagged(if_none_match: str | None = Header(default=None)) -> Response:
         """The citywide overview payload: every flagged (over/under) home plus
         the watch tier (within range, near its edge) — ~51k points, shipped
         whole (gzipped ~10x) so the map can show the pattern at low zoom.
@@ -671,7 +689,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                 )
                 & pl.col("loc_lon").is_not_null()
             )
-            flagged_cache["fc"] = {
+            fc = {
                 "type": "FeatureCollection",
                 "features": [
                     {
@@ -703,7 +721,17 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                     ).to_dicts()
                 ],
             }
-        return flagged_cache["fc"]
+            body = json.dumps(
+                fc, ensure_ascii=False, allow_nan=False, separators=(",", ":")
+            ).encode()
+            flagged_cache["body"] = body
+            # weak: GZipMiddleware changes the bytes on the wire
+            flagged_cache["etag"] = f'W/"{hashlib.sha256(body).hexdigest()[:32]}"'
+        etag = flagged_cache["etag"]
+        headers = {"ETag": etag, "Cache-Control": f"public, max-age={_FLAGGED_MAX_AGE}"}
+        if if_none_match is not None and _etag_matches(if_none_match, etag):
+            return Response(status_code=304, headers=headers)
+        return Response(flagged_cache["body"], media_type="application/json", headers=headers)
 
     @app.get("/api/property/{parcel_id}", response_model=PropertyCore)
     def property_core(parcel_id: str) -> PropertyCore:

@@ -1,3 +1,5 @@
+import re
+
 import polars as pl
 from fastapi.testclient import TestClient
 
@@ -109,8 +111,8 @@ def _features_rows(screen: list[dict]) -> list[dict]:
     ]
 
 
-def _client(tmp_path) -> TestClient:
-    screen = _screen_rows()
+def _client(tmp_path, screen: list[dict] | None = None) -> TestClient:
+    screen = screen if screen is not None else _screen_rows()
     screen_cols = [{k: v for k, v in r.items() if not k.startswith("_")} for r in screen]
     write_derived_table(
         pl.DataFrame(screen_cols),
@@ -173,6 +175,21 @@ def test_parcels_bbox_filters(tmp_path):
     assert "attention" in fc["features"][0]["properties"]
 
 
+def test_parcels_bbox_says_when_the_limit_drops_homes(tmp_path):
+    c = _client(tmp_path)
+    box = {"minx": -75.16, "miny": 39.94, "maxx": -75.14, "maxy": 39.96}
+    every = c.get("/api/parcels", params=box).json()
+    in_view = len(every["features"])
+    assert every["type"] == "FeatureCollection" and every["truncated"] is False
+
+    capped = c.get("/api/parcels", params={**box, "limit": in_view - 1}).json()
+    assert len(capped["features"]) == in_view - 1
+    assert capped["truncated"] is True
+
+    exact = c.get("/api/parcels", params={**box, "limit": in_view}).json()
+    assert len(exact["features"]) == in_view and exact["truncated"] is False
+
+
 def test_report_degrades_without_model_artifacts(tmp_path):
     c = _client(tmp_path)
     body = c.get("/api/property/p1/report").json()
@@ -194,6 +211,31 @@ def test_flagged_parcels_returns_flags_and_watch_tier(tmp_path):
     assert all("attention" in f["properties"] for f in fc["features"])
     # cached second call returns the same payload
     assert c.get("/api/parcels/flagged").json() == fc
+
+
+def test_flagged_parcels_revalidate_with_an_etag(tmp_path):
+    c = _client(tmp_path)
+    first = c.get("/api/parcels/flagged")
+    assert first.status_code == 200
+    etag = first.headers["etag"]
+    # the payload changes only on a deploy, so a cached copy may live briefly
+    max_age = int(re.search(r"max-age=(\d+)", first.headers["cache-control"]).group(1))
+    assert 0 < max_age <= 300
+
+    unchanged = c.get("/api/parcels/flagged", headers={"If-None-Match": etag})
+    assert unchanged.status_code == 304
+    assert unchanged.content == b""
+    assert unchanged.headers["etag"] == etag
+
+    other = c.get("/api/parcels/flagged", headers={"If-None-Match": 'W/"another-payload"'})
+    assert other.status_code == 200
+    assert other.json() == first.json()
+
+    # new data behind a deploy must not match the old validator
+    screen = _screen_rows()
+    screen[1]["opa_market_value"] = 950_000.0
+    redeployed = _client(tmp_path / "next", screen).get("/api/parcels/flagged")
+    assert redeployed.headers["etag"] != etag
 
 
 def test_admin_leaderboard_kinds(tmp_path):

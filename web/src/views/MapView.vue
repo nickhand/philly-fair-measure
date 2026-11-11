@@ -105,6 +105,8 @@ function markMapReady() {
 }
 /** Viewport fetch in flight (street zoom) — drives the "loading homes" pill. */
 const fetching = ref(false)
+/** The API capped the viewport's homes, so some are missing from the layer. */
+const truncated = ref(false)
 
 /** Stacked dots: condo towers put many homes on one coordinate, so a click
  * can hit dozens of units. When it does, the sheet shows this pick-a-home
@@ -124,6 +126,8 @@ function closeChoices() {
 
 let controller: AbortController | undefined
 let painted = false
+/** Bumped by every new selection so a slow lookup cannot replace a newer one. */
+let selection = 0
 
 async function refreshParcels() {
   const m = map.value
@@ -132,6 +136,7 @@ async function refreshParcels() {
   const source = m.getSource('parcels') as maplibregl.GeoJSONSource | undefined
   if (!source) return
   if (zoomedOut.value) {
+    controller?.abort()
     source.setData({ type: 'FeatureCollection', features: [] })
     return
   }
@@ -146,6 +151,7 @@ async function refreshParcels() {
       controller.signal,
     )
     source.setData(fc)
+    truncated.value = fc.truncated === true
     loadError.value = false
   } catch (err) {
     if ((err as Error).name !== 'AbortError') loadError.value = true
@@ -156,19 +162,29 @@ async function refreshParcels() {
 
 const searchRef = ref<InstanceType<typeof AddressSearch> | null>(null)
 
-async function openParcel(parcelId: string) {
-  track('map_parcel_opened')
-  try {
-    selected.value = await api.property(parcelId)
-    map.value?.setFilter('fm-dot-selected', ['==', ['get', 'id'], parcelId])
-  } catch {
-    selected.value = null
+/** maplibre throws on setFilter until the style loads; ensureParcelLayer
+ * calls this again once the layer exists. */
+function applySelectedFilter() {
+  const m = map.value
+  if (m?.getLayer('fm-dot-selected')) {
+    m.setFilter('fm-dot-selected', ['==', ['get', 'id'], selected.value?.parcel_id ?? ''])
   }
+}
+
+/** False when a newer selection replaced this one before it loaded. */
+async function openParcel(parcelId: string): Promise<boolean> {
+  track('map_parcel_opened')
+  const mine = ++selection
+  const property = await api.property(parcelId).catch(() => null)
+  if (mine !== selection) return false
+  selected.value = property
+  applySelectedFilter()
+  return true
 }
 
 function closeSheet() {
   selected.value = null
-  map.value?.setFilter('fm-dot-selected', ['==', ['get', 'id'], ''])
+  applySelectedFilter()
   // a cleared selection leaves a stale address in the bar otherwise
   searchRef.value?.clear()
 }
@@ -177,7 +193,7 @@ function closeSheet() {
  * Deep links jump instead of flying: the just-mounted map gets resized by
  * settling layout, and maplibre cancels in-flight animations on resize. */
 async function focusParcel(parcelId: string, animate = true) {
-  await openParcel(parcelId)
+  if (!(await openParcel(parcelId))) return
   const p = selected.value
   if (p?.lon != null && p.lat != null) {
     const camera = { center: [p.lon, p.lat] as [number, number], zoom: 17 }
@@ -242,6 +258,7 @@ function ensureParcelLayer(m: maplibregl.Map) {
       },
     })
     applyDotFilter()
+    applySelectedFilter()
     const dotLayerIds = ['fm-dots-base', 'fm-dots-flagged', 'fm-dots-far', 'fm-dots-far-watch']
     // one map-level click handler across every dot layer: collect ALL homes
     // under the tap (padded a few px for fat fingers), dedupe by parcel —
@@ -277,6 +294,7 @@ function ensureParcelLayer(m: maplibregl.Map) {
         openParcel([...seen.keys()][0]!)
         return
       }
+      selection++
       selected.value = null
       choices.value = [...seen.values()].sort((a, b) =>
         a.address.localeCompare(b.address, undefined, { numeric: true }),
@@ -411,9 +429,9 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- zoom hint / fetch pill: bottom-center so they never cover the legend
-         column or the map itself (the old top-center bar blanketed both on
-         phones); the two states are mutually exclusive by zoom level -->
+    <!-- zoom hint / fetch pill / cap hint: bottom-center so they never cover
+         the legend column or the map itself (the old top-center bar blanketed
+         both on phones); one shows at a time -->
     <div
       v-if="zoomedOut"
       class="pointer-events-none absolute bottom-8 left-1/2 z-10 w-max max-w-[min(92vw,560px)] -translate-x-1/2 rounded-xl bg-[rgba(22,36,58,0.85)] px-3.5 py-1.5 text-center text-caption font-semibold text-white"
@@ -428,6 +446,13 @@ onBeforeUnmount(() => {
     >
       <span class="spinner spinner-sm"></span>
       Loading homes…
+    </div>
+    <div
+      v-else-if="truncated"
+      class="pointer-events-none absolute bottom-8 left-1/2 z-10 w-max max-w-[min(92vw,560px)] -translate-x-1/2 rounded-xl bg-[rgba(22,36,58,0.85)] px-3.5 py-1.5 text-center text-caption font-semibold text-white"
+      role="status"
+    >
+      Some homes in this view are hidden. Zoom in to see every home.
     </div>
     <div
       v-if="loadError"
