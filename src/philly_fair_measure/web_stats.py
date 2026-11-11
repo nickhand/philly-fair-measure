@@ -161,15 +161,14 @@ MILLAGE = 0.013998
 
 
 def _tax_shift(screen: pl.DataFrame) -> dict[str, Any]:
-    """What adopting our assessments would do at today's tax rate.
+    """Gross yearly tax change if our estimate replaced OPA's value at today's rate.
 
-    Philadelphia under-assesses its most expensive homes, so correcting the roll
-    is found revenue, not just a reshuffle: at the current rate the city collects
-    more, and the increase falls on the top, while the over-assessed cheapest
-    homes get relief. No rate change and no new tax law. Because the increase at
-    the top outweighs the relief at the bottom, the net is positive. Uses the
-    displayed model estimate (`display_median`) against OPA's market value over
-    every scored residential + condo property.
+    Each home's change is `MILLAGE * (display_median - opa_market_value)`, over
+    every scored residential and condo property with both values positive.
+    Returns the mean and total change per OPA-value fifth, the citywide change in
+    summed value (`base_change_pct`), and the sum of every home's change
+    (`new_revenue_musd`). Either total can be positive or negative. Exemptions
+    and abatements are ignored, so neither total is a change in collections.
     """
     opa = screen["opa_market_value"].to_numpy().astype(np.float64)
     model = screen["display_median"].to_numpy().astype(np.float64)
@@ -191,8 +190,6 @@ def _tax_shift(screen: pl.DataFrame) -> dict[str, Any]:
     return {
         "millage_pct": round(MILLAGE * 100, 2),
         "base_change_pct": round((model.sum() / opa.sum() - 1) * 100, 1),
-        # Net new revenue at the current rate — the city collects more because the
-        # under-assessed top pays more than the over-assessed bottom is relieved.
         "new_revenue_musd": round(float(home_shift.sum()) / 1e6),
         "cheapest_home_usd": tiers[0]["home_usd"],
         "priciest_home_usd": tiers[-1]["home_usd"],
