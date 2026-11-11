@@ -31,6 +31,7 @@ const core = ref<PropertyCore | null>(null)
 const report = ref<Report | null>(null)
 const coreError = ref<string | null>(null)
 const reportLoading = ref(false)
+const reportError = ref(false)
 /** Comparable sales — loaded on demand (the endpoint recomputes model comps
  * and takes a few seconds; no reason to pay that on every page view). */
 const comps = ref<CompRow[] | null>(null)
@@ -39,15 +40,25 @@ const compsError = ref(false)
 /** Condo building comps carry no leaf similarity — hide the column. */
 const hasSimilarity = computed(() => (comps.value ?? []).some((c) => c.similarity != null))
 
+/** Bumped by every load so a late response for the previous property is dropped. */
+let visit = 0
+
 async function load(id: string) {
+  const mine = ++visit
   core.value = null
   report.value = null
+  reportLoading.value = false
+  reportError.value = false
   coreError.value = null
   comps.value = null
+  compsLoading.value = false
   compsError.value = false
   try {
-    core.value = await api.property(id)
+    const property = await api.property(id)
+    if (mine !== visit) return
+    core.value = property
   } catch (err) {
+    if (mine !== visit) return
     coreError.value =
       err instanceof ApiError && err.status === 404
         ? 'We could not find that property. Try searching again from the home page.'
@@ -57,14 +68,18 @@ async function load(id: string) {
   // Router set a generic title on navigation; replace it with the address.
   document.title = `${core.value.address} · Fair Measure`
   track('report_viewed', { flag: core.value.flag, family: core.value.model_family })
+  await loadReport(id)
+}
+
+async function loadReport(id: string) {
+  const mine = visit
   reportLoading.value = true
-  try {
-    report.value = await api.report(id)
-  } catch {
-    report.value = null // panels degrade individually below
-  } finally {
-    reportLoading.value = false
-  }
+  reportError.value = false
+  const result = await api.report(id).catch(() => null)
+  if (mine !== visit) return
+  report.value = result
+  reportError.value = result === null
+  reportLoading.value = false
 }
 
 watch(() => props.parcelId, load, { immediate: true })
@@ -168,16 +183,15 @@ const inquiryLink = computed(() =>
 
 
 async function loadComps() {
+  const mine = visit
   track('comps_shown')
   compsLoading.value = true
   compsError.value = false
-  try {
-    comps.value = await api.comps(props.parcelId)
-  } catch {
-    compsError.value = true
-  } finally {
-    compsLoading.value = false
-  }
+  const rows = await api.comps(props.parcelId).catch(() => null)
+  if (mine !== visit) return
+  comps.value = rows
+  compsError.value = rows === null
+  compsLoading.value = false
 }
 
 function distMiles(m: number | null): string {
@@ -373,10 +387,18 @@ function printPage() {
         </div>
       </div>
 
-      <!-- report panels -->
+      <!-- report panels; a failed report hides the three it feeds, whose
+           empty-data copy would read as fact -->
+      <p v-if="reportError" class="mt-6 text-body-sm text-over" role="alert">
+        Could not load the rest of this report right now.
+        <button type="button" class="font-bold underline" @click="loadReport(props.parcelId)">
+          Try again
+        </button>
+      </p>
       <div class="mt-6 grid gap-5 lg:grid-cols-2">
         <!-- drivers -->
         <SectionCard
+          v-if="!reportError"
           title="What shapes our estimate"
           :subtitle="`The biggest things pushing this home’s estimated value up or down, compared with a typical Philadelphia ${core.model_family === 'condo' ? 'condo' : 'home'}.`"
         >
@@ -408,6 +430,7 @@ function printPage() {
 
         <!-- equity -->
         <SectionCard
+          v-if="!reportError"
           title="How your assessment compares nearby"
           subtitle="Equal treatment check: your assessment level next to similar homes in your area."
         >
@@ -443,6 +466,7 @@ function printPage() {
 
         <!-- history -->
         <SectionCard
+          v-if="!reportError"
           class="history-panel"
           title="Assessment history"
           subtitle="How the city’s value for this home changed over time, with actual sales marked."
