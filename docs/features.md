@@ -90,7 +90,8 @@ with `garage_spaces`/`garage_type`.
 / `evt_n_open_severe_at_sale` (L&I case priority in HAZARDOUS/UNSAFE/IMMINENTLY
 DANGEROUS/UNFIT, as_of_sale), `evt_n_demolitions_before` / `evt_demo_days_since`
 (as_of_sale), and `dist_tax_delinquent`/`_years_owed`/`_total_due`/`_sheriff_sale`
-(**current_only**, the delinquency table shows today's delinquents). Result:
+(tagged **current_only**, but the source is a single June 2022 file: every staged
+row has `year_month` 202206, so these mark accounts delinquent in June 2022). Result:
 best overall model to date (RMSE(log) 0.337, R² 0.810, COD 25.8; delinquency
 amount/years rank highest among the additions) but the **q1 median ratio stayed
 ~1.20**, the cheap-tail gradient is dominated by unobservable interior
