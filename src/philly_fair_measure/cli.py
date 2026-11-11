@@ -10,6 +10,7 @@ from philly_fair_measure import catalog, config
 from philly_fair_measure.ingest.diff import SNAPSHOT_DIFF_SPECS
 from philly_fair_measure.ingest.snapshots import snapshot_carto_table
 from philly_fair_measure.sources.carto import DEFAULT_PAGE_SIZE
+from philly_fair_measure.staging.runner import BUILDERS
 from philly_fair_measure.vocab import Market
 
 
@@ -1140,7 +1141,11 @@ def main(argv: list[str] | None = None) -> int:
 
     stage = subparsers.add_parser("stage", help="build staged tables from the latest raw snapshots")
     stage.add_argument(
-        "--tables", nargs="*", help="staged tables to build (default: all)", default=None
+        "--tables",
+        nargs="*",
+        choices=sorted(BUILDERS),
+        help="staged tables to build (default: all)",
+        default=None,
     )
     stage.add_argument("--data-dir", type=Path)
     stage.set_defaults(func=_cmd_stage)
