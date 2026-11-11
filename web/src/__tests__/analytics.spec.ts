@@ -13,7 +13,7 @@ const posthog = {
 function pageviews(): unknown[] {
   return posthog.capture.mock.calls
     .filter(([event]) => event === '$pageview')
-    .map(([, props]) => props?.path)
+    .map(([, props]) => props?.route)
 }
 
 function mountedApp(): App | undefined {
@@ -71,12 +71,12 @@ describe('analytics', () => {
     vi.doMock('posthog-js', () => ({ default: posthog }))
     const { initAnalytics, track, trackPageview } = await import('@/lib/analytics')
     initAnalytics()
-    trackPageview('/map')
+    trackPageview('map')
     track('map_filter_toggled', { group: 'condos', on: true })
     await vi.waitFor(() => expect(posthog.capture).toHaveBeenCalledTimes(2))
     expect(posthog.capture.mock.calls).toEqual([
-      ['$pageview', { path: '/map' }],
-      ['map_filter_toggled', { group: 'condos', on: true }],
+      ['$pageview', { route: 'map' }],
+      ['map_filter_toggled', { group: 'condos', on: true, route: 'map' }],
     ])
     expect(posthog.init).toHaveBeenCalledOnce()
     expect(posthog.init.mock.invocationCallOrder[0]).toBeLessThan(posthog.capture.mock.invocationCallOrder[0]!)
@@ -107,7 +107,7 @@ describe('analytics', () => {
     await router.push('/findings')
     await nextFrame()
     expect(document.activeElement?.textContent).toContain('What we found')
-    await vi.waitFor(() => expect(pageviews()).toEqual([report, '/findings']))
+    await vi.waitFor(() => expect(pageviews()).toEqual(['annual-report', 'findings']))
   })
 
   it('names the route instead of the URL and stores nothing in the browser', async () => {

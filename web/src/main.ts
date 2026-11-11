@@ -19,7 +19,7 @@ export const createApp = ViteSSG(
         // An in-page link changes only the hash. The visitor is still on the
         // same page, so their focus stays put and no pageview is counted.
         if (from !== START_LOCATION && withoutHash(to.fullPath) === withoutHash(from.fullPath)) return
-        trackPageview(to.fullPath)
+        trackPageview(String(to.name))
         requestAnimationFrame(() => {
           const heading = document.querySelector('main h1') as HTMLElement | null
           heading?.setAttribute('tabindex', '-1')
