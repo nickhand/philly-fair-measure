@@ -90,15 +90,6 @@ export const routes: RouteRecordRaw[] = [
     },
   },
   {
-    // Leaderboards — intentionally unlinked from public navigation; moves
-    // behind a real paywall/admin login when the product tier ships.
-    path: '/leaderboards',
-    alias: '/admin',
-    name: 'admin',
-    component: () => import('@/views/AdminView.vue'),
-    meta: { title: 'Leaderboards', noindex: true },
-  },
-  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('@/views/NotFoundView.vue'),

@@ -1,6 +1,4 @@
 User-agent: *
 Allow: /
-Disallow: /fair-measure/admin
-Disallow: /fair-measure/leaderboards
 
 Sitemap: https://www.nickhand.dev/fair-measure/sitemap.xml

@@ -56,12 +56,12 @@ canonical URLs, and social metadata at build time and keeps them current during
 browser navigation. No API connection is required to build: Home starts with
 the committed screen counts and refreshes them in the browser.
 
-Map, admin, and property-report URLs use `dist/spa.html`, an empty app shell,
+Map and property-report URLs use `dist/spa.html`, an empty app shell,
 and render in the browser. Generated pages hydrate their existing HTML; the
 fallback and Vite dev server mount normally. The Cloudflare Worker resolves
 clean URLs to generated `.html` files, redirects trailing slashes within the
 public base path, and falls back only to the separate SPA shell. Unknown URLs
-return 404, and admin routes remain noindex. `npm run preview` also uses the
+return 404 and are noindex. `npm run preview` also uses the
 separate shell for routes without generated HTML.
 
 Appeal deadlines are rendered with date-neutral wording. The banner and

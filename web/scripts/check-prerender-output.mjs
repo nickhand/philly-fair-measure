@@ -54,7 +54,7 @@ assert.equal(titles.size, 6, 'Informational pages must have distinct titles')
 const shell = new JSDOM(readFileSync(new URL('spa.html', dist), 'utf8')).window.document
 assert.equal(shell.querySelector('#app').innerHTML, '', 'Dynamic routes need an empty, non-hydrating shell')
 assert.equal(shell.querySelector('link[rel="canonical"]'), null, 'Do not pin Home as dynamic routes’ canonical')
-for (const path of ['map.html', 'admin.html', 'leaderboards.html', 'property']) {
+for (const path of ['map.html', 'property']) {
   assert.equal(existsSync(new URL(path, dist)), false, `Unexpected pre-rendered dynamic route: ${path}`)
 }
 console.log('Verified 6 pre-rendered pages, the report alias, per-page metadata, neutral deadlines, and SPA fallback.')
