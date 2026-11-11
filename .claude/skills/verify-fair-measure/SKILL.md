@@ -103,7 +103,7 @@ saves `api/<name>.json` and `api/<name>.headers` and exits 1 on any other status
 | `/api/property/052174500/report` | `drivers`, `equity`, `assessment_history`, `sale_history`, `screen_built` |
 | `/api/property/052174500/comps` | 8 residential comps in about 1 s; condo `888520502` gets same-building sales |
 | `/api/parcels?minx=-75.17&miny=39.94&maxx=-75.14&maxy=39.96` | GeoJSON points in a viewport |
-| `/api/parcels/flagged` | GeoJSON of every flagged or watch-tier home, about 10 MB uncompressed |
+| `/api/parcels/flagged` | GeoJSON of every flagged or watch-tier home, about 10 MB uncompressed and 1.2 MB gzipped |
 | `/api/admin/leaderboard?kind=over` | open locally; 404 under `PHILLY_ENV=prod` with no `PHILLY_ADMIN_TOKEN` |
 | `/api/docs` | the OpenAPI UI |
 
