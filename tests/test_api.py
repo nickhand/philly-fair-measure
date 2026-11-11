@@ -109,8 +109,8 @@ def _features_rows(screen: list[dict]) -> list[dict]:
     ]
 
 
-def _client(tmp_path) -> TestClient:
-    screen = _screen_rows()
+def _client(tmp_path, screen: list[dict] | None = None) -> TestClient:
+    screen = screen if screen is not None else _screen_rows()
     screen_cols = [{k: v for k, v in r.items() if not k.startswith("_")} for r in screen]
     write_derived_table(
         pl.DataFrame(screen_cols),
@@ -201,3 +201,17 @@ def test_admin_leaderboard_kinds(tmp_path):
     over = c.get("/api/admin/leaderboard", params={"kind": "over", "n": 5}).json()
     assert over and over[0]["parcel_id"] == "p2"
     assert c.get("/api/admin/leaderboard", params={"kind": "bogus"}).status_code == 422
+
+
+def test_admin_leaderboard_shows_the_displayed_estimate(tmp_path):
+    screen = _screen_rows()
+    p2 = next(r for r in screen if r["parcel_id"] == "p2")
+    # the shown estimate (calibrated stacked point) differs from the Bayesian median
+    p2.update(display_median=360_000.0, display_ratio=2.5)
+    c = _client(tmp_path, screen)
+    over = c.get("/api/admin/leaderboard", params={"kind": "over", "n": 5}).json()
+    assert over[0]["parcel_id"] == "p2"
+    assert over[0]["model_median"] == 360_000.0
+    assert over[0]["ratio"] == 2.5
+    core = c.get("/api/property/p2").json()
+    assert over[0]["model_median"] == core["model_median"]  # same estimate as the report page

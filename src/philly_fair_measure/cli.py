@@ -10,6 +10,7 @@ from philly_fair_measure import catalog, config
 from philly_fair_measure.ingest.diff import SNAPSHOT_DIFF_SPECS
 from philly_fair_measure.ingest.snapshots import snapshot_carto_table
 from philly_fair_measure.sources.carto import DEFAULT_PAGE_SIZE
+from philly_fair_measure.staging.runner import BUILDERS
 from philly_fair_measure.vocab import Market
 
 
@@ -925,7 +926,7 @@ def _cmd_leaderboard(args: argparse.Namespace) -> int:
             else:
                 print(
                     f"  {r['parcel_id']}  {addr:<34} OPA ${r['opa_market_value']:>10,.0f}  "
-                    f"model ${r['model_median']:>10,.0f}  {r['opa_vs_model_ratio']:.1f}x  "
+                    f"model ${r['display_median']:>10,.0f}  {r['display_ratio']:.1f}x  "
                     f"z {r['screen_z']:+.1f}"
                 )
 
@@ -974,9 +975,13 @@ def _cmd_comps(args: argparse.Namespace) -> int:
         if row.height:
             r = row.to_dicts()[0]
             print(
-                f"  model: ${r['model_median']:,.0f} "
-                f"(90% PI ${r['model_pi_low_90']:,.0f} - ${r['model_pi_high_90']:,.0f}, "
-                f"{r['interval_method']}) -> {r['assessment_flag']}"
+                f"  model: ${r['display_median']:,.0f} "
+                f"(90% range ${r['display_pi_low_90']:,.0f} - ${r['display_pi_high_90']:,.0f})"
+                f" -> {r['assessment_flag']}"
+            )
+            print(
+                f"  flag judged on the {r['interval_method']} 90% PI "
+                f"${r['model_pi_low_90']:,.0f} - ${r['model_pi_high_90']:,.0f}"
             )
 
     print(f"\ntop {result.comps.height} comparable arms-length sales:")
@@ -1136,7 +1141,11 @@ def main(argv: list[str] | None = None) -> int:
 
     stage = subparsers.add_parser("stage", help="build staged tables from the latest raw snapshots")
     stage.add_argument(
-        "--tables", nargs="*", help="staged tables to build (default: all)", default=None
+        "--tables",
+        nargs="*",
+        choices=sorted(BUILDERS),
+        help="staged tables to build (default: all)",
+        default=None,
     )
     stage.add_argument("--data-dir", type=Path)
     stage.set_defaults(func=_cmd_stage)
