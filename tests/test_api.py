@@ -92,6 +92,7 @@ def _screen_rows() -> list[dict]:
     ]
     rows[0]["quality_area_outlier"] = True
     rows[0]["record_quality_warning"] = True
+    rows[1]["dist_tax_delinquent"] = 1.0
     return rows
 
 
@@ -158,6 +159,13 @@ def test_property_core_and_404(tmp_path):
     warning = c.get("/api/property/p1").json()
     assert warning["quality_reasons"] == ["learned_area_outlier"]
     assert warning["data_quality_warning"] is True
+
+
+def test_property_omits_the_june_2022_tax_delinquency(tmp_path):
+    # the only delinquency file is from June 2022, so it says nothing about a balance owed today
+    signals = _client(tmp_path).get("/api/property/p2").json()["signals"]
+    assert signals["unpermitted_work_complaints_5y"] == 1
+    assert "tax_delinquent" not in signals
 
 
 def test_parcels_bbox_filters(tmp_path):
