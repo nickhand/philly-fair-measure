@@ -170,7 +170,6 @@ const signalChips = computed(() => {
     chips.push(`${s.vacancy_complaints_5y} vacancy complaint(s) in 5 years`)
   if ((s.unpermitted_work_complaints_5y ?? 0) > 0)
     chips.push(`${s.unpermitted_work_complaints_5y} unpermitted-work complaint(s)`)
-  if (s.tax_delinquent) chips.push('Property tax balance owed')
   if (s.owner_occupied) chips.push('Owner-occupied (homestead exemption)')
   if ((s.linked_parcels ?? 0) > 1) chips.push('Owner holds a neighboring lot')
   return chips
@@ -341,9 +340,8 @@ function printPage() {
                 relying on the result.
               </InfoTip>
               <InfoTip v-else label="Why a range and not one number?">
-                No one knows a home’s exact value until it sells. Our model studies thousands of nearby
-                sales and gives its best estimate, plus the range where its two independent ways of
-                measuring uncertainty agree. It’s like a weather forecast for your home’s value.
+                Our 90% range. In testing, about 9 in 10 sale prices fell inside a range built this
+                way.
                 <RouterLink to="/methodology" class="font-semibold text-brand-600 underline"
                   >Learn how this works</RouterLink
                 >.

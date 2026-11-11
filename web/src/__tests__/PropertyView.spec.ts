@@ -28,7 +28,6 @@ function home(id: string, address: string) {
       aerial_pair: null,
       vacancy_complaints_5y: 0,
       unpermitted_work_complaints_5y: 0,
-      tax_delinquent: false,
       owner_occupied: false,
       linked_parcels: 1,
     },
@@ -194,5 +193,33 @@ describe('PropertyView', () => {
     expect(w.text()).not.toContain('Data updated 2026-07-14')
     expect(w.text()).not.toContain('110 ELFRETHS ALY')
     expect(hasButton(w, 'Show comparable sales')).toBe(true)
+  })
+
+  it('shows no tax-balance chip, even when an older API still sends the June 2022 flag', async () => {
+    routes['/api/property/591073500'] = ok({
+      ...PRICE,
+      signals: { ...PRICE.signals, owner_occupied: true, tax_delinquent: true },
+    })
+    routes['/api/property/591073500/report'] = ok(REPORT)
+    const w = await mountAt('591073500')
+    await flushPromises()
+
+    const panel = w
+      .findAll('section')
+      .find((s) => s.text().startsWith('Other things we see in city data'))!
+    expect(panel.text()).toContain('Owner-occupied (homestead exemption)')
+    expect(panel.text()).not.toMatch(/tax/i)
+  })
+
+  it('describes the range as one tested 90% range', async () => {
+    routes['/api/property/052174500'] = ok(ELFRETHS)
+    routes['/api/property/052174500/report'] = ok(REPORT)
+    const w = await mountAt('052174500')
+    await flushPromises()
+
+    expect(w.text()).toContain(
+      'Our 90% range. In testing, about 9 in 10 sale prices fell inside a range built this way.',
+    )
+    expect(w.text()).not.toContain('two independent ways')
   })
 })

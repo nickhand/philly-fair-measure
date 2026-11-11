@@ -22,7 +22,6 @@ export interface Signals {
   aerial_pair: string | null
   vacancy_complaints_5y: number | null
   unpermitted_work_complaints_5y: number | null
-  tax_delinquent: boolean
   owner_occupied: boolean
   linked_parcels: number | null
 }
