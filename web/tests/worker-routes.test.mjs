@@ -43,7 +43,7 @@ test('resolves generated HTML and canonical redirects without losing the public 
 test('uses the empty SPA shell for dynamic routes and returns 404 for unknown pages', async () => {
   for (const [path, status, noindex] of [
     ['/map', 200, false], ['/property/123456789', 200, false],
-    ['/admin', 200, true], ['/leaderboards', 200, true], ['/missing-page', 404, true],
+    ['/admin', 404, true], ['/leaderboards', 404, true], ['/missing-page', 404, true],
   ]) {
     const requests = []
     const assets = { fetch: async (request) => {
