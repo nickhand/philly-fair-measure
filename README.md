@@ -102,28 +102,21 @@ Three rules shape the modeling (details in [docs/model.md](docs/model.md)):
 
 ## Reproducing it
 
-Requires [uv](https://docs.astral.sh/uv/) (Python 3.13) and Node 22+ for the
-dashboard. All data comes from public APIs; no credentials are needed.
+Requires [uv](https://docs.astral.sh/uv/) (Python 3.13),
+[just](https://github.com/casey/just), and Node 22+ for the dashboard. All data
+comes from public APIs; no credentials are needed.
 
 ```bash
 uv sync
 
-# Data pipeline: raw snapshots → staged tables → sale-validity mart
-uv run fair-measure snapshot-all      # capture all core tables
-uv run fair-measure stage             # typed/deduped/classified staged tables
-uv run fair-measure validate-sales    # marts/sale_validity.parquet with reason codes
+# Capture every raw source: the CARTO core tables, then the ArcGIS layers
+# (parcels, building footprints, proximity layers, tract demographics)
+just snapshot-sources
 
-# Features and models
-uv run fair-measure build-features        # residential feature marts
-uv run fair-measure build-condo-features  # condo feature marts
-uv run fair-measure train-baseline        # GBM stack + Ridge, benchmarked against OPA
-uv run fair-measure train-baseline --market retail   # financed-only variant
-uv run fair-measure train-bayesian        # hierarchical Bayesian intervals
-uv run fair-measure train-condo           # condo LightGBM + conformal intervals
-
-# The screen and the site's statistics
-uv run fair-measure screen-assessments   # flag OPA values outside each interval
-uv run fair-measure export-web-stats     # regenerate web/src/data/siteStats.json
+# Rebuild in dependency order: staged tables, sale validity, market areas,
+# price index, proximity, feature marts, every model, the screen, the site's
+# statistics (web/src/data/siteStats.json) and the generated doc blocks
+just retrain-all
 
 # The public dashboard: API + Vue app
 uv run fair-measure api                  # JSON API on :8000
@@ -133,6 +126,15 @@ npm --prefix web install && npm --prefix web run dev   # site on :5173
 uv run fair-measure catalog
 uv run fair-measure sql "SELECT ... FROM mart_assessment_screen LIMIT 5"
 ```
+
+`just --dry-run retrain-all` prints each `fair-measure` command in order, to
+run or inspect one step at a time. A fresh capture fetches today's records, so
+the rebuilt numbers differ from the published ones, which come from the July
+2026 snapshots. One input cannot be recaptured at all. CARTO has answered
+"permission denied" for the parcel-level tax-delinquency table since September
+2026, so `snapshot-all` skips it, and a fresh rebuild leaves the four
+delinquency features (`dist_tax_*`, `dist_sheriff_sale`) null. See
+[docs/snapshots/README.md](docs/snapshots/README.md).
 
 `annual_report.json` holds the current assessment cycle’s official dates,
 appeal deadlines, status, and source links. The web-stats export validates and
@@ -187,7 +189,7 @@ data/                  # local data lake (gitignored): raw/ staged/ marts/ model
 | [docs/historical-redistribution.md](docs/historical-redistribution.md) | What OPA's regressivity shifted 2016–2025, in dollars |
 | [docs/ccao-lessons.md](docs/ccao-lessons.md) | Patterns adopted from the Cook County Assessor's open-source stack |
 | [docs/frontend.md](docs/frontend.md) | Dashboard + API architecture and deployment |
-| [docs/operations.md](docs/operations.md) | Recurring snapshot schedule + freshness checks |
+| [docs/operations.md](docs/operations.md) | Snapshots, the rebuild sequence, and publishing a rebuild |
 | [docs/research-notes.md](docs/research-notes.md) | Literature and design notes behind the choices |
 
 ## Development

@@ -44,13 +44,22 @@ The current [OpenDataPhilly tax listing](https://opendataphilly.org/datasets/rea
 links balances aggregated by ZIP, council district, and census tract. These
 are not a parcel-level replacement. Preserve the existing raw delinquency
 snapshots and their original timestamps; do not treat them as fresh or replace
-missing updates with zero balances. The explicit `snapshot-all` command still
-attempts the registered source and reports failure if it remains unavailable.
+missing updates with zero balances. The table is listed in
+`PAUSED_CARTO_TABLES` (`config.py`), so a default `snapshot-all` skips it and
+prints why, and a default `stage` builds the other tables without it.
+`snapshot-all --tables real_estate_tax_delinquencies` still attempts the
+source and exits 1 while access is denied.
+
+A clean checkout therefore has no delinquency snapshot, and a rebuild there
+leaves the delinquency features null. The published July 2026 models were
+trained with the copy captured on 2026-07-03, whose records carry a June 2022
+`year_month`.
 
 Each scheduled run records this pause as a warning and in its job summary.
 Before resuming, verify public API access and the parcel-level schema, then
-restore the table to `TABLES` in the workflow and the `snapshot-current` recipe
-and remove the pause warning. A different source needs its own provenance.
+remove the table from `PAUSED_CARTO_TABLES`, restore it to `TABLES` in the
+workflow and the `snapshot-current` recipe, and remove the pause warning. A
+different source needs its own provenance.
 
 ## How it works
 

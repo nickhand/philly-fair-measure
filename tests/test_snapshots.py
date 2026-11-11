@@ -7,9 +7,12 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import respx
 
+from philly_fair_measure import catalog, cli, config
 from philly_fair_measure.ingest.manifests import read_manifest
 from philly_fair_measure.ingest.snapshots import snapshot_carto_table
 from philly_fair_measure.sources.carto import PHL_CARTO_URL
+
+RETIRED = "real_estate_tax_delinquencies"
 
 FIELDS = {
     "cartodb_id": {"type": "number", "pgtype": "int8"},
@@ -114,3 +117,30 @@ def test_snapshot_respects_limit(tmp_path):
     result = snapshot_carto_table("opa_test", data_dir=tmp_path, page_size=2, limit=2)
     assert result.manifest.row_count == 2
     assert result.manifest.row_limit == 2
+
+
+def _carto_today(request: httpx.Request) -> httpx.Response:
+    """CARTO since 2026-09-21, which denies access to the retired table."""
+    if RETIRED in request.url.params["q"]:
+        return httpx.Response(403, json={"error": [f"permission denied for table {RETIRED}"]})
+    return _handler(request)
+
+
+@respx.mock
+def test_snapshot_all_skips_the_retired_delinquency_table(tmp_path, capsys):
+    route = respx.get(PHL_CARTO_URL).mock(side_effect=_carto_today)
+
+    assert cli.main(["snapshot-all", "--data-dir", str(tmp_path)]) == 0
+
+    assert set(catalog.latest_snapshots(tmp_path)) == set(config.CORE_CARTO_TABLES) - {RETIRED}
+    assert not [call for call in route.calls if RETIRED in call.request.url.params["q"]]
+    assert RETIRED in capsys.readouterr().out
+
+
+@respx.mock
+def test_snapshot_all_still_fetches_the_retired_table_when_named(tmp_path):
+    route = respx.get(PHL_CARTO_URL).mock(side_effect=_carto_today)
+
+    assert cli.main(["snapshot-all", "--tables", RETIRED, "--data-dir", str(tmp_path)]) == 1
+
+    assert route.call_count == 1

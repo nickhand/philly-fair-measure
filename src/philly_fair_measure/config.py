@@ -15,8 +15,9 @@ DEFAULT_DATA_DIR: Final = Path("data")
 # dedicated model (see the CCAO condo playbook in docs/ccao-lessons.md).
 CONDO_ACCOUNT_PREFIX: Final = "88"
 
-# The recurring snapshot set: every table here is captured by `fair-measure snapshot-all`.
-# Page sizes reflect row width (verified in docs/source_inventory.md).
+# The recurring snapshot set: `fair-measure snapshot-all` captures every table
+# here except the paused ones below. Page sizes reflect row width (verified in
+# docs/source_inventory.md).
 CORE_CARTO_TABLES: Final[dict[str, int]] = {
     "opa_properties_public": 20_000,
     "assessments": 50_000,
@@ -30,6 +31,14 @@ CORE_CARTO_TABLES: Final[dict[str, int]] = {
     "case_investigations": 30_000,
     "business_licenses": 20_000,
     "appeals": 20_000,
+}
+
+# Core tables a default `snapshot-all` skips, with the reason it prints. Naming
+# one in `snapshot-all --tables` still fetches it, to check whether access is back.
+PAUSED_CARTO_TABLES: Final[dict[str, str]] = {
+    "real_estate_tax_delinquencies": (
+        "CARTO has denied access since 2026-09-21; see docs/snapshots/README.md"
+    ),
 }
 
 
