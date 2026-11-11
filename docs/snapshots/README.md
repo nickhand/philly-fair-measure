@@ -81,7 +81,9 @@ The committed summary is the point of the program: a small, greppable record
 of what changed, reviewed like any other diff. It also keeps the schedule
 alive: GitHub disables cron workflows in public repos after 60 days without
 repository activity, and the weekly bot commit resets that clock. Failure
-emails go to the workflow author (GitHub's default for scheduled runs).
+emails go to the workflow author (GitHub's default for scheduled runs). A
+failed run also comments its URL on the open "Snapshot workflow failed" issue,
+or opens that issue when none is open. Close it once the job is green again.
 
 Raw parquet is never committed; it lives in S3 (~165 MB/run, ~8.5 GB/year,
 pennies per month at standard rates).

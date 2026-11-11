@@ -16,6 +16,7 @@ on:
 permissions:
   id-token: write # OIDC token for assuming the AWS role
   contents: write # push the diff summary commit
+  issues: write # open or comment on the failure issue
 
 concurrency:
   group: snapshot
@@ -28,10 +29,10 @@ env:
 
 jobs:
   snapshot:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Report paused source
         run: |
@@ -39,7 +40,7 @@ jobs:
           echo "Parcel-level tax delinquency snapshots are paused: CARTO returns permission denied. Last successful scheduled capture: 2026-09-14. See docs/snapshots/README.md." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           enable-cache: true
 
@@ -50,7 +51,7 @@ jobs:
         run: uv sync
 
       - name: Assume AWS role (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.SNAPSHOT_ROLE_ARN }}
           aws-region: ${{ vars.SNAPSHOT_AWS_REGION }}
@@ -60,8 +61,12 @@ jobs:
           set -euo pipefail
           for ds in $TABLES; do
             prefix="raw/source=carto/dataset=$ds/"
-            latest=$(aws s3 ls "s3://${{ vars.SNAPSHOT_BUCKET }}/$prefix" \
-              | awk '$2 ~ /^fetched_at=/ && $2 !~ /\.incomplete\// {print $2}' \
+            # `aws s3 ls` exits 1 on an empty prefix, which a new table has
+            # until its first upload. list-objects-v2 exits 0 with no prefixes.
+            latest=$(aws s3api list-objects-v2 --bucket "${{ vars.SNAPSHOT_BUCKET }}" \
+                --prefix "$prefix" --delimiter / --output json \
+              | jq -r --arg prefix "$prefix" '.CommonPrefixes[]?.Prefix | ltrimstr($prefix)
+                  | select(startswith("fetched_at=") and (endswith(".incomplete/") | not))' \
               | sort | tail -1)
             if [ -n "$latest" ]; then
               echo "previous $ds: $latest"
@@ -103,4 +108,21 @@ jobs:
             git commit -m "snapshot: diff summary $(date -u +%F)"
             git pull --rebase origin main
             git push origin main
+          fi
+
+      - name: Open or update the snapshot failure issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          title="Snapshot workflow failed"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          body="Run ${run_url} failed. The city overwrites these tables in place, so a missed week cannot be captured later."
+          number="$(gh issue list --repo "${GITHUB_REPOSITORY}" --state open --limit 1000 --json number,title \
+            | jq -r --arg title "${title}" 'map(select(.title == $title))[0].number // empty')"
+          if [[ -n "${number}" ]]; then
+            gh issue comment "${number}" --repo "${GITHUB_REPOSITORY}" --body "${body}"
+          else
+            gh issue create --repo "${GITHUB_REPOSITORY}" --title "${title}" --body "${body}"
           fi
