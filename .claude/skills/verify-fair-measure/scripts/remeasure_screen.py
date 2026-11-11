@@ -16,11 +16,42 @@ import argparse
 import json
 import os
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
 import httpx
 import polars as pl
+
+
+class VisibleText(HTMLParser):
+    """Text a visitor reads: no comments, attributes, or script and style contents."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.parts: list[str] = []
+        self.hidden = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in ("script", "style"):
+            self.hidden += 1
+        self.parts.append(" ")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in ("script", "style") and self.hidden:
+            self.hidden -= 1
+        self.parts.append(" ")
+
+    def handle_data(self, data: str) -> None:
+        if not self.hidden:
+            self.parts.append(data)
+
+
+def visible_text(html: str) -> str:
+    parser = VisibleText()
+    parser.feed(html)
+    parser.close()
+    return " ".join("".join(parser.parts).split())
 
 
 def recount(screen: Path) -> dict[str, Any]:
@@ -50,7 +81,9 @@ def main() -> int:
     )
     parser.add_argument("--stats", type=Path, default=Path("web/src/data/siteStats.json"))
     parser.add_argument("--api", help="base URL of a running API to compare /api/stats")
-    parser.add_argument("--html", type=Path, help="prerendered home page to check for the counts")
+    parser.add_argument(
+        "--html", type=Path, help="prerendered home page whose visible text must show each count"
+    )
     parser.add_argument("--out", type=Path, help="write the comparison as JSON here")
     args = parser.parse_args()
 
@@ -76,13 +109,14 @@ def main() -> int:
         ]
 
     if args.html:
-        text = args.html.read_text()
+        text = visible_text(args.html.read_text())
         for label, n in (
-            ("homes valued", mart["properties"]),
-            ("flagged", mart["over"] + mart["under"]),
-            ("worth a look", mart["watch"]),
+            ("homes we valued citywide", mart["properties"]),
+            ("flagged outside our range", mart["over"] + mart["under"]),
+            ("more worth a closer look", mart["watch"]),
         ):
-            rows.append((f"{args.html.name} shows {label} {n:,}", f"{n:,}" in text, True))
+            shown = f"{n:,} {label}"
+            rows.append((f"{args.html.name} shows '{shown}'", shown in text, True))
 
     mismatches = [r for r in rows if r[1] != r[2]]
     print(f"screen mart {screen.resolve()} built {manifest['built_at'][:19]}")

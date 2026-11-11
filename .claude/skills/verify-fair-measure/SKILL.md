@@ -168,7 +168,7 @@ The recount of the published screen numbers:
 $S remeasure <slug> --api http://127.0.0.1:8000 --html web/dist/index.html
 ```
 
-runs `scripts/remeasure_screen.py`, which recounts the flags from `marts/assessment_screen.parquet` with polars and compares the manifest, `siteStats.json`, `/api/stats` and the built home page. `--api` and `--html` are optional. It saves `remeasure.json` and `remeasure.txt` and exits 1 on any difference.
+runs `scripts/remeasure_screen.py`, which recounts the flags from `marts/assessment_screen.parquet` with polars and compares the manifest, `siteStats.json`, `/api/stats` and the built home page, whose visible text must read each count next to its label (`496,975 homes we valued citywide`). `--api` and `--html` are optional. It saves `remeasure.json` and `remeasure.txt` and exits 1 on any difference.
 
 `data/marts/assessment_screen.manifest.json` lists the `models/<run_id>` inputs (baseline, bayesian, condo) the screen was built from, and each `data/models/run_id=<id>/run.manifest.json` lists what that run trained on. `siteStats.json` `meta.model_run_id` and `meta.interval_run_id` must appear among the screen's inputs; remeasure checks it. For any other number, write the polars query and `tee` it into the evidence folder:
 
