@@ -142,6 +142,23 @@ test('production HTML is revalidated and receives HSTS', async () => {
   )
 })
 
+test('lets the map ask for the visitor location and keeps camera and microphone off', async () => {
+  const assets = {
+    fetch: async () => new Response('<div id="app"></div>', {
+      headers: { 'Content-Type': 'text/html' },
+    }),
+  }
+  const response = await worker.fetch(
+    new Request('https://www.nickhand.dev/fair-measure/map'),
+    { ASSETS: assets, INDEXABLE: 'true' },
+  )
+
+  assert.equal(
+    response.headers.get('Permissions-Policy'),
+    'camera=(), geolocation=(self), microphone=()',
+  )
+})
+
 test('rejects SPA fallback HTML for missing file requests', async () => {
   const assets = {
     fetch: async () => new Response('<main>SPA fallback</main>', {
