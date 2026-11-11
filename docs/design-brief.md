@@ -34,7 +34,7 @@ The working name is **"Philly Assessment Check"**, functional, not final. Treat 
 - **Mobile-first.** Every layout must be designed at 375px first; desktop is the enhancement.
 - **Accessibility is a hard floor:** WCAG 2.1 AA contrast minimum (AAA for body text preferred), color never the sole channel, visible focus states, 44px touch targets, `prefers-reduced-motion` variants, all charts keep their `role="img"` sentence-labels and `<details>` table fallbacks.
 - **Reading level:** existing copy is written to 8th grade and centrally managed, do not rewrite verdict language (it is legally cautious on purpose: "may be too high," never "is too high").
-- **No dark patterns, no tracking, no urgency theater.** The footer promise "no ads, no cookies, no analytics" is part of the brand.
+- **No dark patterns, no tracking, no urgency theater.** The footer promise "no ads, no cookies, anonymous usage statistics only" is part of the brand.
 
 ## 4. Design direction: "civic craft"
 
