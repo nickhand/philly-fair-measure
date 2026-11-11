@@ -214,9 +214,9 @@ policies, are in [CONTRIBUTING.md](CONTRIBUTING.md).
   nominal level; [docs/model.md](docs/model.md) measures the per-method
   shortfall, and the site reports interval results with that caveat.
 <!-- generated:condo-card:begin -->
-- Condo accuracy: the model beats OPA on error (rmse 0.240 vs 0.278) and on
-  uniformity (COD 17.3 vs 18.8). Condos were long OPA's strongest segment; the
-  market-area price index closed the last gap.
+- Condo accuracy: the model beats OPA on error (rmse 0.240 vs 0.278) and
+  uniformity (COD 17.3 vs 18.8) but trails it on vertical equity (PRD 1.060 vs
+  1.032).
 <!-- generated:condo-card:end -->
 - OPA's recorded condition codes cannot be independently verified (the city
   does not inspect interiors), and in a measured ~10–20% tail the distress

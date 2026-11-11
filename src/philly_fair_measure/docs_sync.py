@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import json
 import re
+import textwrap
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -148,8 +150,12 @@ def _mark_cod(v: float) -> str:
     return "✓" if v <= 15 else "⚠︎" if v <= 20 else "✗"
 
 
+# The IAAO acceptable range for the price-related differential.
+_PRD_RANGE = (0.98, 1.03)
+
+
 def _mark_prd(v: float) -> str:
-    return "✓" if 0.98 <= v <= 1.03 else "✗"
+    return "✓" if _PRD_RANGE[0] <= v <= _PRD_RANGE[1] else "✗"
 
 
 def _mark_prb(v: float) -> str:
@@ -276,36 +282,64 @@ def veq_robustness(stats: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _versus(model: str, opa: str) -> str:
-    """How the model compares with OPA on a lower-is-better statistic."""
-    if float(model) < float(opa):
+Rank = Callable[[str], tuple[bool, float]]
+
+
+def _lower_is_better(printed: str) -> tuple[bool, float]:
+    return (False, float(printed))
+
+
+def _prd_rank(printed: str) -> tuple[bool, float]:
+    """The IAAO ordering: a PRD inside the acceptable range beats one outside
+    it, and otherwise the PRD closer to 1.00 is better."""
+    prd = float(printed)
+    return (not _PRD_RANGE[0] <= prd <= _PRD_RANGE[1], round(abs(prd - 1), 3))
+
+
+def _versus(model: str, opa: str, rank: Rank) -> str:
+    """How the model compares with OPA; the lower rank is better."""
+    if rank(model) < rank(opa):
         return "beats"
-    if float(model) > float(opa):
+    if rank(model) > rank(opa):
         return "trails"
     return "matches"
+
+
+def _and(items: list[str]) -> str:
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
 
 
 def condo_bullet(stats: dict[str, Any]) -> str:
     """The condo accuracy line, shared by README limitations and model.md §6.
 
-    The verdict compares the printed values, so it never contradicts them.
+    The verdicts compare the printed values, so they never contradict them.
     """
     c, o = stats["condo_card"]["model"], stats["condo_card"]["opa"]
-    rmse = (f"{c['rmse_log']:.3f}", f"{o['rmse_log']:.3f}")
-    cod = (f"{c['cod']:.1f}", f"{o['cod']:.1f}")
-    error, uniformity = _versus(*rmse), _versus(*cod)
-    joiner = "and on" if error == uniformity else f"but {uniformity} it on"
-    bullet = (
-        f"- Condo accuracy: the model {error} OPA on error (rmse {rmse[0]} vs {rmse[1]}) "
-        f"{joiner}\n"
-        f"  uniformity (COD {cod[0]} vs {cod[1]})."
+    measures: tuple[tuple[str, str, str, str, Rank], ...] = (
+        ("error", "rmse", f"{c['rmse_log']:.3f}", f"{o['rmse_log']:.3f}", _lower_is_better),
+        ("uniformity", "COD", f"{c['cod']:.1f}", f"{o['cod']:.1f}", _lower_is_better),
+        ("vertical equity", "PRD", f"{c['prd']:.3f}", f"{o['prd']:.3f}", _prd_rank),
     )
-    if error == uniformity == "beats":
-        bullet += (
-            " Condos were long OPA's strongest segment; the\n"
-            "  market-area price index closed the last gap."
+    by_verdict: dict[str, list[str]] = {}
+    for label, statistic, model, opa, rank in measures:
+        by_verdict.setdefault(_versus(model, opa, rank), []).append(
+            f"{label} ({statistic} {model} vs {opa})"
         )
-    return bullet + "\n"
+    clauses = [
+        f"{verdict} {'it' if i else 'OPA'} on {_and(items)}"
+        for i, (verdict, items) in enumerate(by_verdict.items())
+    ]
+    verdicts = " but ".join(clauses) if len(clauses) == 2 else _and(clauses)
+    text = f"Condo accuracy: the model {verdicts}."
+    if list(by_verdict) == ["beats"]:
+        text += (
+            " Condos were long OPA's strongest segment; the market-area price index"
+            " closed the last gap."
+        )
+    wrapped = textwrap.fill(
+        text, width=79, initial_indent="- ", subsequent_indent="  ", break_on_hyphens=False
+    )
+    return wrapped + "\n"
 
 
 BLOCKS: dict[str, Any] = {

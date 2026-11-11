@@ -285,9 +285,9 @@ Honest caveats:
   arm's-length sample the model clears the vertical-equity bands while OPA does
   not, see the [vertical-equity report card](vertical-equity-report-card.md).
 <!-- generated:condo-card:begin -->
-- Condo accuracy: the model beats OPA on error (rmse 0.240 vs 0.278) and on
-  uniformity (COD 17.3 vs 18.8). Condos were long OPA's strongest segment; the
-  market-area price index closed the last gap.
+- Condo accuracy: the model beats OPA on error (rmse 0.240 vs 0.278) and
+  uniformity (COD 17.3 vs 18.8) but trails it on vertical equity (PRD 1.060 vs
+  1.032).
 <!-- generated:condo-card:end -->
 - **Interval undercoverage in the cheap tail:** at nominal 90%, realized
   coverage is ~90% overall but falls short in the **cheapest quintile**
