@@ -1,18 +1,24 @@
 import './assets/main.css'
 
 import { ViteSSG } from 'vite-ssg'
+import { START_LOCATION } from 'vue-router'
 import App from './App.vue'
+import { initAnalytics, trackPageview } from './lib/analytics'
 import { routes, scrollBehavior } from './router'
+
+const withoutHash = (fullPath: string) => fullPath.split('#')[0]
 
 export const createApp = ViteSSG(
   App,
   { routes, base: import.meta.env.BASE_URL, scrollBehavior },
-  async ({ router }) => {
+  ({ router }) => {
     if (!import.meta.env.SSR) {
-      const { initAnalytics, trackPageview } = await import('./lib/analytics')
       initAnalytics()
-      router.afterEach((to, _from, failure) => {
+      router.afterEach((to, from, failure) => {
         if (failure) return
+        // An in-page link changes only the hash. The visitor is still on the
+        // same page, so their focus stays put and no pageview is counted.
+        if (from !== START_LOCATION && withoutHash(to.fullPath) === withoutHash(from.fullPath)) return
         trackPageview(to.fullPath)
         requestAnimationFrame(() => {
           const heading = document.querySelector('main h1') as HTMLElement | null
