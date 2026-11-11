@@ -388,28 +388,22 @@ def render_html(data: ReportData) -> str:
         if s.get("interval_method") == "bayesian_posterior"
         else "spatially weighted conformal interval"
     )
-    # headline range: where both uncertainty machines agree (display_pi_*,
-    # Bayesian ∩ conformal); the full flag-anchoring band moves to the
-    # methods footnote. A $2.7M posterior ceiling on an $800k rowhome is
-    # honest math but dishonest communication.
+    # The headline range is the shown estimate's own CQR band (display_pi_*);
+    # the Bayesian band that anchors the verdict moves to the footnote. A $2.7M
+    # posterior ceiling on an $800k rowhome is honest math but dishonest
+    # communication.
     display_lo = s.get("display_pi_low_90") or s.get("model_pi_low_90")
     display_hi = s.get("display_pi_high_90") or s.get("model_pi_high_90")
-    has_agreed_band = (
-        s.get("display_pi_low_90") is not None
-        and s.get("model_pi_low_90") is not None
-        and (
-            s["display_pi_low_90"] != s["model_pi_low_90"]
-            or s.get("display_pi_high_90") != s.get("model_pi_high_90")
-        )
+    shows_cqr_band = (
+        s.get("display_pi_low_90") is not None and s.get("conformal_pi_low_90") is not None
     )
     band_note = (
-        f"Estimated range: where two independent uncertainty methods agree — a "
-        f"Bayesian posterior predictive interval and a spatially weighted "
-        f"conformal band around the point model. The full Bayesian 90% interval "
-        f"is {_fmt_money(s.get('model_pi_low_90'))} – "
-        f"{_fmt_money(s.get('model_pi_high_90'))}; the verdict above is judged "
-        f"against it."
-        if has_agreed_band
+        "Estimated range: the model's own 90% band from conformalized quantile "
+        "regression (CQR), widened where needed to reach at least 10% either side "
+        "of the estimate. The over/under verdict is judged against the Bayesian "
+        f"model's 90% interval, {_fmt_money(s.get('model_pi_low_90'))} – "
+        f"{_fmt_money(s.get('model_pi_high_90'))}, and needs the CQR band to agree."
+        if shows_cqr_band
         else f"Interval: {interval_note}."
     )
 
@@ -498,8 +492,8 @@ def render_html(data: ReportData) -> str:
     parts.append("</div>")
     parts.append(
         "<p class='note'>Note: OPA does not inspect interiors; the interior "
-        "condition code matches the exterior code on 82% of residential parcels "
-        "and rarely changes even after major renovation permits.</p>"
+        "condition code usually matches the exterior code and rarely changes "
+        "even after major renovation permits.</p>"
     )
 
     links = _viewer_links({**s, "parcel_id": data.parcel_id}, c)
