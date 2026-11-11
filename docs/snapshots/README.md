@@ -71,6 +71,11 @@ Directories ending in `.incomplete` are excluded from uploads and previous
 snapshot selection. An empty S3 prefix is a valid first run; S3 access errors
 still fail the job.
 
+If a fetch returns a different number of rows than the source counted before
+the fetch, that table fails and its directory stays `.incomplete`. A city
+update during the fetch can cause this, so rerun the workflow
+(`gh workflow run snapshot`) before you treat it as a bug.
+
 CARTO can also return HTTP 400 with `query_wait_timeout` when a query cannot
 obtain a database connection (observed in the
 [2026-11-02 verification run](https://github.com/nickhand/philly-fair-measure/actions/runs/41458154798)).

@@ -1116,7 +1116,12 @@ def main(argv: list[str] | None = None) -> int:
         "--dataset", help="dataset name used in the storage path (defaults to the table name)"
     )
     snapshot.add_argument("--page-size", type=int, default=DEFAULT_PAGE_SIZE)
-    snapshot.add_argument("--limit", type=int, help="fetch at most this many rows (smoke tests)")
+    snapshot.add_argument(
+        "--limit",
+        type=int,
+        help="fetch at most this many rows (smoke tests); a fetch cut short by the limit "
+        "stays .incomplete and never becomes the latest snapshot",
+    )
     snapshot.add_argument(
         "--org",
         choices=("phl", "septa"),

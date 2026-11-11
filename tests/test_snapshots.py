@@ -1,12 +1,15 @@
 import hashlib
 import json
+from collections.abc import Callable
 from typing import Any
 
 import httpx
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
 import respx
 
+from philly_fair_measure import catalog
 from philly_fair_measure.ingest.manifests import read_manifest
 from philly_fair_measure.ingest.snapshots import snapshot_carto_table
 from philly_fair_measure.sources.carto import PHL_CARTO_URL
@@ -51,21 +54,26 @@ def _payload(rows: list[dict[str, Any]], fields: dict | None = None) -> dict[str
     return {"rows": rows, "fields": fields or {}, "total_rows": len(rows)}
 
 
-def _handler(request: httpx.Request) -> httpx.Response:
-    sql = request.url.params["q"]
-    if "LIMIT 0" in sql:
-        return httpx.Response(200, json=_payload([], FIELDS))
-    if "count(*)" in sql:
-        return httpx.Response(200, json=_payload([{"n": 3}]))
-    assert "the_geom_webmercator" not in sql, "excluded column must not be fetched"
-    if '"cartodb_id" > 2' in sql:
-        return httpx.Response(200, json=_payload(PAGE_TWO))
-    return httpx.Response(200, json=_payload(PAGE_ONE))
+def _source(count: int = 3) -> Callable[[httpx.Request], httpx.Response]:
+    """A three-row table whose count(*) reports `count`."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sql = request.url.params["q"]
+        if "LIMIT 0" in sql:
+            return httpx.Response(200, json=_payload([], FIELDS))
+        if "count(*)" in sql:
+            return httpx.Response(200, json=_payload([{"n": count}]))
+        assert "the_geom_webmercator" not in sql, "excluded column must not be fetched"
+        if '"cartodb_id" > 2' in sql:
+            return httpx.Response(200, json=_payload(PAGE_TWO))
+        return httpx.Response(200, json=_payload(PAGE_ONE))
+
+    return handler
 
 
 @respx.mock
 def test_snapshot_carto_table_end_to_end(tmp_path):
-    respx.get(PHL_CARTO_URL).mock(side_effect=_handler)
+    respx.get(PHL_CARTO_URL).mock(side_effect=_source())
 
     result = snapshot_carto_table("opa_test", data_dir=tmp_path, page_size=2)
 
@@ -109,8 +117,26 @@ def test_snapshot_carto_table_end_to_end(tmp_path):
 
 
 @respx.mock
-def test_snapshot_respects_limit(tmp_path):
-    respx.get(PHL_CARTO_URL).mock(side_effect=_handler)
+def test_limited_snapshot_is_kept_but_never_becomes_latest(tmp_path):
+    respx.get(PHL_CARTO_URL).mock(side_effect=_source())
     result = snapshot_carto_table("opa_test", data_dir=tmp_path, page_size=2, limit=2)
-    assert result.manifest.row_count == 2
-    assert result.manifest.row_limit == 2
+
+    assert "opa_test" not in catalog.latest_snapshots(tmp_path)
+    assert pq.read_table(result.directory / "data.parquet").num_rows == 2
+    manifest = read_manifest(result.directory)
+    assert (manifest.row_limit, manifest.row_count, manifest.source_row_count) == (2, 2, 3)
+
+
+@pytest.mark.parametrize("source_count", [4, 2])
+@respx.mock
+def test_count_mismatch_fails_and_is_never_published(tmp_path, source_count):
+    respx.get(PHL_CARTO_URL).mock(side_effect=_source(count=source_count))
+
+    with pytest.raises(RuntimeError):
+        snapshot_carto_table("opa_test", data_dir=tmp_path, page_size=2)
+
+    assert "opa_test" not in catalog.latest_snapshots(tmp_path)
+    (kept,) = (tmp_path / "raw" / "source=carto" / "dataset=opa_test").glob("*.incomplete")
+    assert pq.read_table(kept / "data.parquet").num_rows == 3
+    manifest = read_manifest(kept)
+    assert (manifest.source_row_count, manifest.row_count) == (source_count, 3)
