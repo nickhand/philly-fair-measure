@@ -21,7 +21,7 @@ fm-verify <command> <slug> [args]
   remeasure <slug> [--api URL] [--html FILE]  recount the screen from the mart, save remeasure.json
   ci <slug> [base, default origin/main]  CI contract tests, change routing, workflow YAML parse
   doctor <slug>                 read-only health report, saved to doctor.txt
-  stop <slug>                   kill only what this slug started, remove scratch, list evidence
+  stop <slug>                   kill only what this checkout and slug started, remove scratch, list evidence
 
 Acts on the checkout of the current directory. Evidence goes to <main checkout>/data/verify/.
 Env: FM_API_PORT FM_PREVIEW_PORT FM_DEV_PORT PHILLY_DATA_DIR (default: <checkout>/data)
@@ -40,7 +40,7 @@ MAIN="$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd)
 API_PORT=${FM_API_PORT:-8000}
 PREVIEW_PORT=${FM_PREVIEW_PORT:-4173}
 DEV_PORT=${FM_DEV_PORT:-5173}
-SCRATCH="${TMPDIR:-/tmp}/fm-verify/$slug"
+SCRATCH="${TMPDIR:-/tmp}/fm-verify/$(printf %s "$ROOT" | shasum | cut -c1-12)-$slug"
 
 evidence_dir() {
   local existing
@@ -79,21 +79,27 @@ refuse_busy_port() {
   fi
 }
 
-# Start a command in its own process group so stop can kill the whole tree.
+started_at() { ps -o lstart= -p "$1" 2>/dev/null | sed 's/^ *//; s/ *$//'; }
+
+# Start a command in its own process group so stop can kill the whole tree. The record holds the
+# group id and its leader's start time, so a reused pid is never mistaken for ours.
 # Sets LAUNCHED to the group id.
 launch() {
-  local name=$1
+  local name=$1 pgid started
   shift
   mkdir -p "$SCRATCH"
-  if [[ -f $SCRATCH/$name.pid ]] && kill -0 -- "-$(cat "$SCRATCH/$name.pid")" 2>/dev/null; then
-    echo "$name already running for $slug (process group $(cat "$SCRATCH/$name.pid"))" >&2
-    exit 3
+  if [[ -f $SCRATCH/$name.pid ]]; then
+    read -r pgid started <"$SCRATCH/$name.pid"
+    if [[ -n $started && $(started_at "$pgid") == "$started" ]]; then
+      echo "$name already running for $slug (process group $pgid)" >&2
+      exit 3
+    fi
   fi
   set -m
   (cd "$ROOT" && exec "$@") </dev/null >"$EV/logs/$name.log" 2>&1 &
   LAUNCHED=$!
   set +m
-  echo "$LAUNCHED" >"$SCRATCH/$name.pid"
+  echo "$LAUNCHED $(started_at "$LAUNCHED")" >"$SCRATCH/$name.pid"
   log "start $name pgid=$LAUNCHED: $*"
 }
 
@@ -339,7 +345,7 @@ case $cmd in
   doctor)
     {
       echo "== doctor $(date -u +%FT%TZ)"
-      (cd "$ROOT" && uv run --quiet python "$HERE/doctor.py" --slug "$slug" \
+      (cd "$ROOT" && uv run --quiet python "$HERE/doctor.py" --scratch "$SCRATCH" \
         --api-port "$API_PORT" --preview-port "$PREVIEW_PORT" --dev-port "$DEV_PORT")
     } 2>&1 | tee -a "$EV/doctor.txt"
     exit "${PIPESTATUS[0]}"
@@ -348,13 +354,20 @@ case $cmd in
     shopt -s nullglob
     for pidfile in "$SCRATCH"/*.pid; do
       name=$(basename "$pidfile" .pid)
-      pgid=$(cat "$pidfile")
-      if kill -0 -- "-$pgid" 2>/dev/null; then
+      read -r pgid started <"$pidfile"
+      now=$(started_at "$pgid")
+      if [[ -n $now && $now == "$started" ]]; then
         kill -TERM -- "-$pgid"
         for _ in {1..20}; do kill -0 -- "-$pgid" 2>/dev/null || break; sleep 0.5; done
         if kill -0 -- "-$pgid" 2>/dev/null; then kill -KILL -- "-$pgid"; fi
         log "stop $name pgid=$pgid"
         echo "stopped $name (process group $pgid)"
+      elif [[ -n $now ]]; then
+        log "stop $name skipped: pid $pgid started $now, recorded ${started:-no start time}"
+        echo "$name: pid $pgid is a process started $now, not the one launched ${started:-(no start time recorded)}; left alone"
+      elif kill -0 -- "-$pgid" 2>/dev/null; then
+        echo "$name: leader $pgid exited but process group $pgid lives on; left alone:"
+        ps -A -o pid=,pgid=,command= | awk -v g="$pgid" '$2 == g' | head -5
       else
         echo "$name (process group $pgid) was not running"
       fi

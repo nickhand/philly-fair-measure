@@ -11,7 +11,7 @@ Run everything from the root of the checkout under test. The helper is
 S=.claude/skills/verify-fair-measure/scripts/fm-verify
 ```
 
-The helpers act on the checkout of the current directory, wherever they live: its code, its `.venv`, its `web/`, and its `data` link or `PHILLY_DATA_DIR`. A checkout that predates this skill can call them by absolute path from one that has it. `$S` with no arguments lists its commands. Each takes a `<slug>` naming the change, such as `fix-search-trim`. The slug keys the evidence folder and the processes the run owns. Use a new slug per run; a reused slug appends to its earlier folder. Pass the same `FM_*` port variables to every call of one run.
+The helpers act on the checkout of the current directory, wherever they live: its code, its `.venv`, its `web/`, and its `data` link or `PHILLY_DATA_DIR`. A checkout that predates this skill can call them by absolute path from one that has it. `$S` with no arguments lists its commands. Each takes a `<slug>` naming the change, such as `fix-search-trim`. The slug keys the evidence folder; the checkout and the slug together key the processes the run owns. Use a new slug per run; a reused slug appends to its earlier folder. Pass the same `FM_*` port variables to every call of one run.
 
 ## What counts as proof
 
@@ -190,7 +190,7 @@ runs the `.github/ci` contract tests, lists the changed paths with the diff `ci.
 $S stop <slug>
 ```
 
-kills only the process groups this slug started (recorded under `$TMPDIR/fm-verify/<slug>/`), removes that scratch folder, reports any port still held by someone else, lists any file under the main checkout's `data/` (outside `verify/`) or `deploy/` modified since the run began into `lake-writes.txt`, and lists the evidence it kept. A lake write you did not intend means the verification itself changed the artifact; say so. Close browser pane tabs with `mcp__Claude_Browser__tabs_close`. Leave `web/dist` and `.venv-serve`; they are gitignored build output. Run stop after a failed attempt too, then confirm the evidence folder still lists its files.
+kills only the process groups this checkout and slug started. Each start records its group under `$TMPDIR/fm-verify/<checkout hash>-<slug>/` with the leader's start time, and stop leaves a group alone, with a message, when the leader is gone or its pid now belongs to a process started at another time. Stop then removes the records, reports any port still held by someone else, lists any file under the main checkout's `data/` (outside `verify/`) or `deploy/` modified since the run began into `lake-writes.txt`, and lists the evidence it kept. A lake write you did not intend means the verification itself changed the artifact; say so. Close browser pane tabs with `mcp__Claude_Browser__tabs_close`. Leave `web/dist` and `.venv-serve`; they are gitignored build output. Run stop after a failed attempt too, then confirm the evidence folder still lists its files.
 
 ## Feature map
 

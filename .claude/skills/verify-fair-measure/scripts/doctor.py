@@ -71,11 +71,14 @@ def listener(port: int) -> Listener | None:
     )
 
 
-def owned_groups(slug: str | None) -> dict[int, str]:
-    if not slug:
-        return {}
-    scratch = Path(os.environ.get("TMPDIR", "/tmp")) / "fm-verify" / slug
-    return {int(p.read_text()): p.stem for p in scratch.glob("*.pid")}
+def owned_groups(scratch: Path | None) -> dict[int, str]:
+    """Process groups fm-verify launched whose leader still has the recorded start time."""
+    owned: dict[int, str] = {}
+    for record in scratch.glob("*.pid") if scratch else []:
+        pgid, _, started = record.read_text().strip().partition(" ")
+        if started and sh("ps", "-o", "lstart=", "-p", pgid) == started:
+            owned[int(pgid)] = record.stem
+    return owned
 
 
 def describe(name: str, port: int, owned: dict[int, str]) -> Listener | None:
@@ -227,13 +230,13 @@ def check_site(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--slug")
+    parser.add_argument("--scratch", type=Path, help="fm-verify's process records")
     parser.add_argument("--api-port", type=int, default=8000)
     parser.add_argument("--preview-port", type=int, default=4173)
     parser.add_argument("--dev-port", type=int, default=5173)
     args = parser.parse_args()
     root = Path(sh("git", "rev-parse", "--show-toplevel"))
-    owned = owned_groups(args.slug)
+    owned = owned_groups(args.scratch)
     check_checkout(root)
     check_api(args.api_port, owned)
     check_site(root, args.api_port, args.preview_port, args.dev_port, owned)
