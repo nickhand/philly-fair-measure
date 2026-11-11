@@ -39,7 +39,8 @@ export interface PropertyCore {
   model_pi_high_90: number | null
   /** The displayed estimate's own band (CQR for residential, the native
    * conformal band for condos) — what the UI should display. Flags are
-   * still judged against model_pi_* plus a second method. Optional so older API
+   * still judged against model_pi_*, plus the CQR band for residential rows
+   * only (condos have one band). Optional so older API
    * payloads keep working; fall back to model_pi_*. */
   display_pi_low_90?: number | null
   display_pi_high_90?: number | null

@@ -32,10 +32,11 @@ internally inconsistent to price.
   an immutable, manifest-tracked local data lake.
 - Classifies sale validity (arm's-length vs. distressed/related-party/nominal)
   following the Cook County Assessor's published methodology.
-- Trains valuation models on public data only: a LightGBM+CatBoost stack with
-  financed-market calibration and conformalized-quantile-regression intervals
-  (what the site displays), cross-examined by a hierarchical Bayesian model,
-  a flag requires both methods to agree.
+- Trains valuation models on public data only. For houses, a LightGBM+CatBoost
+  stack with financed-market calibration and conformalized-quantile-regression
+  intervals (what the site displays) is cross-examined by a hierarchical
+  Bayesian model, and a flag requires both methods to agree. Condo units have
+  their own LightGBM model and are flagged on its conformal range alone.
 - Screens every assessment: OPA's value is compared against the model's 90%
   interval, and the disagreement is expressed in predictive-uncertainty units
   (`screen_z`), so a flag always accounts for how certain the model is about

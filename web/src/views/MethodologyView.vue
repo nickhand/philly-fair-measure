@@ -123,7 +123,8 @@ const dots = computed(() => Array.from({ length: TOTAL }, (_, i) => i < filled.v
       </p>
       <p class="mt-2 text-center text-caption text-muted">
         We only flag an assessment when the city’s value falls <strong>outside</strong> the 90%
-        range, and two different statistical methods have to agree first.
+        range. For houses, two different statistical methods have to agree first. A condo is
+        flagged on its one condo model’s range.
       </p>
     </section>
 
