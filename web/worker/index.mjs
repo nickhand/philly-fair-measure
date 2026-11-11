@@ -4,7 +4,7 @@ function addResponseHeaders(response, requestUrl, indexable) {
   const headers = new Headers(response.headers)
   headers.set('X-Content-Type-Options', 'nosniff')
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-  headers.set('Permissions-Policy', 'camera=(), geolocation=(), microphone=()')
+  headers.set('Permissions-Policy', 'camera=(), geolocation=(self), microphone=()')
   headers.set('X-Frame-Options', 'DENY')
 
   if (new URL(requestUrl).hostname.endsWith('nickhand.dev')) {
