@@ -60,8 +60,12 @@ jobs:
           set -euo pipefail
           for ds in $TABLES; do
             prefix="raw/source=carto/dataset=$ds/"
-            latest=$(aws s3 ls "s3://${{ vars.SNAPSHOT_BUCKET }}/$prefix" \
-              | awk '$2 ~ /^fetched_at=/ && $2 !~ /\.incomplete\// {print $2}' \
+            # `aws s3 ls` exits 1 on an empty prefix, which a new table has
+            # until its first upload. list-objects-v2 exits 0 with no prefixes.
+            latest=$(aws s3api list-objects-v2 --bucket "${{ vars.SNAPSHOT_BUCKET }}" \
+                --prefix "$prefix" --delimiter / --output json \
+              | jq -r --arg prefix "$prefix" '.CommonPrefixes[]?.Prefix | ltrimstr($prefix)
+                  | select(startswith("fetched_at=") and (endswith(".incomplete/") | not))' \
               | sort | tail -1)
             if [ -n "$latest" ]; then
               echo "previous $ds: $latest"
