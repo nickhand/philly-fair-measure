@@ -6,8 +6,11 @@ Layout::
                                                                /manifest.json
 
 Snapshots are immutable once written. The fetch writes into a sibling directory
-with an ``.incomplete`` suffix and renames it only after the manifest lands, so
-a crashed fetch can never masquerade as a valid snapshot.
+with an ``.incomplete`` suffix and renames it only after the manifest lands and
+only when the snapshot holds every row the source counted. A crashed, limited
+or short fetch stays ``.incomplete`` with its rows kept, and nothing that
+resolves the latest snapshot (the catalog, ``snapshot-diff``, the S3 upload)
+reads it.
 """
 
 from __future__ import annotations
@@ -52,6 +55,34 @@ FETCHED_AT_FORMAT = "%Y%m%dT%H%M%SZ"
 class SnapshotResult:
     directory: Path
     manifest: SnapshotManifest
+
+
+def _publish(manifest: SnapshotManifest, work_dir: Path, final_dir: Path) -> SnapshotResult:
+    """Write the manifest, then publish the snapshot only if it is complete.
+
+    The source count is one count(*) taken before the first page of a live
+    table. A mismatch means either a truncated fetch (CARTO paging stops at the
+    first short page) or a table that changed during the fetch, and this code
+    cannot tell which. So a mismatch fails unless the caller's limit caused it.
+    """
+    write_manifest(manifest, work_dir)
+    if manifest.row_count == manifest.source_row_count:
+        work_dir.rename(final_dir)
+        logger.info("snapshot complete: %s rows -> %s", f"{manifest.row_count:,}", final_dir)
+        return SnapshotResult(directory=final_dir, manifest=manifest)
+    if manifest.row_limit is not None:
+        logger.warning(
+            "%s: limited fetch of %s of %s rows kept unpublished at %s",
+            manifest.dataset,
+            manifest.row_count,
+            manifest.source_row_count,
+            work_dir,
+        )
+        return SnapshotResult(directory=work_dir, manifest=manifest)
+    raise RuntimeError(
+        f"{manifest.dataset}: fetched {manifest.row_count} rows but the source counted "
+        f"{manifest.source_row_count}; kept unpublished at {work_dir}"
+    )
 
 
 def _sha256(path: Path) -> str:
@@ -156,10 +187,7 @@ def snapshot_carto_table(
             ],
             package_version=__version__,
         )
-        write_manifest(manifest, work_dir)
-        work_dir.rename(final_dir)
-        logger.info("snapshot complete: %s rows -> %s", f"{row_count:,}", final_dir)
-        return SnapshotResult(directory=final_dir, manifest=manifest)
+        return _publish(manifest, work_dir, final_dir)
     finally:
         if owns_client:
             client.close()
@@ -259,10 +287,7 @@ def snapshot_arcgis_layer(
             ],
             package_version=__version__,
         )
-        write_manifest(manifest, work_dir)
-        work_dir.rename(final_dir)
-        logger.info("snapshot complete: %s rows -> %s", f"{row_count:,}", final_dir)
-        return SnapshotResult(directory=final_dir, manifest=manifest)
+        return _publish(manifest, work_dir, final_dir)
     finally:
         if owns_client:
             client.close()
