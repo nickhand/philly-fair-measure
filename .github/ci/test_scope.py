@@ -46,12 +46,18 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(
             SCOPE.classify(
                 [
-                    ".github/workflows/ci.yml",
+                    ".github/ci/scope.py",
                     ".github/ci/test_release_contracts.py",
                     ".github/ci/test_scope.py",
                 ]
             ),
             {"python": False, "web": True, "release": True},
+        )
+
+    def test_ci_workflow_change_runs_both_jobs(self) -> None:
+        self.assertEqual(
+            SCOPE.classify([".github/workflows/ci.yml"]),
+            {"python": True, "web": True, "release": True},
         )
 
     def test_empty_input_fails_closed(self) -> None:
