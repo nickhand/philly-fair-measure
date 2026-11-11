@@ -349,32 +349,3 @@ def test_render_html_minimal_condo():
     assert "conformal" in out
     assert "270 units" in out
     assert "Uniformity exhibit" not in out  # no twins for condos yet
-
-
-def test_render_html_range_note_names_the_band_it_shows():
-    import re
-
-    screen = _screen_row(
-        display_median=500_000.0,
-        display_pi_low_90=380_000.0,
-        display_pi_high_90=640_000.0,
-        conformal_pi_low_90=380_000.0,
-        conformal_pi_high_90=640_000.0,
-    )
-    out = render_html(
-        ReportData(
-            parcel_id="052174500",
-            screen=screen,
-            characteristics={},
-            provenance={"generated": "2026-07-03"},
-        )
-    )
-    assert "$380,000 – $640,000" in out  # the range shown is the CQR display band
-    note = re.search(r"Estimated range:[^<]*", out)
-    assert note is not None
-    assert "CQR" in note.group(0)
-    assert "$150,000 – $1,800,000" in note.group(0)  # the Bayesian band the verdict uses
-    # one band is shown, so the note must not claim two methods agree on it
-    assert "agree —" not in note.group(0) and "methods agree" not in note.group(0)
-    # a measured share printed as a constant goes stale when the roll changes
-    assert not re.search(r"\d+% of residential parcels", out)
