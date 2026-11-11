@@ -147,7 +147,7 @@ Never write to the lake while verifying. Run CLI checks through
 $S cli <slug> <name> <fair-measure args>
 ```
 
-which runs `uv run fair-measure <args>` in the current checkout, saves `cli/<name>.txt` with the command and exit code, and refuses anything outside this table except `--help`:
+which runs `uv run fair-measure <args>` in the current checkout and saves `cli/<name>.txt` with the command and exit code. It allows `--help` or `-h` on any command and refuses anything else outside this table. It accepts each command's flags only when spelled in full, because argparse would read `--rep` as `--reports`. Every output path (`--out`, `--json-out`) must resolve inside the evidence folder. `sql` takes one `SELECT` or `WITH` statement with no `COPY`, `EXPORT`, `ATTACH`, `INSTALL`, `LOAD`, `CREATE`, `INSERT`, `UPDATE`, `DELETE` or `PRAGMA` in it.
 
 | Command | Proves |
 |---|---|
@@ -159,7 +159,7 @@ which runs `uv run fair-measure <args>` in the current checkout, saves `cli/<nam
 | `report 052174500 --out <evidence>/reports` | the static appeal packet |
 | `export-web-stats --out <evidence>/siteStats.json` | every site statistic recomputed; diff it against `web/src/data/siteStats.json`, where only `meta.generated_at` should differ |
 | `sync-docs --check` | the generated README.md and docs/model.md blocks match `siteStats.json` |
-| `freshness`, `snapshot-diff ... --out <file>` | snapshot ages and changes |
+| `freshness`, `snapshot-diff [--out <evidence>/<file>]` | snapshot ages and changes |
 | `<any command> --help` | a changed command's arguments |
 
 The recount of the published screen numbers:

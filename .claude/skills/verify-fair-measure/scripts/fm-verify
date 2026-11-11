@@ -135,6 +135,84 @@ fetch() {
   [[ $code == "$expect" ]] || { echo "expected $expect, got $code" >&2; exit 1; }
 }
 
+# The flags of each command `cli` runs, spelled in full. out: an output path that must resolve
+# inside the evidence folder; value: takes one argument; flag: takes none, or a list nothing reads.
+# Any other flag, including an argparse prefix abbreviation such as --rep for --reports, is refused.
+cli_flags() {
+  case $1 in
+    catalog) echo "--data-dir:value" ;;
+    freshness) echo "--max-age-days:value --data-dir:value" ;;
+    comps) echo "--k:value --window-years:value --data-dir:value" ;;
+    sql) echo "--max-rows:value --data-dir:value" ;;
+    leaderboard) echo "--kind:value --n:value --extremes:flag --data-dir:value" ;;
+    screen-audit) echo "--no-save:flag --data-dir:value" ;;
+    sync-docs) echo "--check:flag" ;;
+    report) echo "--out:out --data-dir:value" ;;
+    export-web-stats) echo "--out:out --data-dir:value --annual-report-config:value" ;;
+    snapshot-diff) echo "--datasets:flag --out:out --json-out:out --data-dir:value" ;;
+    *) return 1 ;;
+  esac
+}
+
+realpath_from_root() { (cd "$ROOT" && python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$1"); }
+
+# Prints why `fair-measure "$@"` could write outside the evidence folder; prints nothing if it cannot.
+cli_refusal() {
+  local sub=${1:-} tok flags flag spec kind names val seen=" " ev first body
+  local positional=()
+  for tok in "$@"; do
+    [[ $tok == -- ]] && break
+    [[ $tok == --help || $tok == -h ]] && return 0
+  done
+  flags=$(cli_flags "$sub") || { echo "may write the lake or the repo; only --help is allowed"; return 0; }
+  ev=$(realpath_from_root "$EV")
+  shift
+  while (($#)); do
+    tok=$1
+    shift
+    if [[ $tok != -* ]]; then
+      positional+=("$tok")
+      continue
+    fi
+    flag=${tok%%=*}
+    kind= names=
+    for spec in $flags; do
+      names+=" ${spec%%:*}"
+      [[ ${spec%%:*} == "$flag" ]] && kind=${spec#*:}
+    done
+    [[ -n $kind ]] || { echo "$sub does not take $flag here; spell flags in full:$names"; return 0; }
+    seen+="$flag "
+    [[ $kind == flag ]] && continue
+    if [[ $tok == *=* ]]; then
+      val=${tok#*=}
+    else
+      val=${1:-}
+      shift || true
+    fi
+    [[ -n $val && $val != -* ]] || { echo "$flag needs a value"; return 0; }
+    if [[ $kind == out ]]; then
+      val=$(realpath_from_root "$val")
+      [[ $val == "$ev" || $val == "$ev"/* ]] || { echo "$flag $val is outside the evidence folder $ev"; return 0; }
+    fi
+  done
+  case $sub in
+    screen-audit) [[ $seen == *" --no-save "* ]] || echo "needs --no-save" ;;
+    sync-docs) [[ $seen == *" --check "* ]] || echo "needs --check" ;;
+    report | export-web-stats) [[ $seen == *" --out "* ]] || echo "needs --out into the evidence folder" ;;
+    sql)
+      ((${#positional[@]} == 1)) || { echo "sql takes exactly one query"; return 0; }
+      [[ ${positional[0]} =~ ^[[:space:]]*([A-Za-z]+) ]] && first=$(tr '[:upper:]' '[:lower:]' <<<"${BASH_REMATCH[1]}")
+      [[ ${first:-} == select || ${first:-} == with ]] || { echo "sql must be one SELECT or WITH query"; return 0; }
+      body=${positional[0]}
+      [[ $body =~ ^(.*)\;[[:space:]]*$ ]] && body=${BASH_REMATCH[1]}
+      [[ $body != *\;* ]] || { echo "sql must be a single statement"; return 0; }
+      if grep -qiwE 'copy|export|attach|install|load|create|insert|update|delete|pragma' <<<"$body"; then
+        echo "sql may only read: no COPY, EXPORT, ATTACH, INSTALL, LOAD, CREATE, INSERT, UPDATE, DELETE or PRAGMA"
+      fi
+      ;;
+  esac
+}
+
 case $cmd in
   setup)
     for link in data deploy web/node_modules; do
@@ -206,16 +284,8 @@ case $cmd in
     [[ $# -ge 2 ]] || { usage; exit 2; }
     name=$1
     shift
-    args=" $* "
-    case "$1" in
-      catalog | sql | comps | freshness) ;;
-      leaderboard) [[ $args != *" --reports "* ]] || unsafe="--reports writes data/reports/" ;;
-      report | export-web-stats | snapshot-diff) [[ $args == *" --out "* ]] || unsafe="needs --out into the evidence folder" ;;
-      screen-audit) [[ $args == *" --no-save "* ]] || unsafe="needs --no-save" ;;
-      sync-docs) [[ $args == *" --check "* ]] || unsafe="needs --check" ;;
-      *) [[ $args == *" --help "* ]] || unsafe="may write the lake or the repo; only --help is allowed" ;;
-    esac
-    if [[ -n ${unsafe:-} ]]; then
+    unsafe=$(cli_refusal "$@")
+    if [[ -n $unsafe ]]; then
       echo "refusing fair-measure $*: $unsafe" >&2
       exit 2
     fi
