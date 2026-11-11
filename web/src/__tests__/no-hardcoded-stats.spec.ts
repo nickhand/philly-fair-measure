@@ -136,7 +136,7 @@ describe('frontend does not hardcode run-dependent stats', () => {
     const year = String(stats.annual_report.tax_year)
     const files = [
       'index.html',
-      'public/sitemap.xml',
+      'sitemap.xml',
       'scripts/check-cloudflare-release.mjs',
       'scripts/check-cloudflare-browser.mjs',
     ]

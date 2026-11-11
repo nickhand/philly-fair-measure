@@ -6,10 +6,13 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+const stats = JSON.parse(await readFile(new URL('../src/data/siteStats.json', import.meta.url), 'utf8'))
+export const REPORT_PATH = `/reports/ty-${stats.annual_report.tax_year}`
+
 export const PAGE_PATHS = [
   '/',
   '/map',
-  '/reports/ty-2027',
+  REPORT_PATH,
   '/findings',
   '/methodology',
   '/trust',
