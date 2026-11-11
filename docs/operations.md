@@ -6,10 +6,12 @@ than none. Two commands cover this:
 
 ```bash
 uv run fair-measure snapshot-all   # capture the active core tables (continues past failures, exits 1 if any failed)
-uv run fair-measure freshness      # heartbeat: exits 1 if any core dataset is missing or > 8 days old
+uv run fair-measure freshness      # heartbeat: exits 1 if any scheduled table is missing or > 8 days old
 ```
 
 The core table set lives in `philly_fair_measure.config.CORE_CARTO_TABLES`.
+The weekly job captures the subset in `SCHEDULED_CARTO_TABLES`, and
+`freshness` checks only that subset.
 `snapshot-all` skips the tables in `PAUSED_CARTO_TABLES` and prints why. Today
 that is the retired `real_estate_tax_delinquencies` table, which CARTO denies
 (see [the snapshot program](snapshots/README.md)). Name a paused table in

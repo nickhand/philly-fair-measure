@@ -1084,7 +1084,7 @@ def _cmd_freshness(args: argparse.Namespace) -> int:
     latest = catalog.latest_snapshots(args.data_dir)
     now = datetime.now(UTC)
     stale = []
-    for table in config.CORE_CARTO_TABLES:
+    for table in config.SCHEDULED_CARTO_TABLES:
         ref = latest.get(table)
         if ref is None:
             print(f"{table:<28} MISSING")
@@ -1569,7 +1569,7 @@ def main(argv: list[str] | None = None) -> int:
 
     freshness = subparsers.add_parser(
         "freshness",
-        help="check snapshot ages; exit 1 if any core dataset is missing or stale",
+        help="check snapshot ages; exit 1 if any scheduled table is missing or stale",
     )
     freshness.add_argument("--max-age-days", type=float, default=8.0)
     freshness.add_argument("--data-dir", type=Path)

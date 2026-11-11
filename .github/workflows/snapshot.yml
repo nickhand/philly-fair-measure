@@ -1,5 +1,6 @@
-# Weekly snapshots of the current-only CARTO tables (the city overwrites
-# these in place, so our snapshots are the only history that exists).
+# Weekly snapshots of the scheduled CARTO tables (config.SCHEDULED_CARTO_TABLES).
+# The city overwrites the current-only tables in place, so our snapshots are
+# the only history of them that exists.
 #
 # Each run: pull the previous snapshot from S3 -> fetch fresh copies ->
 # upload to S3 -> commit a small diff summary to docs/snapshots/. That commit
@@ -22,9 +23,13 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  # The current-only tables. Each run pulls last week's copy and diffs against it.
   # Parcel-level delinquencies have returned permission denied since 2026-09-21.
   # Keep historical snapshots; see docs/snapshots/README.md before re-enabling.
   TABLES: opa_properties_public assessments
+  # Sales, permits and violations. snapshot-diff has no spec for them, so each
+  # run captures and uploads them without a diff.
+  EVENT_TABLES: rtt_summary permits violations
 
 jobs:
   snapshot:
@@ -75,7 +80,7 @@ jobs:
 
       - name: Fetch fresh snapshots
         id: fetch
-        run: uv run fair-measure snapshot-all --tables $TABLES
+        run: uv run fair-measure snapshot-all --tables $TABLES $EVENT_TABLES
 
       - name: Upload completed snapshots to S3
         # snapshot-all continues after a failed table. Preserve its successes,

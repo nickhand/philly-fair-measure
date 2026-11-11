@@ -47,13 +47,12 @@ test:
 
 # ---------------------------------------------------------------- pipeline
 
-# Snapshot the current-only tables and summarize what the city changed since
-# the previous snapshot (the local flavor of .github/workflows/snapshot.yml;
-# see docs/snapshots/README.md).
+# The local flavor of .github/workflows/snapshot.yml; see docs/snapshots/README.md.
+# Snapshot the scheduled tables and diff the current-only ones against the previous snapshot
 [group: "pipeline"]
 snapshot-current:
 	@echo "Tax delinquency snapshots are paused (CARTO permission denied); see docs/snapshots/README.md."
-	uv run fair-measure snapshot-all --tables assessments opa_properties_public
+	uv run fair-measure snapshot-all --tables assessments opa_properties_public rtt_summary permits violations
 	uv run fair-measure snapshot-diff --datasets assessments opa_properties_public
 
 # The ArcGIS layers are parcels, building footprints, the proximity layers and

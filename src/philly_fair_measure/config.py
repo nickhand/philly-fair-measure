@@ -41,6 +41,17 @@ PAUSED_CARTO_TABLES: Final[dict[str, str]] = {
     ),
 }
 
+# The core tables the weekly snapshot job and `just snapshot-current` capture.
+# `fair-measure freshness` checks only these, because nothing else refreshes on
+# a schedule. .github/ci/test_snapshot_tables.py fails when either list differs.
+SCHEDULED_CARTO_TABLES: Final[tuple[str, ...]] = (
+    "opa_properties_public",
+    "assessments",
+    "rtt_summary",
+    "permits",
+    "violations",
+)
+
 
 def data_dir() -> Path:
     """Root of the local data lake (raw/, staged/, marts/).
