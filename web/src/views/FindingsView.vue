@@ -224,28 +224,21 @@ const taxShiftAria =
       </ul>
     </section>
 
-    <!-- Finding 5: accurate assessments = found revenue + a fair-share correction -->
+    <!-- Finding 5: a fair-share correction -->
     <section class="mt-4 rounded-xl border border-line-soft bg-white p-4 sm:p-5">
       <p class="text-caption font-bold text-brand-600">FINDING 5 · THE FIX</p>
       <h2 class="mt-1 text-title font-bold text-ink">
         Make the wealthy pay their fair share.
       </h2>
       <p class="mt-1.5 text-body-sm leading-relaxed text-body">
-        Cities everywhere are scrambling for revenue, and passing a new tax is a long, hard fight.
-        Philadelphia has an easier option that needs no new law and no rate hike: fix the assessments
-        it already has. Today the priciest homes are under-assessed, so their owners are billed on
-        less than their homes are worth.
+        Today the priciest homes are under-assessed, so their owners are billed on less than their
+        homes are worth.
       </p>
       <p class="mt-2 text-body-sm leading-relaxed text-body">
         Correcting that makes the wealthiest homeowners pay their fair share, and it gives the
         over-assessed cheapest homes a break. The typical priciest-fifth home would pay about
         <strong>${{ shift.priciest_home_usd }} more</strong> a year; the typical cheapest-fifth home
         pays about <strong>${{ Math.abs(shift.cheapest_home_usd) }} less</strong>.
-      </p>
-      <p class="mt-2 text-body-sm leading-relaxed text-body">
-        Because the increase at the top outweighs the relief at the bottom, the city comes out ahead:
-        an estimated <strong>${{ shift.new_revenue_musd }} million a year</strong> it is not
-        collecting today, at the same rate, with no new tax.
       </p>
 
       <div class="mt-4" role="img" :aria-label="taxShiftAria">
@@ -281,15 +274,8 @@ const taxShiftAria =
         </p>
       </div>
 
-      <div class="mt-3 rounded-md bg-brand-50 p-3 text-body-sm leading-relaxed text-body">
-        <strong class="text-brand-900">No new tax. No new law. No rate hike.</strong> The city only
-        has to get its own numbers right, and that pays for itself.
-      </div>
       <p class="mt-2 text-caption text-muted">
-        An estimate across every home the model scores; the corrected values run about
-        {{ shift.base_change_pct }}% higher citywide, concentrated in the most expensive homes.
-        Residential and condo property only. The city could instead keep total collections flat and
-        cut the rate for everyone; either way the regressive tilt is gone.
+        An estimate across every home the model scores. Residential and condo property only.
       </p>
     </section>
 
