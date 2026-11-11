@@ -38,7 +38,7 @@ creates the missing ones as absolute symlinks and warns when the main checkout's
 
 `uv run` builds the worktree's own `.venv` on first use (about 10 s).
 
-The `web/node_modules` link shares more than packages. `vue-tsc --build` writes `web/node_modules/.tmp/*.tsbuildinfo`, which lands in the main checkout. Do not build in a worktree while the main checkout builds. When the main checkout's install is emptied or reinstalled, every linked worktree loses it at once; `vite: command not found` or `Cannot find module 'playwright'` means the shared install is gone (seen on 2026-11-11). Ask the owner before reinstalling in the main checkout, or give the worktree its own with `npm --prefix web ci`.
+The `web/node_modules` link shares more than packages. `vue-tsc --build` writes `web/node_modules/.tmp/*.tsbuildinfo`, which lands in the main checkout. Do not build in a worktree while the main checkout builds. Never run `npm ci` or `npm install` in a worktree while `web/node_modules` is a link: npm empties the link's target, which is the main checkout's install, and every linked worktree loses it at once (this happened on 2026-11-11). To give a worktree its own install, remove the link first (`rm web/node_modules`), then run `timeout 900 npm --prefix web ci`. `vite: command not found` or `Cannot find module 'playwright'` in a linked worktree means the shared install is gone; restore it from the lockfile with `timeout 900 npm --prefix <main checkout>/web ci` and say so in your report.
 
 ## Evidence
 
