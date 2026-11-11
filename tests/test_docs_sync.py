@@ -4,6 +4,9 @@ and --check catches drift without touching files."""
 import json
 from pathlib import Path
 
+import pytest
+
+from philly_fair_measure import cli
 from philly_fair_measure.docs_sync import (
     STATS_PATH,
     condo_bullet,
@@ -216,13 +219,18 @@ def _repo(tmp_path: Path) -> Path:
     (tmp_path / "README.md").write_text(
         "# Title\n\nprose stays\n\n"
         "<!-- generated:readme-screen-counts:begin -->\nstale\n"
-        "<!-- generated:readme-screen-counts:end -->\n\nmore prose\n"
+        "<!-- generated:readme-screen-counts:end -->\n\nmore prose\n\n"
+        "<!-- generated:readme-results-tables:begin -->\n"
+        "<!-- generated:readme-results-tables:end -->\n\n"
+        "<!-- generated:condo-card:begin -->\n<!-- generated:condo-card:end -->\n"
     )
     (tmp_path / "docs" / "model.md").write_text(
         "## 6. Results\n\n"
         "<!-- generated:model-results-table:begin -->\n"
         "<!-- generated:model-results-table:end -->\n\n"
-        "<!-- generated:condo-card:begin -->\n<!-- generated:condo-card:end -->\n"
+        "<!-- generated:condo-card:begin -->\n<!-- generated:condo-card:end -->\n\n"
+        "<!-- generated:model-screen-counts:begin -->\n"
+        "<!-- generated:model-screen-counts:end -->\n"
     )
     (tmp_path / "docs" / "vertical-equity-report-card.md").write_text(
         "# card\n\n"
@@ -239,8 +247,11 @@ def test_sync_rewrites_then_is_idempotent_and_check_passes(tmp_path):
     first = sync_docs(root)
     assert set(first.changed) == {
         "README.md:readme-screen-counts",
+        "README.md:readme-results-tables",
+        "README.md:condo-card",
         "docs/model.md:model-results-table",
         "docs/model.md:condo-card",
+        "docs/model.md:model-screen-counts",
         "docs/vertical-equity-report-card.md:veq-meta",
         "docs/vertical-equity-report-card.md:veq-card-iaao",
         "docs/vertical-equity-report-card.md:veq-card-full",
@@ -262,3 +273,46 @@ def test_check_detects_drift_without_writing(tmp_path):
     result = sync_docs(root, check=True)
     assert result.changed == ["README.md:readme-screen-counts"]
     assert "999,999" in (root / "README.md").read_text()  # check mode never writes
+
+
+def test_check_fails_when_a_block_loses_its_markers(tmp_path, monkeypatch, capsys):
+    root = _repo(tmp_path)
+    sync_docs(root)
+    monkeypatch.chdir(root)
+    assert cli.main(["sync-docs", "--check"]) == 0
+
+    readme = (root / "README.md").read_text()
+    (root / "README.md").write_text(
+        readme.replace("<!-- generated:readme-screen-counts:begin -->\n", "")
+        .replace("<!-- generated:readme-screen-counts:end -->\n", "")
+        .replace("496,975", "999,999")
+    )
+    capsys.readouterr()
+
+    assert cli.main(["sync-docs", "--check"]) == 1
+    assert "README.md:readme-screen-counts" in capsys.readouterr().out
+    assert cli.main(["sync-docs"]) == 1
+    assert "999,999" in (root / "README.md").read_text()
+
+
+@pytest.mark.parametrize(
+    ("model", "opa", "verdicts"),
+    [
+        ((0.243, 17.5), (0.278, 18.8), {"beats"}),
+        ((0.278, 18.8), (0.243, 17.5), {"trails"}),
+        ((0.243, 18.8), (0.278, 17.5), {"beats", "trails"}),
+        ((0.2431, 17.54), (0.2429, 17.46), {"matches"}),
+    ],
+    ids=["model-ahead", "opa-ahead", "split", "tie-at-printed-precision"],
+)
+def test_condo_verdict_follows_the_printed_numbers(model, opa, verdicts):
+    stats = {
+        **STATS,
+        "condo_card": {
+            "model": {"rmse_log": model[0], "cod": model[1]},
+            "opa": {"rmse_log": opa[0], "cod": opa[1]},
+        },
+    }
+    bullet = condo_bullet(stats)
+    assert {v for v in ("beats", "trails", "matches") if v in bullet} == verdicts
+    assert ("closed the last gap" in bullet) == (verdicts == {"beats"})
