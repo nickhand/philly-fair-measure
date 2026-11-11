@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
-import { existsSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type {} from 'vite-ssg'
 
@@ -7,6 +7,12 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
+
+// index.html and the sitemap name the tax year the router uses for the annual report.
+const taxYear = String(
+  JSON.parse(readFileSync(new URL('./src/data/siteStats.json', import.meta.url), 'utf8')).annual_report.tax_year,
+)
+const fillTaxYear = (text: string) => text.replaceAll('%TAX_YEAR%', taxYear)
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -28,6 +34,16 @@ export default defineConfig({
           }
         }
         next()
+      })
+    },
+  }, {
+    name: 'fair-measure-tax-year',
+    transformIndexHtml: { order: 'pre', handler: fillTaxYear },
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'sitemap.xml',
+        source: fillTaxYear(readFileSync(new URL('./sitemap.xml', import.meta.url), 'utf8')),
       })
     },
   }],

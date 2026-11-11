@@ -4,6 +4,8 @@ import assert from 'node:assert/strict'
 
 import { chromium } from 'playwright'
 
+import { REPORT_PATH } from './check-cloudflare-release.mjs'
+
 const appBaseUrl = process.argv[2]?.replace(/\/$/, '')
 assert.match(appBaseUrl ?? '', /^https:\/\/[^/?#]+\/fair-measure$/i, 'pass the canonical Fair Measure base URL')
 
@@ -63,11 +65,11 @@ try {
   await page.getByRole('heading', { name: 'Assessment map of Philadelphia', exact: true }).waitFor()
   await page.getByRole('region', { name: /Map of Philadelphia homes/ }).waitFor()
 
-  const reportResponse = await page.goto(`${appBaseUrl}/reports/ty-2027`, {
+  const reportResponse = await page.goto(`${appBaseUrl}${REPORT_PATH}`, {
     waitUntil: 'domcontentloaded',
   })
   assert.equal(reportResponse?.status(), 200)
-  assert.equal(new URL(page.url()).pathname, '/fair-measure/reports/ty-2027')
+  assert.equal(new URL(page.url()).pathname, `/fair-measure${REPORT_PATH}`)
   await page.locator('h1').waitFor()
   assert.ok((await page.locator('h1').innerText()).trim().length > 10)
 
