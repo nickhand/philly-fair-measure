@@ -139,9 +139,9 @@ function edgeAnchor(v: number): 'start' | 'middle' | 'end' {
         />
         <line :x1="medSx" :x2="medSx" y1="32" y2="60" stroke="#0f4d90" stroke-width="2.5" />
         <circle :cx="opaSx" cy="46" r="5" :fill="verdict.hex" />
-        <text :x="clampX(x(bandLo!))" y="72" text-anchor="middle" font-size="11.5" fill="#8593a4" style="font-variant-numeric: tabular-nums">{{ moneyCompact(bandLo!) }}</text>
+        <text :x="clampX(x(bandLo!))" y="72" text-anchor="middle" font-size="11.5" fill="#637182" style="font-variant-numeric: tabular-nums">{{ moneyCompact(bandLo!) }}</text>
         <text :x="clampX(medSx)" y="14" :text-anchor="edgeAnchor(medSx)" font-size="11.5" font-weight="700" fill="#0f4d90" style="font-variant-numeric: tabular-nums">Ours {{ moneyCompact(property.model_median!) }}</text>
-        <text :x="clampX(x(bandHi!))" y="72" text-anchor="middle" font-size="11.5" fill="#8593a4" style="font-variant-numeric: tabular-nums">{{ moneyCompact(bandHi!) }}</text>
+        <text :x="clampX(x(bandHi!))" y="72" text-anchor="middle" font-size="11.5" fill="#637182" style="font-variant-numeric: tabular-nums">{{ moneyCompact(bandHi!) }}</text>
         <text
           :x="clampX(opaSx)"
           :y="cityLabelY"

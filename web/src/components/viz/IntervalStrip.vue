@@ -178,7 +178,7 @@ const ariaLabel = computed(
           {{ moneyCompact(props.high) }}
         </text>
       </template>
-      <text :x="width / 2" :y="height - 4" text-anchor="middle" :font-size="narrow ? 12 : 11.5" :fill="narrow ? '#5d6b7c' : '#8593a4'" style="font-variant-numeric: tabular-nums">
+      <text :x="width / 2" :y="height - 4" text-anchor="middle" :font-size="narrow ? 12 : 11.5" :fill="narrow ? '#5d6b7c' : '#637182'" style="font-variant-numeric: tabular-nums">
         {{ caption }}
       </text>
     </svg>
