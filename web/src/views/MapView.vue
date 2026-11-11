@@ -125,7 +125,6 @@ function closeChoices() {
 }
 
 let controller: AbortController | undefined
-let painted = false
 /** Bumped by every new selection so a slow lookup cannot replace a newer one. */
 let selection = 0
 
@@ -208,14 +207,10 @@ async function onSearchSelect(hit: SearchHit) {
   await focusParcel(hit.parcel_id)
 }
 
-/** Add paint overrides + the parcel source/layers as soon as the style can
- * accept them. Deliberately NOT gated on the `load` event; `styledata` fires
- * early and repeatedly, and this wiring is idempotent. */
+/** Add the parcel source/layers as soon as the style can accept them.
+ * Deliberately NOT gated on the `load` event; `styledata` fires early and
+ * repeatedly, and this wiring is idempotent. */
 function ensureParcelLayer(m: maplibregl.Map) {
-  if (!painted && m.isStyleLoaded()) {
-    applyFairMeasurePaint(m)
-    painted = true
-  }
   if (m.getSource('parcels')) return
   try {
     m.addSource('parcels', {
@@ -324,6 +319,10 @@ onMounted(() => {
   m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
   m.addControl(new maplibregl.GeolocateControl({}), 'top-right')
 
+  // style.load fires once the style JSON is parsed, before any tile draws, and
+  // again if the style is replaced. isStyleLoaded() also waits for every tile
+  // and the sprite, so it is false at every styledata event.
+  m.on('style.load', () => applyFairMeasurePaint(m))
   m.on('styledata', () => ensureParcelLayer(m))
   m.on('moveend', refreshParcels) // independent of style readiness
   m.once('idle', markMapReady) // first idle = tiles + flagged payload rendered
