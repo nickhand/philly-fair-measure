@@ -1,0 +1,242 @@
+#!/usr/bin/env bash
+# Launch, capture, and tear down Fair Measure instances for one verification run.
+# Usage: fm-verify <command> <slug> [args]; run with no arguments for the command list.
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+fm-verify <command> <slug> [args]
+
+  setup <slug>                  link data/, deploy/ and web/node_modules into this worktree
+  evidence <slug>               print (and create) the evidence folder
+  start-api <slug>              uv run fair-measure api on FM_API_PORT (8000); waits for /health
+  build-site <slug>             production build into web/dist, analytics off, api at FM_API_PORT
+  start-preview <slug>          vite preview of web/dist on FM_PREVIEW_PORT (4173)
+  start-dev <slug>              vite dev server on FM_DEV_PORT (5173)
+  get <slug> <name> <path> [code]   GET an API path, save api/<name>.json (expects 200)
+  page <slug> <name> <path> [code]  GET a preview path, save site/<name>.html (expects 200)
+  browse <slug> <name> <path> [step ...]  drive the preview in headless Chrome (steps: browse.mjs)
+  doctor <slug>                 read-only health report, saved to doctor.txt
+  stop <slug>                   kill only what this slug started, remove scratch, list evidence
+
+Env: FM_API_PORT FM_PREVIEW_PORT FM_DEV_PORT FM_DATA_DIR (default: the worktree's data/)
+EOF
+}
+
+[[ $# -ge 2 ]] || { usage; exit 2; }
+cmd=$1
+slug=$2
+shift 2
+[[ $slug =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "slug must match [a-z0-9][a-z0-9-]*: $slug" >&2; exit 2; }
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(git -C "$HERE" rev-parse --show-toplevel)"
+MAIN="$(cd "$(git -C "$HERE" rev-parse --path-format=absolute --git-common-dir)/.." && pwd)"
+API_PORT=${FM_API_PORT:-8000}
+PREVIEW_PORT=${FM_PREVIEW_PORT:-4173}
+DEV_PORT=${FM_DEV_PORT:-5173}
+SCRATCH="${TMPDIR:-/tmp}/fm-verify/$slug"
+
+evidence_dir() {
+  local existing
+  existing=$(ls -d "$MAIN/data/verify/"*-"$slug" 2>/dev/null | sort | tail -1 || true)
+  if [[ -n $existing ]]; then
+    echo "$existing"
+    return
+  fi
+  local dir="$MAIN/data/verify/$(date +%F)-$slug"
+  mkdir -p "$dir/logs" "$dir/api" "$dir/site"
+  {
+    echo "slug: $slug"
+    echo "created: $(date -u +%FT%TZ)"
+    echo "worktree: $ROOT"
+    echo "branch: $(git -C "$ROOT" branch --show-current)"
+    echo "head: $(git -C "$ROOT" rev-parse HEAD)"
+    echo "dirty files: $(git -C "$ROOT" status --porcelain | wc -l | tr -d ' ')"
+  } >"$dir/meta.txt"
+  echo "$dir"
+}
+
+EV=$(evidence_dir)
+mkdir -p "$EV/logs" "$EV/api" "$EV/site"
+
+log() { echo "$(date -u +%FT%TZ) $*" >>"$EV/commands.log"; }
+
+listener() { lsof -nP -t -iTCP:"$1" -sTCP:LISTEN 2>/dev/null | head -1 || true; }
+
+refuse_busy_port() {
+  local port=$1 var=$2 pid
+  pid=$(listener "$port")
+  if [[ -n $pid ]]; then
+    echo "port $port is taken by pid $pid: $(ps -o command= -p "$pid")" >&2
+    echo "not killing it. Rerun with $var=<free port>." >&2
+    exit 3
+  fi
+}
+
+# Start a command in its own process group so stop can kill the whole tree.
+# Sets LAUNCHED to the group id.
+launch() {
+  local name=$1
+  shift
+  mkdir -p "$SCRATCH"
+  if [[ -f $SCRATCH/$name.pid ]] && kill -0 -- "-$(cat "$SCRATCH/$name.pid")" 2>/dev/null; then
+    echo "$name already running for $slug (process group $(cat "$SCRATCH/$name.pid"))" >&2
+    exit 3
+  fi
+  set -m
+  (cd "$ROOT" && exec "$@") </dev/null >"$EV/logs/$name.log" 2>&1 &
+  LAUNCHED=$!
+  set +m
+  echo "$LAUNCHED" >"$SCRATCH/$name.pid"
+  log "start $name pgid=$LAUNCHED: $*"
+}
+
+wait_http() {
+  local name=$1 port=$2 path=$3 timeout=$4 pgid=$5 waited=0
+  local url="http://127.0.0.1:$port$path"
+  until curl -sf -o /dev/null "$url"; do
+    if ! kill -0 -- "-$pgid" 2>/dev/null; then
+      echo "$name exited before it was ready; last log lines:" >&2
+      tail -20 "$EV/logs/$name.log" >&2
+      exit 1
+    fi
+    if ((waited >= timeout)); then
+      echo "$name not ready at $url after ${timeout}s" >&2
+      exit 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  local owner
+  owner=$(listener "$port")
+  log "ready $name $url after ${waited}s (listener pid $owner, pgid $(ps -o pgid= -p "$owner" | tr -d ' '))"
+  echo "$name ready at $url after ${waited}s (listener pid $owner, process group $pgid)"
+}
+
+fetch() {
+  local kind=$1 name=$2 path=$3 expect=$4 base out
+  if [[ $kind == api ]]; then
+    base="http://127.0.0.1:$API_PORT"
+    out="$EV/api/$name.json"
+  else
+    base="http://127.0.0.1:$PREVIEW_PORT"
+    out="$EV/site/$name.html"
+  fi
+  local code
+  code=$(curl -sS --compressed -D "${out%.*}.headers" -o "$out" -w '%{http_code}' "$base$path")
+  log "GET $base$path -> $code ($(wc -c <"$out" | tr -d ' ') bytes) saved $out"
+  echo "$code $(wc -c <"$out" | tr -d ' ') bytes -> $out"
+  [[ $code == "$expect" ]] || { echo "expected $expect, got $code" >&2; exit 1; }
+}
+
+case $cmd in
+  setup)
+    for link in data deploy web/node_modules; do
+      target="$MAIN/$link"
+      if [[ -e $ROOT/$link || -L $ROOT/$link ]]; then
+        echo "$link: present ($(ls -ld "$ROOT/$link" | awk '{print $NF}'))"
+      elif [[ $ROOT == "$MAIN" ]]; then
+        echo "$link: missing in the main checkout; build it there (see SKILL.md Launch)" >&2
+      else
+        ln -s "$target" "$ROOT/$link"
+        echo "$link -> $target"
+      fi
+    done
+    for pattern in /data /deploy; do
+      grep -qx "$pattern" "$MAIN/.git/info/exclude" || echo "add $pattern to $MAIN/.git/info/exclude so git ignores the link" >&2
+    done
+    ;;
+  evidence)
+    echo "$EV"
+    ;;
+  start-api)
+    refuse_busy_port "$API_PORT" FM_API_PORT
+    data_dir=$(cd "${FM_DATA_DIR:-$ROOT/data}" && pwd -P)
+    launch api uv run fair-measure api --port "$API_PORT" --data-dir "$data_dir"
+    wait_http api "$API_PORT" /health 240 "$LAUNCHED"
+    ;;
+  build-site)
+    # vite preview answers /api/* with the SPA shell, so the build calls the api directly
+    build_env=(VITE_ANALYTICS_ENABLED=false "VITE_API_BASE=http://127.0.0.1:$API_PORT")
+    log "build-site: env ${build_env[*]} npm --prefix web run build"
+    if (cd "$ROOT" && env "${build_env[@]}" npm --prefix web run build) >"$EV/logs/site-build.log" 2>&1; then
+      tail -3 "$EV/logs/site-build.log"
+      (cd "$ROOT/web/dist" && find . -name '*.html' | sort) >"$EV/site/dist-html-files.txt"
+      echo "built web/dist; html list in $EV/site/dist-html-files.txt"
+    else
+      tail -30 "$EV/logs/site-build.log" >&2
+      exit 1
+    fi
+    ;;
+  start-preview)
+    [[ -f $ROOT/web/dist/index.html ]] || { echo "web/dist missing: run fm-verify build-site $slug" >&2; exit 1; }
+    refuse_busy_port "$PREVIEW_PORT" FM_PREVIEW_PORT
+    launch preview npm --prefix web run preview -- --host 127.0.0.1 --port "$PREVIEW_PORT" --strictPort
+    wait_http preview "$PREVIEW_PORT" / 60 "$LAUNCHED"
+    ;;
+  start-dev)
+    refuse_busy_port "$DEV_PORT" FM_DEV_PORT
+    dev_env=()
+    [[ $API_PORT == 8000 ]] || dev_env+=("VITE_API_BASE=http://127.0.0.1:$API_PORT")
+    launch dev env "${dev_env[@]}" npm --prefix web run dev -- --host 127.0.0.1 --port "$DEV_PORT" --strictPort
+    wait_http dev "$DEV_PORT" / 60 "$LAUNCHED"
+    ;;
+  get)
+    [[ $# -ge 2 ]] || { usage; exit 2; }
+    fetch api "$1" "$2" "${3:-200}"
+    ;;
+  page)
+    [[ $# -ge 2 ]] || { usage; exit 2; }
+    fetch site "$1" "$2" "${3:-200}"
+    ;;
+  browse)
+    [[ $# -ge 2 ]] || { usage; exit 2; }
+    name=$1 path=$2
+    shift 2
+    log "browse $name http://127.0.0.1:$PREVIEW_PORT$path $*"
+    node "$HERE/browse.mjs" "$EV/site" "$name" "http://127.0.0.1:$PREVIEW_PORT$path" "$@"
+    ;;
+  doctor)
+    {
+      echo "== doctor $(date -u +%FT%TZ)"
+      (cd "$ROOT" && uv run --quiet python "$HERE/doctor.py" --slug "$slug" \
+        --api-port "$API_PORT" --preview-port "$PREVIEW_PORT" --dev-port "$DEV_PORT")
+    } 2>&1 | tee -a "$EV/doctor.txt"
+    exit "${PIPESTATUS[0]}"
+    ;;
+  stop)
+    shopt -s nullglob
+    for pidfile in "$SCRATCH"/*.pid; do
+      name=$(basename "$pidfile" .pid)
+      pgid=$(cat "$pidfile")
+      if kill -0 -- "-$pgid" 2>/dev/null; then
+        kill -TERM -- "-$pgid"
+        for _ in {1..20}; do kill -0 -- "-$pgid" 2>/dev/null || break; sleep 0.5; done
+        if kill -0 -- "-$pgid" 2>/dev/null; then kill -KILL -- "-$pgid"; fi
+        log "stop $name pgid=$pgid"
+        echo "stopped $name (process group $pgid)"
+      else
+        echo "$name (process group $pgid) was not running"
+      fi
+    done
+    rm -rf "$SCRATCH"
+    for port in "$API_PORT" "$PREVIEW_PORT" "$DEV_PORT"; do
+      pid=$(listener "$port")
+      [[ -z $pid ]] || echo "port $port still served by pid $pid ($(ps -o command= -p "$pid")); not ours, left alone"
+    done
+    changed=$(find "$MAIN/data" "$MAIN/deploy" -type f -newer "$EV/meta.txt" -not -path "$MAIN/data/verify/*" 2>/dev/null || true)
+    if [[ -n $changed ]]; then
+      echo "lake or bundle files written since this run began (by anyone):"
+      echo "$changed"
+    else
+      echo "no lake or bundle writes since this run began"
+    fi | tee "$EV/lake-writes.txt"
+    echo "evidence kept at $EV:"
+    (cd "$EV" && find . -type f | sort)
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac
