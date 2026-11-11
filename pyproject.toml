@@ -66,8 +66,14 @@ serve = [
 # only, never in the image.
 serve-smoke = ["httpx"]
 
+# uv.lock records this setting. Declaring it in the project, not only in a
+# user-level uv config, keeps the lock identical in CI, where `uv sync --locked`
+# would otherwise fail.
+[tool.uv]
+exclude-newer = "1 week"
+
 [build-system]
-requires = ["uv_build>=0.11,<0.12"]
+requires = ["uv_build>=0.13,<0.14"]
 build-backend = "uv_build"
 
 [tool.ruff]

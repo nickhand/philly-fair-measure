@@ -14,9 +14,10 @@ WEB_SUPPORT_FILES = {
     "Justfile",
     "docs/frontend.md",
 }
-# Web paths the Python job also reads: `sync-docs --check` and the stats tests
-# take the committed site statistics as their source of truth.
-PYTHON_WEB_INPUTS = {"web/src/data/siteStats.json"}
+# Web-routed paths the Python job also depends on. `sync-docs --check` and the
+# stats tests take the committed site statistics as their source of truth, and
+# ci.yml defines the Python job's own steps.
+PYTHON_WEB_INPUTS = {".github/workflows/ci.yml", "web/src/data/siteStats.json"}
 NON_RELEASE_WEB_FILES = {"web/README.md"}
 NON_RELEASE_WEB_PREFIXES = ("web/tests/", "web/src/__tests__/")
 

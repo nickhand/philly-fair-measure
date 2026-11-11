@@ -68,13 +68,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           enable-cache: true
       - name: Set up Python
         run: uv python install 3.13
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --locked --dev
       - name: Format (ruff)
         run: uv run ruff format --check src tests
       - name: Lint (ruff)

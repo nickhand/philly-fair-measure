@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -40,6 +41,20 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("--retry-delay-ms 10000", WORKFLOW)
         self.assertIn("check-cloudflare-browser.mjs", WORKFLOW)
         self.assertIn("mcr.microsoft.com/playwright:v1.62.0-noble@sha256:", WORKFLOW)
+
+
+class InstallContractTests(unittest.TestCase):
+    def test_python_job_installs_the_committed_lock(self) -> None:
+        syncs = re.findall(r"uv sync\b.*", WORKFLOW)
+        self.assertTrue(syncs, "ci.yml no longer runs uv sync")
+        for command in syncs:
+            self.assertIn("--locked", command.split(), command)
+
+    def test_every_action_is_pinned_to_a_commit(self) -> None:
+        actions = re.findall(r"uses:\s*(\S+)", WORKFLOW)
+        self.assertTrue(actions, "ci.yml no longer uses any action")
+        for action in actions:
+            self.assertRegex(action, r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
 
 
 if __name__ == "__main__":
