@@ -20,8 +20,9 @@ range ("worth a look").
 A residential flag requires two independent uncertainty methods: the
 Bayesian posterior interval and a spatially weighted
 conformalized-quantile-regression band. Both must place the city's value
-outside on the same side. 19020 records with no recorded livable
-area are reported as insufficient rather than valued.
+outside on the same side. 19,020 records are reported as
+insufficient rather than valued: no recorded livable area, or a record too
+internally inconsistent to price.
 <!-- generated:readme-screen-counts:end -->
 
 ## What it does
@@ -170,7 +171,7 @@ src/philly_fair_measure/
 web/                   # public dashboard: Vue 3 + TypeScript + Tailwind + MapLibre
 scripts/               # deploy-bundle builder + serve-only API smoke test
 docs/                  # documentation (see below)
-data/                  # local data lake (gitignored): raw/ staged/ marts/ runs/
+data/                  # local data lake (gitignored): raw/ staged/ marts/ models/ diagnostics/
 ```
 
 ## Documentation
@@ -192,14 +193,14 @@ data/                  # local data lake (gitignored): raw/ staged/ marts/ runs/
 ## Development
 
 ```bash
-just gates    # ruff + mypy (strict) + pytest, then web tests + production build
+just gates    # ruff + ty + pytest, then web tests + production build
 uv run pytest             # offline tests (HTTP mocked)
 uv run pytest -m live     # live smoke tests against the real CARTO API
 npm --prefix web run test:unit
 ```
 
-CI runs lint, strict type checks, and the offline test suite on every push and
-pull request. Contribution guidelines, including the project's dependency
+CI runs lint, type checks, and the offline test suite on pushes to `main` and
+on pull requests (the Python and web jobs each run when their paths change). Contribution guidelines, including the project's dependency
 policies, are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Limitations

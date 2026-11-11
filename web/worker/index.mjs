@@ -86,7 +86,13 @@ export default {
     let response = await env.ASSETS.fetch(new Request(route.url, request))
     if (response.status === 404 && !isFileRequest(request.url)) {
       const shell = new URL('/spa.html', request.url)
-      const fallback = await env.ASSETS.fetch(new Request(shell, request))
+      // Always fetch the full shell. A reload sends If-None-Match with the
+      // shell's own ETag; the asset binding would answer 304 with no body,
+      // which cannot be re-served as this page.
+      const shellRequest = new Request(shell, request)
+      shellRequest.headers.delete('If-None-Match')
+      shellRequest.headers.delete('If-Modified-Since')
+      const fallback = await env.ASSETS.fetch(shellRequest)
       const path = new URL(request.url).pathname.slice(BASE_PATH.length)
       const clientRoute = ['/map', '/admin', '/leaderboards'].includes(path) ||
         /^\/property\/[^/]+$/.test(path)

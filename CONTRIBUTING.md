@@ -26,7 +26,7 @@ Everything that CI enforces, in one command:
 just gates
 ```
 
-That runs `ruff format --check`, `ruff check`, `mypy` (strict mode),
+That runs `ruff format --check`, `ruff check`, `ty check`,
 `fair-measure sync-docs --check` (generated doc blocks must match the committed
 stats), and `pytest` on the Python side, then the Vitest suite and a production
 build on the web side. Please run it before opening a pull request. Lint or
@@ -35,11 +35,14 @@ you touch.
 
 ## Project conventions
 
-- **polars, not pandas.** pandas is deliberately excluded; if a dependency
-  would pull it into a code path, it stays out.
+- **polars, not pandas.** Our own code never imports pandas; dataframes are
+  polars throughout. (A few dependencies install pandas; that is not a
+  licence to use it.)
 - **httpx, not requests**, with tenacity for retries; tests mock HTTP with
   respx.
-- **Strict typing.** `mypy --strict` passes on `src/`; new code is typed.
+- **Strict typing.** `ty check` passes on `src/` with the strict-equivalent
+  rules in `pyproject.toml`, and ruff's `ANN` rules require annotations; new
+  code is typed.
 - **No assessment inputs, no demographic inputs.** OPA's assessed values are
   never model features (they are the benchmark), and demographic variables are
   never valuation features (they appear only in after-the-fact equity

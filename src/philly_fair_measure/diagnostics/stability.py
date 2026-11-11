@@ -74,8 +74,10 @@ def _fit_predict(
         valid_sets=[lgb.Dataset(x_val, label=y(val_df), reference=None)],
         callbacks=[lgb.early_stopping(80, verbose=False)],
     )
-    cal = fit_vertical_calibration(booster.predict(x_val), y(val_df))
-    pred_ref = apply_vertical_calibration(booster.predict(x_test), cal)
+    val_pred = np.asarray(booster.predict(x_val), dtype=np.float64)
+    test_pred = np.asarray(booster.predict(x_test), dtype=np.float64)
+    cal = fit_vertical_calibration(val_pred, y(val_df))
+    pred_ref = apply_vertical_calibration(test_pred, cal)
     return np.asarray(np.exp(pred_ref - test_df["time_adj_log"].to_numpy()), dtype=np.float64)
 
 

@@ -388,8 +388,10 @@ def stg_violations(raw: pl.LazyFrame) -> pl.LazyFrame:
     )
 
 
-_UNIT_TOKEN_REGEX = r"\b(?:APT|UNIT|STE|SUITE|PH|FL|#)\s*([0-9A-Z-]+)$"
-_UNIT_SUFFIX_REGEX = r"\s+(?:APT|UNIT|STE|SUITE|PH|FL|#)\s*[0-9A-Z-]*$"
+# "#" is its own alternative: a word boundary can never precede it after a
+# space, so "\b(?:...|#)" silently missed every "123 MAIN ST # 4B" address.
+_UNIT_TOKEN_REGEX = r"(?:\b(?:APT|UNIT|STE|SUITE|PH|FL)\s*#?|#)\s*([0-9A-Z-]+)$"
+_UNIT_SUFFIX_REGEX = r"\s+(?:(?:APT|UNIT|STE|SUITE|PH|FL)\s*#?|#)\s*[0-9A-Z-]*$"
 
 
 def _norm_unit(expr: pl.Expr) -> pl.Expr:

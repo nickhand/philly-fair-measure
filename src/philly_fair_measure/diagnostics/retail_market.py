@@ -83,12 +83,14 @@ def _train_predict(
         valid_sets=[train_set.create_valid(x_val, label=target(val_df))],
         callbacks=[lgb.early_stopping(100, verbose=False)],
     )
-    calibration = fit_vertical_calibration(
-        booster.predict(x_val, num_iteration=booster.best_iteration), target(val_df)
+    val_pred = np.asarray(
+        booster.predict(x_val, num_iteration=booster.best_iteration), dtype=np.float64
     )
-    pred_ref = apply_vertical_calibration(
-        booster.predict(x_test, num_iteration=booster.best_iteration), calibration
+    test_pred = np.asarray(
+        booster.predict(x_test, num_iteration=booster.best_iteration), dtype=np.float64
     )
+    calibration = fit_vertical_calibration(val_pred, target(val_df))
+    pred_ref = apply_vertical_calibration(test_pred, calibration)
     return np.asarray(np.exp(pred_ref - test_df["time_adj_log"].to_numpy()), dtype=np.float64)
 
 

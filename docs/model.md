@@ -360,7 +360,7 @@ Guards keep the flags honest where the record, not the value, is the problem:
 <!-- generated:model-screen-counts:begin -->
 As of run `20260714T190028Z` (Tax Year 2027 roll): 496,975 properties
 screened: 970 over-assessed candidates, 6,465 under-assessed
-candidates, 40,200 in the attention tier, 19020 insufficient
+candidates, 40,200 in the attention tier, 19,020 insufficient
 records.
 <!-- generated:model-screen-counts:end -->
 (The constant-quality index of 2026-07-06 cut under-assessed candidates

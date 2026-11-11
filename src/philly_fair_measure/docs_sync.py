@@ -68,8 +68,9 @@ def readme_screen_counts(stats: dict[str, Any]) -> str:
         f"A residential flag requires two independent uncertainty methods: the\n"
         f"Bayesian posterior interval and a spatially weighted\n"
         f"conformalized-quantile-regression band. Both must place the city's value\n"
-        f"outside on the same side. {s['insufficient']} records with no recorded livable\n"
-        f"area are reported as insufficient rather than valued.\n"
+        f"outside on the same side. {s['insufficient']:,} records are reported as\n"
+        f"insufficient rather than valued: no recorded livable area, or a record too\n"
+        f"internally inconsistent to price.\n"
     )
 
 
@@ -133,7 +134,7 @@ def model_md_screen_counts(stats: dict[str, Any]) -> str:
         f"(Tax Year {meta['tax_year']} roll): "
         f"{s['properties']:,} properties\n"
         f"screened: {s['over']:,} over-assessed candidates, {s['under']:,} under-assessed\n"
-        f"candidates, {s['watch']:,} in the attention tier, {s['insufficient']} insufficient\n"
+        f"candidates, {s['watch']:,} in the attention tier, {s['insufficient']:,} insufficient\n"
         f"records.\n"
     )
 
@@ -228,7 +229,7 @@ def veq_meta(stats: dict[str, Any]) -> str:
     return (
         f"Numbers are the out-of-time test slice of baseline run\n"
         f"`{m['model_run_id']}` (n ≈ {m['n_test'] / 1000:.1f}k residential arms-length sales).\n"
-        f"Reproduce with `fair-measure train-baseline` then `fair-measure ratio-study`. This\n"
+        f"Reproduce with `fair-measure train-baseline` then `fair-measure export-web-stats`. This\n"
         f'report card is deliberately not a "we made it fair" claim, see the honest '
         f"reading below.\n"
     )

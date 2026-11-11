@@ -15,6 +15,8 @@ describe('moneyCompact', () => {
   it('uses k and M', () => {
     expect(moneyCompact(442_000)).toBe('$442k')
     expect(moneyCompact(1_200_000)).toBe('$1.2M')
+    expect(moneyCompact(999_499)).toBe('$999k')
+    expect(moneyCompact(999_600)).toBe('$1M')
     expect(moneyCompact(950)).toBe('$950')
   })
 })

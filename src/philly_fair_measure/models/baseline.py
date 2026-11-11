@@ -309,7 +309,7 @@ def _load_frame(mart_path: Path) -> pl.DataFrame:
 
 
 def _fit_category_mappings(df: pl.DataFrame, categorical: list[str]) -> dict[str, dict[str, int]]:
-    mappings = {}
+    mappings: dict[str, dict[str, int]] = {}
     for column in categorical:
         values = df[column].cast(pl.String).drop_nulls().unique().sort().to_list()
         mappings[column] = {value: code for code, value in enumerate(values)}

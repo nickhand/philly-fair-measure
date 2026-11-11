@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import polars as pl
 
@@ -149,7 +149,7 @@ class SnapshotDiff:
     columns: list[ColumnChange] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 

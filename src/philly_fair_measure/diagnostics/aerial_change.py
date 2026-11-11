@@ -76,10 +76,10 @@ def _square_bbox(geom: BaseGeometry) -> tuple[float, float, float, float]:
     w_m = max((lon1 - lon0) * m_per_deg_lon, (lat1 - lat0) * _M_PER_DEG_LAT)
     half_m = max(w_m * (1 + 2 * PAD_FRAC), MIN_BOX_M) / 2
     return (
-        c_lon - half_m / m_per_deg_lon,
-        c_lat - half_m / _M_PER_DEG_LAT,
-        c_lon + half_m / m_per_deg_lon,
-        c_lat + half_m / _M_PER_DEG_LAT,
+        float(c_lon - half_m / m_per_deg_lon),
+        float(c_lat - half_m / _M_PER_DEG_LAT),
+        float(c_lon + half_m / m_per_deg_lon),
+        float(c_lat + half_m / _M_PER_DEG_LAT),
     )
 
 

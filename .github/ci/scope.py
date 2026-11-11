@@ -13,8 +13,10 @@ WEB_SUPPORT_FILES = {
     ".github/workflows/ci.yml",
     "Justfile",
     "docs/frontend.md",
-    "netlify.toml",
 }
+# Web paths the Python job also reads: `sync-docs --check` and the stats tests
+# take the committed site statistics as their source of truth.
+PYTHON_WEB_INPUTS = {"web/src/data/siteStats.json"}
 NON_RELEASE_WEB_FILES = {"web/README.md"}
 NON_RELEASE_WEB_PREFIXES = ("web/tests/", "web/src/__tests__/")
 
@@ -29,7 +31,7 @@ def classify(paths: Iterable[str]) -> dict[str, bool]:
     web_related = {
         path for path in normalized if path.startswith("web/") or path in WEB_SUPPORT_FILES
     }
-    python_related = normalized - web_related
+    python_related = (normalized - web_related) | (normalized & PYTHON_WEB_INPUTS)
     release_related = {
         path
         for path in web_related

@@ -184,10 +184,11 @@ def equity_robustness(
     p = financed["sale_price"].to_numpy().astype(np.float64)
     lon = financed["loc_lon"].to_numpy().astype(np.float64)
     lat = financed["loc_lat"].to_numpy().astype(np.float64)
+    meta: dict[str, Any] = result["meta"]
     for name, col in (("opa", "opa_assessment"), ("model", "pred_point")):
         r = _ratio(financed[col].to_numpy().astype(np.float64), p)
         with np.errstate(all="ignore"):
-            result["meta"][f"morans_i_{name}"] = round(morans_i(lon, lat, np.log(r)), 3)
+            meta[f"morans_i_{name}"] = round(morans_i(lon, lat, np.log(r)), 3)
     logger.info(
         "equity robustness: OPA nbhd-binned q1 %.3f / q5 %.3f (individual %.3f / %.3f)",
         result["all_sales"]["neighborhood"]["opa"]["q1"],

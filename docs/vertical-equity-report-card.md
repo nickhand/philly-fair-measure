@@ -8,7 +8,7 @@ happens to every home, including the cash/distressed tail the standard excludes)
 <!-- generated:veq-meta:begin -->
 Numbers are the out-of-time test slice of baseline run
 `20260714T190028Z-baseline` (n ≈ 19.5k residential arms-length sales).
-Reproduce with `fair-measure train-baseline` then `fair-measure ratio-study`. This
+Reproduce with `fair-measure train-baseline` then `fair-measure export-web-stats`. This
 report card is deliberately not a "we made it fair" claim, see the honest reading below.
 <!-- generated:veq-meta:end -->
 

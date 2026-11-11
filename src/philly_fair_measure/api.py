@@ -10,13 +10,14 @@ history) to `web/`. Design notes:
   from the marts and model artifacts; ~1s each today because the booster is
   reloaded per call (fine for a single-host public tool; memoize before real
   traffic).
-- Admin endpoints are NOT authenticated — they are for local/staff use and the
-  deploy story must add real auth before exposure (documented in
-  docs/frontend.md).
+- Admin endpoints are staff worklists: open locally, and in production
+  (`PHILLY_ENV=prod`) they require the `X-Admin-Token` header to match
+  `PHILLY_ADMIN_TOKEN` (see docs/frontend.md).
 """
 
 from __future__ import annotations
 
+import hmac
 import logging
 import math
 from pathlib import Path
@@ -37,7 +38,6 @@ _BBOX_LIMIT = 4000
 _HIST_BINS = 24
 _HIST_LO, _HIST_HI = 0.4, 1.6
 _VALUE_BAND = 1.5  # mirrors equity_context peer rule
-_MIN_VALUE = 30_000.0
 
 
 def _f(value: object) -> float | None:
@@ -84,9 +84,9 @@ class PropertyCore(BaseModel):
     model_median: float | None
     model_pi_low_90: float | None
     model_pi_high_90: float | None
-    # the range both uncertainty machines support (Bayesian ∩ conformal for
-    # residential; the native band elsewhere) — what surfaces should display.
-    # Flags are still judged against model_pi_*.
+    # the displayed estimate's own band (CQR for residential, the native
+    # conformal band for condos) — what surfaces should display. Flags are
+    # still judged against model_pi_* plus the second machine's agreement.
     display_pi_low_90: float | None = None
     display_pi_high_90: float | None = None
     ratio: float | None
@@ -525,10 +525,11 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.middleware.gzip import GZipMiddleware
     from fastapi.responses import JSONResponse
+    from starlette.middleware.base import RequestResponseEndpoint
 
     root = data_dir if data_dir is not None else config.data_dir()
     frame, screen_built = _load_frame(root)
-    app = FastAPI(title="Philly Assessment Check API", docs_url="/api/docs")
+    app = FastAPI(title="Fair Measure API", docs_url="/api/docs")
     # the citywide overview payload is ~51k GeoJSON points (~6 MB raw, ~10x
     # smaller gzipped); everything else compresses as a free bonus
     app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -538,15 +539,15 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
     # carries no CORS headers, and the browser then reports an opaque
     # "access control" failure instead of the real status.
     @app.middleware("http")
-    async def json_500(request: Request, call_next: Any) -> Response:
+    async def json_500(request: Request, call_next: RequestResponseEndpoint) -> Response:
         try:
-            return await call_next(request)  # type: ignore[no-any-return]
+            return await call_next(request)
         except Exception:
             logger.exception("unhandled error on %s", request.url.path)
             return JSONResponse({"detail": "internal server error"}, status_code=500)
 
     # public read-only data service: the site is served from another origin
-    # (Netlify / nickhand.dev) and calls the Fly API directly. GET-only, no
+    # (Cloudflare Workers, nickhand.dev) and calls the Fly API directly. GET-only, no
     # credentials, so a permissive default is appropriate; override with a
     # comma-separated PHILLY_CORS_ORIGINS if it ever needs narrowing.
     app.add_middleware(
@@ -562,7 +563,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
         denied outright if no token was configured."""
         token = os.environ.get("PHILLY_ADMIN_TOKEN")
         if token:
-            if x_admin_token != token:
+            if not hmac.compare_digest((x_admin_token or "").encode(), token.encode()):
                 raise HTTPException(status_code=403, detail="admin token required")
         elif os.environ.get("PHILLY_ENV") == "prod":
             raise HTTPException(status_code=404, detail="not found")
@@ -588,6 +589,8 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
     @app.get("/api/search", response_model=list[SearchHit])
     def search(q: str = Query(min_length=2, max_length=80)) -> list[SearchHit]:
         needle = q.strip().upper()
+        if len(needle) < 2:  # whitespace-only input would match every address
+            return []
         hits = (
             frame.filter(
                 pl.col("address").str.contains(needle, literal=True)
@@ -612,7 +615,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
         miny: float,
         maxx: float,
         maxy: float,
-        limit: int = Query(default=_BBOX_LIMIT, le=_BBOX_LIMIT),
+        limit: int = Query(default=_BBOX_LIMIT, ge=1, le=_BBOX_LIMIT),
     ) -> dict[str, Any]:
         """GeoJSON points in a map viewport (client gates to high zoom)."""
         sub = frame.filter(
@@ -700,7 +703,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
                     ).to_dicts()
                 ],
             }
-        return flagged_cache["fc"]  # type: ignore[no-any-return]
+        return flagged_cache["fc"]
 
     @app.get("/api/property/{parcel_id}", response_model=PropertyCore)
     def property_core(parcel_id: str) -> PropertyCore:
@@ -757,7 +760,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
     @app.get("/api/admin/leaderboard", response_model=list[LeaderRow])
     def admin_leaderboard(
         kind: str = Query(pattern="^(over|under|nonuniform)$"),
-        n: int = Query(default=25, le=100),
+        n: int = Query(default=25, ge=1, le=100),
         extremes: bool = False,
         x_admin_token: str | None = Header(default=None),
     ) -> list[LeaderRow]:

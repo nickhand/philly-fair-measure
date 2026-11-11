@@ -13,9 +13,6 @@ from datetime import datetime, timedelta
 
 import polars as pl
 
-OPEN_CHANGE_OF_OCCUPANCY = "open_change_of_occupancy"
-MULTIFAMILY_AREA_CONFLICT = "multifamily_area_conflict"
-
 _ACTIVE_PERMIT_LOOKBACK_DAYS = 730
 _MIN_FOOTPRINT_SQFT = 200.0
 _MAX_LIVABLE_TO_GROSS_RATIO = 0.40

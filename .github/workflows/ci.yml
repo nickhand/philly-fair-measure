@@ -55,7 +55,7 @@ jobs:
           if [[ -z "${base}" || "${base}" =~ ^0+$ ]] || ! git cat-file -e "${base}^{commit}"; then
             base="$(git rev-list --max-parents=0 "${HEAD_SHA}" | tail -n 1)"
           fi
-          git diff --name-only "${base}" "${HEAD_SHA}" -- \
+          git diff --name-only --no-renames "${base}" "${HEAD_SHA}" -- \
             > "${RUNNER_TEMP}/changed-paths.txt"
           python3 .github/ci/scope.py \
             < "${RUNNER_TEMP}/changed-paths.txt" \
@@ -79,8 +79,8 @@ jobs:
         run: uv run ruff format --check src tests
       - name: Lint (ruff)
         run: uv run ruff check src tests
-      - name: Type check (mypy)
-        run: uv run mypy src
+      - name: Type check (ty)
+        run: uv run ty check
       - name: Tests (offline)
         run: uv run pytest
       - name: Docs in sync with published stats
@@ -236,7 +236,7 @@ jobs:
             exit 0
           fi
           if [[ "${latest_sha}" != "${GITHUB_SHA}" ]]; then
-            git diff --name-only "${GITHUB_SHA}" "${latest_sha}" -- \
+            git diff --name-only --no-renames "${GITHUB_SHA}" "${latest_sha}" -- \
               | python3 .github/ci/scope.py \
               > "${RUNNER_TEMP}/fair-measure-since-source.scope"
             if grep -Fxq "release=true" "${RUNNER_TEMP}/fair-measure-since-source.scope"; then
@@ -302,7 +302,7 @@ jobs:
             exit 0
           fi
           if [[ "${latest_sha}" != "${GITHUB_SHA}" ]]; then
-            git diff --name-only "${GITHUB_SHA}" "${latest_sha}" -- \
+            git diff --name-only --no-renames "${GITHUB_SHA}" "${latest_sha}" -- \
               | python3 .github/ci/scope.py \
               > "${RUNNER_TEMP}/fair-measure-before-deploy.scope"
             if grep -Fxq "release=true" "${RUNNER_TEMP}/fair-measure-before-deploy.scope"; then
@@ -492,7 +492,7 @@ jobs:
             exit 0
           fi
           if [[ "${latest_sha}" != "${GITHUB_SHA}" ]]; then
-            git diff --name-only "${GITHUB_SHA}" "${latest_sha}" -- \
+            git diff --name-only --no-renames "${GITHUB_SHA}" "${latest_sha}" -- \
               | python3 "${GITHUB_WORKSPACE}/.github/ci/scope.py" \
               > "${RUNNER_TEMP}/fair-measure-before-activation.scope"
             if grep -Fxq "release=true" "${RUNNER_TEMP}/fair-measure-before-activation.scope"; then

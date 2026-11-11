@@ -109,7 +109,7 @@ def test_owner_linked_adjacency_side_yard_case():
         }
     )
     owners = _opa_owners(
-        [("h1", "Hand, Nick"), ("y1", "HAND NICK"), ("n1", "OTHER OWNER"), ("f1", "hand nick")]
+        [("h1", "Doe, Jane"), ("y1", "DOE JANE"), ("n1", "OTHER OWNER"), ("f1", "doe jane")]
     )
     out = stg_parcels(raw, owners).collect()
     by = {r["brt_id"]: r for r in out.to_dicts()}

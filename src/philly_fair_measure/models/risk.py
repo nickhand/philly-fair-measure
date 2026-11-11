@@ -23,7 +23,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final
 
 import lightgbm as lgb
 import numpy as np
@@ -46,7 +46,6 @@ logger = logging.getLogger(__name__)
 RISK_MODEL_FILE: Final = "risk_model.txt"
 RISK_METADATA_FILE: Final = "risk_model.json"
 RISK_EVALUATION_FILE: Final = "risk_evaluation.parquet"
-RiskTier = Literal["standard", "elevated", "high"]
 
 MIN_RISK_VALIDATION_ROWS: Final = 500
 MIN_RISK_TEST_ROWS: Final = 300

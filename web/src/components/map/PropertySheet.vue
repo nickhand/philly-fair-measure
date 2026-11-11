@@ -19,7 +19,7 @@ const isQualityWarning = computed(
 const isHighModelRisk = computed(() => props.property.prediction_risk_tier === 'high')
 
 /** Warning records show the Bayesian band whose variance includes the data
- * conflict; ordinary records use the tighter overlap of both methods. */
+ * conflict; ordinary records use the displayed estimate's own band. */
 const bandLo = computed(() =>
   isQualityWarning.value
     ? props.property.model_pi_low_90

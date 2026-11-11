@@ -19,7 +19,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -80,7 +80,7 @@ class Metrics(RatioMetrics, FitMetrics):
     """
 
     def as_row(self) -> dict[str, float | int | None]:
-        return asdict(self)
+        return cast("dict[str, float | int | None]", asdict(self))
 
 
 def fit_metrics(estimate: npt.ArrayLike, sale_price: npt.ArrayLike) -> FitMetrics:

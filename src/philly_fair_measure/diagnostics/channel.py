@@ -25,7 +25,8 @@ value vs channel. An is_cash x distress interaction checks the key claim that
 the cash discount shrinks for distressed houses (where the low price is value,
 not channel). Reported overall and by price quintile (q1 is the equity tail).
 
-Diagnostic only — no model or screen consumes it. Its output is the number
+No model consumes it. The screen does: it applies this module's per-quintile
+discounts to derive `cash_market_value` (validation/opa.py). Its output is the number
 that makes the regressivity finding robust to the "cheap homes really do sell
 for less" rebuttal.
 """
@@ -126,7 +127,8 @@ def _design(df: pl.DataFrame, stage: str) -> tuple[np.ndarray, int]:
         dist = df.select([pl.col(c).cast(pl.Float64).fill_null(0.0) for c in _DISTRESS]).to_numpy()
         blocks.append(_standardize(dist))
         distress_any = (dist.sum(axis=1) > 0).astype(float)
-    is_cash = df["fin_cash_sale"].cast(pl.Float64).fill_null(0.0).to_numpy()
+    # null means no mortgage was matched: cash, as every other consumer treats it
+    is_cash = df["fin_cash_sale"].cast(pl.Float64).fill_null(1.0).to_numpy()
     blocks.append(is_cash[:, None])
     cash_ix = sum(b.shape[1] for b in blocks) - 1
     if stage == "interaction" and distress_any is not None:
