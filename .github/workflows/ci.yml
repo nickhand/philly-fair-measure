@@ -74,7 +74,7 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --locked --dev
       - name: Format (ruff)
         run: uv run ruff format --check src tests
       - name: Lint (ruff)
