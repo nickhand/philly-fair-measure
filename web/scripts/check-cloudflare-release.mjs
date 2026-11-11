@@ -139,7 +139,7 @@ async function readArtifact(artifactDirectory, expectedIndexSha256) {
   return digests
 }
 
-async function requireExactArtifacts({ appBaseUrl, artifactDirectory, digests }) {
+async function requireExactArtifacts({ appBaseUrl, digests }) {
   for (const [artifactPath, expectedSha256] of digests) {
     let encodedPath = artifactPath.split('/').map(encodeURIComponent).join('/')
     if (artifactPath.endsWith('.html')) {
@@ -218,11 +218,7 @@ export async function checkCloudflareRelease({
   assert.equal(asset.url, assetUrl, 'homepage asset redirected')
   assert.ok(asset.body.length > 0, 'homepage asset is empty')
   assert.match(asset.headers.get('cache-control') ?? '', /immutable/i, 'homepage asset is not immutable')
-  const artifactCount = await requireExactArtifacts({
-    appBaseUrl: base,
-    artifactDirectory,
-    digests,
-  })
+  const artifactCount = await requireExactArtifacts({ appBaseUrl: base, digests })
   return { assetUrl, artifactCount }
 }
 
