@@ -863,18 +863,6 @@ def _cmd_facade_coverage(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_report(args: argparse.Namespace) -> int:
-    from philly_fair_measure.report import build_property_report
-
-    try:
-        path = build_property_report(args.query, args.data_dir, args.out)
-    except KeyError as exc:
-        print(exc.args[0])
-        return 1
-    print(f"report -> {path}")
-    return 0
-
-
 def _cmd_export_web_stats(args: argparse.Namespace) -> int:
     from philly_fair_measure.web_stats import export_web_stats
 
@@ -894,7 +882,7 @@ def _cmd_api(args: argparse.Namespace) -> int:
 
 
 def _cmd_leaderboard(args: argparse.Namespace) -> int:
-    from philly_fair_measure.report import build_property_report, leaderboards
+    from philly_fair_measure.report import leaderboards
 
     boards = leaderboards(args.data_dir, n=args.n, plausible=not args.extremes)
     mode = "raw extremes (incl. model blind spots)" if args.extremes else "plausible appeal band"
@@ -911,11 +899,9 @@ def _cmd_leaderboard(args: argparse.Namespace) -> int:
         "nonuniform": ["non_uniform_block"],
     }[args.kind]
 
-    parcels: list[str] = []
     for key in which:
         print(f"\n{titles[key]}")
         for r in boards[key].iter_rows(named=True):
-            parcels.append(str(r["parcel_id"]))
             addr = str(r["address"] or "")[:34]
             if key == "non_uniform_block":
                 gap = (r["opa_vs_twin_median"] - 1) * 100
@@ -929,16 +915,6 @@ def _cmd_leaderboard(args: argparse.Namespace) -> int:
                     f"model ${r['display_median']:>10,.0f}  {r['display_ratio']:.1f}x  "
                     f"z {r['screen_z']:+.1f}"
                 )
-
-    if args.reports:
-        made = 0
-        for pid in dict.fromkeys(parcels):  # dedup, preserve order
-            try:
-                build_property_report(pid, args.data_dir)
-                made += 1
-            except Exception as exc:  # noqa: BLE001 — skip a bad parcel, keep the rest
-                print(f"  (report failed for {pid}: {exc})")
-        print(f"\n{made} reports written under data/reports/")
     return 0
 
 
@@ -1481,15 +1457,6 @@ def main(argv: list[str] | None = None) -> int:
     facade.add_argument("--data-dir", type=Path)
     facade.set_defaults(func=_cmd_facade_coverage)
 
-    report = subparsers.add_parser(
-        "report",
-        help="static HTML property report / appeal packet (parcel id or address)",
-    )
-    report.add_argument("query")
-    report.add_argument("--out", type=Path, help="output directory (default data/reports/)")
-    report.add_argument("--data-dir", type=Path)
-    report.set_defaults(func=_cmd_report)
-
     leaderboard = subparsers.add_parser(
         "leaderboard",
         help="rank the most over-/under-assessed properties and least-uniform blocks",
@@ -1503,9 +1470,6 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="show raw biggest-disagreement outliers (incl. model blind spots) "
         "instead of the plausible appeal band",
-    )
-    leaderboard.add_argument(
-        "--reports", action="store_true", help="also render the HTML report for each listed parcel"
     )
     leaderboard.add_argument("--data-dir", type=Path)
     leaderboard.set_defaults(func=_cmd_leaderboard)
