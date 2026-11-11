@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Recount the published screen numbers from the mart and compare every place they appear.
 
-Reads data/marts/assessment_screen.parquet (read-only), recounts the flags with
-polars, and compares the counts with web/src/data/siteStats.json, the screen
-manifest's model runs, and optionally a running API and the prerendered home page.
-
-  uv run python .claude/skills/verify-fair-measure/scripts/remeasure_screen.py \
-      [--api http://127.0.0.1:8000] [--html web/dist/index.html] [--out FILE.json]
+Run from the checkout root. Reads $PHILLY_DATA_DIR (default data/)/marts/assessment_screen.parquet
+read-only, recounts the flags with polars, and compares the counts with
+web/src/data/siteStats.json, the screen manifest's model runs, and optionally a running API
+and the prerendered home page. `fm-verify remeasure <slug> [--api URL] [--html FILE]` runs it
+with --out in the evidence folder.
 
 Exits 1 on any mismatch.
 """
@@ -15,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -45,7 +45,9 @@ def recount(screen: Path) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    parser.add_argument(
+        "--data-dir", type=Path, default=Path(os.environ.get("PHILLY_DATA_DIR", "data"))
+    )
     parser.add_argument("--stats", type=Path, default=Path("web/src/data/siteStats.json"))
     parser.add_argument("--api", help="base URL of a running API to compare /api/stats")
     parser.add_argument("--html", type=Path, help="prerendered home page to check for the counts")

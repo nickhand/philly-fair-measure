@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Launch, capture, and tear down Fair Measure instances for one verification run.
 # Usage: fm-verify <command> <slug> [args]; run with no arguments for the command list.
+# Acts on the git checkout of the current directory, wherever this script lives.
 set -euo pipefail
 
 usage() {
@@ -16,10 +17,14 @@ fm-verify <command> <slug> [args]
   get <slug> <name> <path> [code]   GET an API path, save api/<name>.json (expects 200)
   page <slug> <name> <path> [code]  GET a preview path, save site/<name>.html (expects 200)
   browse <slug> <name> <path> [step ...]  drive the preview in headless Chrome (steps: browse.mjs)
+  cli <slug> <name> <fair-measure args>  run a read-only fair-measure command, save cli/<name>.txt
+  remeasure <slug> [--api URL] [--html FILE]  recount the screen from the mart, save remeasure.json
+  ci <slug> [base, default origin/main]  CI contract tests, change routing, workflow YAML parse
   doctor <slug>                 read-only health report, saved to doctor.txt
   stop <slug>                   kill only what this slug started, remove scratch, list evidence
 
-Env: FM_API_PORT FM_PREVIEW_PORT FM_DEV_PORT FM_DATA_DIR (default: the worktree's data/)
+Acts on the checkout of the current directory. Evidence goes to <main checkout>/data/verify/.
+Env: FM_API_PORT FM_PREVIEW_PORT FM_DEV_PORT PHILLY_DATA_DIR (default: <checkout>/data)
 EOF
 }
 
@@ -30,8 +35,8 @@ shift 2
 [[ $slug =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "slug must match [a-z0-9][a-z0-9-]*: $slug" >&2; exit 2; }
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(git -C "$HERE" rev-parse --show-toplevel)"
-MAIN="$(cd "$(git -C "$HERE" rev-parse --path-format=absolute --git-common-dir)/.." && pwd)"
+ROOT="$(git rev-parse --show-toplevel)"
+MAIN="$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd)"
 API_PORT=${FM_API_PORT:-8000}
 PREVIEW_PORT=${FM_PREVIEW_PORT:-4173}
 DEV_PORT=${FM_DEV_PORT:-5173}
@@ -152,7 +157,7 @@ case $cmd in
     ;;
   start-api)
     refuse_busy_port "$API_PORT" FM_API_PORT
-    data_dir=$(cd "${FM_DATA_DIR:-$ROOT/data}" && pwd -P)
+    data_dir=$(cd "$ROOT" && cd "${PHILLY_DATA_DIR:-data}" && pwd -P)
     launch api uv run fair-measure api --port "$API_PORT" --data-dir "$data_dir"
     wait_http api "$API_PORT" /health 240 "$LAUNCHED"
     ;;
@@ -195,7 +200,64 @@ case $cmd in
     name=$1 path=$2
     shift 2
     log "browse $name http://127.0.0.1:$PREVIEW_PORT$path $*"
-    node "$HERE/browse.mjs" "$EV/site" "$name" "http://127.0.0.1:$PREVIEW_PORT$path" "$@"
+    (cd "$ROOT" && node "$HERE/browse.mjs" "$EV/site" "$name" "http://127.0.0.1:$PREVIEW_PORT$path" "$@")
+    ;;
+  cli)
+    [[ $# -ge 2 ]] || { usage; exit 2; }
+    name=$1
+    shift
+    args=" $* "
+    case "$1" in
+      catalog | sql | comps | freshness) ;;
+      leaderboard) [[ $args != *" --reports "* ]] || unsafe="--reports writes data/reports/" ;;
+      report | export-web-stats | snapshot-diff) [[ $args == *" --out "* ]] || unsafe="needs --out into the evidence folder" ;;
+      screen-audit) [[ $args == *" --no-save "* ]] || unsafe="needs --no-save" ;;
+      sync-docs) [[ $args == *" --check "* ]] || unsafe="needs --check" ;;
+      *) [[ $args == *" --help "* ]] || unsafe="may write the lake or the repo; only --help is allowed" ;;
+    esac
+    if [[ -n ${unsafe:-} ]]; then
+      echo "refusing fair-measure $*: $unsafe" >&2
+      exit 2
+    fi
+    mkdir -p "$EV/cli"
+    out="$EV/cli/$name.txt"
+    echo "\$ uv run fair-measure $*" >"$out"
+    set +e
+    (cd "$ROOT" && uv run --quiet fair-measure "$@") >>"$out" 2>&1
+    code=$?
+    set -e
+    echo "exit $code" >>"$out"
+    log "cli $name (exit $code): fair-measure $*"
+    tail -15 "$out"
+    exit "$code"
+    ;;
+  remeasure)
+    log "remeasure $*"
+    set +e
+    (cd "$ROOT" && uv run --quiet python "$HERE/remeasure_screen.py" --out "$EV/remeasure.json" "$@") 2>&1 | tee "$EV/remeasure.txt"
+    code=${PIPESTATUS[0]}
+    set -e
+    exit "$code"
+    ;;
+  ci)
+    base=${1:-origin/main}
+    set +e
+    (
+      cd "$ROOT" || exit 1
+      echo "\$ python3 -m unittest discover .github/ci -p 'test_*.py'"
+      python3 -m unittest discover .github/ci -p 'test_*.py' 2>&1
+      echo "exit $?"
+      echo "\$ paths changed vs $base (committed, staged, unstaged, untracked) | python3 .github/ci/scope.py"
+      paths=$({ git diff --name-only "$base"...HEAD; git diff --name-only HEAD; git ls-files --others --exclude-standard; } | sort -u)
+      echo "${paths:-  (none)}" | sed 's/^/  /'
+      echo "$paths" | python3 .github/ci/scope.py
+      echo "\$ yaml.safe_load .github/workflows/*.yml"
+      uv run --quiet python -c "import sys, yaml; [yaml.safe_load(open(f)) for f in sys.argv[1:]]; print('parsed', *sys.argv[1:])" .github/workflows/*.yml 2>&1
+      echo "exit $?"
+    ) | tee "$EV/ci.txt"
+    set -e
+    log "ci vs $base"
+    ! grep -q '^exit [1-9]' "$EV/ci.txt"
     ;;
   doctor)
     {

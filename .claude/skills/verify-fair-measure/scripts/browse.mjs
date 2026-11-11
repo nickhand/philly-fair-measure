@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Drive one page journey in headless system Chrome and save what a visitor sees.
+// Run from the checkout root; Playwright loads from its web/node_modules.
 //
 //   node browse.mjs <out-dir> <name> <url> [step ...]
 //
@@ -17,7 +18,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 
-const require = createRequire(new URL('../../../../web/package.json', import.meta.url))
+const require = createRequire(join(process.cwd(), 'web', 'package.json'))
 const { chromium } = require('playwright')
 
 const [outDir, name, url, ...steps] = process.argv.slice(2)

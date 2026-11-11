@@ -120,21 +120,23 @@ def check_checkout(root: Path) -> None:
     head = sh("git", "-C", str(root), "rev-parse", "--short", "HEAD")
     dirty = len(sh("git", "-C", str(root), "status", "--porcelain").splitlines())
     print(f"  ..    {root} on {branch} @ {head}, {dirty} dirty")
-    for link, probe in (
-        ("data", "marts/assessment_screen.parquet"),
-        ("deploy", "data/marts/assessment_screen.parquet"),
-        ("web/node_modules", ".bin/vite"),
+    lake = (root / os.environ.get("PHILLY_DATA_DIR", "data")).resolve()
+    facts = screen_facts(lake)
+    if facts:
+        rows, built, runs = facts
+        ok(f"lake {lake}: assessment_screen {rows:,} rows, built {built}, from {', '.join(runs)}")
+    else:
+        fail(f"no screen mart under {lake}; run fm-verify setup <slug> or export PHILLY_DATA_DIR")
+    for link, probe, needed_by in (
+        ("deploy", "data/marts/assessment_screen.parquet", "just api-smoke"),
+        ("web/node_modules", ".bin/vite", "build-site, start-preview, start-dev, browse"),
     ):
         path = root / link
         if (path / probe).exists():
             ok(f"{link} -> {path.resolve()}")
         else:
-            fail(f"{link}/{probe} missing; run fm-verify setup <slug>")
-    lake = Path(os.environ.get("PHILLY_DATA_DIR", root / "data")).resolve()
-    facts = screen_facts(lake)
-    if facts:
-        rows, built, runs = facts
-        ok(f"lake {lake}: assessment_screen {rows:,} rows, built {built}, from {', '.join(runs)}")
+            fix = "its target lacks it" if path.exists() else "fm-verify setup <slug> links it"
+            warn(f"{link}/{probe} missing, needed by {needed_by}; {fix}")
     stats = json.loads((root / "web/src/data/siteStats.json").read_text())
     meta, screen = stats["meta"], stats["screen"]
     print(
