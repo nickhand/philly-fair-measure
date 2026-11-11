@@ -34,6 +34,6 @@ Preconditions:
 - "Showing flagged homes" appears before the map is ready. Wait for "Loading the map" to disappear (`gone:`), or the screenshot is a spinner.
 - The flagged payload is about 10 MB uncompressed (47,623 features on the 2026-07-14 lake); first paint takes a few seconds.
 - In a hidden desktop browser pane the map can stall at "Loading the map…", and `read_network_requests` may not list the GeoJSON fetch. Use `$S browse` for proof.
-- The headless driver runs system Chrome with WebGL; a `pageerror` about WebGL in `map-*.log.json` means the environment, not the app, failed. Report it as unverified.
+- The headless driver runs system Chrome with WebGL. A page error about WebGL fails the run and appears under `problems.pageerror` in `map-*.log.json`; it means the environment, not the app, failed. Report it as unverified.
 - The cold deep link `/map?parcel=<id>` (the report's "see on the map" link) lands on `/property/<id>` instead of opening the sheet. Observed twice on 2026-11-11 at `ae7a681`, for `591073500` and `052174500`. The likely cause, read from `MapView.vue` and not instrumented, is that `openParcel` calls `setFilter` before the style has loaded, the throw is caught as a failed lookup, and `focusParcel` falls back to `router.push` to the report. Report this journey as failing until a fix lands; do not drop the step.
 - Dots are canvas pixels with no accessible handles. Assert through the legend chips, the dialog, and the API responses, never by clicking coordinates.

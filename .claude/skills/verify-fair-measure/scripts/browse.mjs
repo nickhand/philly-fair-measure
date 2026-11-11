@@ -11,9 +11,10 @@
 //   text:<text>                 wait until this text is visible
 //   gone:<text>                 wait until this text is hidden (a loading message)
 //   snap:<label>                save <name>-<label>.png and .aria.txt
-// The final state is always saved as <name>-final. Every /api/ response the page made, console
-// errors, page errors, failed requests and HTTP >= 400 responses go to <name>.log.json.
-// Exits 1 if a step fails.
+// The final state is always saved as <name>-final. Every /api/ response the page made and the
+// problems (HTTP >= 400 responses, failed requests, uncaught page errors, console errors) go to
+// <name>.log.json, and the last line counts each kind. Exits 1 if a step fails or the page throws
+// an uncaught error; HTTP errors alone do not fail it, since some journeys expect a 404.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
@@ -28,17 +29,18 @@ if (!outDir || !name || !url) {
 }
 mkdirSync(outDir, { recursive: true })
 
-const problems = []
+const problems = { http: [], failed: [], pageerror: [], console: [] }
 const done = []
 const api = []
+let stepError = null
 const browser = await chromium.launch({ headless: true, channel: 'chrome' })
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
-page.on('console', (msg) => msg.type() === 'error' && problems.push(`console: ${msg.text()}`))
-page.on('pageerror', (err) => problems.push(`pageerror: ${err.message}`))
-page.on('requestfailed', (req) => problems.push(`failed: ${req.url()} ${req.failure()?.errorText}`))
+page.on('console', (msg) => msg.type() === 'error' && problems.console.push(msg.text()))
+page.on('pageerror', (err) => problems.pageerror.push(err.message))
+page.on('requestfailed', (req) => problems.failed.push(`${req.url()} ${req.failure()?.errorText}`))
 page.on('response', (res) => {
   if (res.url().includes('/api/')) api.push(`${res.status()} ${res.url()}`)
-  if (res.status() >= 400) problems.push(`http ${res.status()}: ${res.url()}`)
+  if (res.status() >= 400) problems.http.push(`${res.status()} ${res.url()}`)
 })
 
 async function snap(label) {
@@ -53,7 +55,6 @@ function locate(spec) {
   return page.getByRole(spec.slice(0, at), { name: spec.slice(at + 1) }).first()
 }
 
-let exitCode = 0
 try {
   const response = await page.goto(url, { waitUntil: 'domcontentloaded' })
   done.push(`goto ${url} -> ${response?.status()}`)
@@ -81,15 +82,21 @@ try {
   }
   await snap('final')
 } catch (err) {
-  exitCode = 1
-  problems.push(`step failed after [${done.at(-1) ?? 'start'}]: ${err.message.split('\n')[0]}`)
+  stepError = `after [${done.at(-1) ?? 'start'}]: ${err.message.split('\n')[0]}`
   await snap('failed').catch(() => {})
 } finally {
   await browser.close()
 }
-writeFileSync(join(outDir, `${name}.log.json`), `${JSON.stringify({ url, steps, done, api, problems }, null, 2)}\n`)
+const log = { url, steps, done, api, problems, step_error: stepError }
+writeFileSync(join(outDir, `${name}.log.json`), `${JSON.stringify(log, null, 2)}\n`)
 for (const line of done) console.log(`  ok  ${line}`)
 for (const line of api) console.log(`  api ${line}`)
-for (const line of problems) console.log(`  !!  ${line}`)
-console.log(`${exitCode ? 'FAILED' : 'passed'}: ${name} (${problems.length} problems logged)`)
+for (const [kind, lines] of Object.entries(problems)) for (const line of lines) console.log(`  !!  ${kind} ${line}`)
+if (stepError) console.log(`  !!  step failed ${stepError}`)
+const exitCode = stepError || problems.pageerror.length ? 1 : 0
+const { http, failed, pageerror } = problems
+console.log(
+  `${exitCode ? 'FAILED' : 'passed'}: ${name} (${http.length} HTTP errors, ${failed.length} failed requests, ` +
+    `${pageerror.length} page errors, ${problems.console.length} console errors)`,
+)
 process.exit(exitCode)
