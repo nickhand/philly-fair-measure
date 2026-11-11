@@ -11,7 +11,7 @@ The JSON API (`src/philly_fair_measure/api.py`, served by `fair-measure api` loc
 - `api-report` returns `drivers`, `equity`, `assessment_history`, `sale_history`, `screen_built`.
 - `api-comps` returns 8 leaf-similarity comps for a residential parcel, same-building sales for a condo; 503 if model artifacts are missing.
 - `api-admin` serves `/api/admin/leaderboard` locally, 403 with a wrong `X-Admin-Token`, 404 under `PHILLY_ENV=prod` with no token configured.
-- `api-bundle` serves every endpoint from the trimmed `deploy/data` bundle with only the `serve` dependency group installed.
+- `api-bundle` serves the business endpoints from the trimmed `deploy/data` bundle with only the `serve` dependency group installed.
 
 ## How to get to it (user POV)
 
@@ -36,7 +36,7 @@ Preconditions:
 
 - `just api-smoke` runs the worktree's code against the main checkout's `deploy/data`. If your change alters what the API reads from the lake, that bundle is stale until `just bundle-data` runs, and that command deletes and rewrites the shared `deploy/data`. Ask before running it; report the smoke result against the old bundle as such.
 - `just api-smoke` deletes and rebuilds the worktree's `.venv-serve` each run (about 12 s with a warm uv cache). It never opens a port.
-- The API loads the whole screen into memory at startup. A rebuilt mart is not served until you `$S stop` and `$S start-api` again; `$S doctor` flags the mismatch.
+- The API loads the whole screen into memory at startup. A rebuilt mart is not served until you `$S stop` and `$S start-api` again. `$S doctor` flags it only when the row count or the build day changed, so restart after any rebuild.
 - `/api/parcels/flagged` is built once per process and cached.
 - Comps raise 503 when the baseline run's model files are missing; that is a lake problem, not an API bug.
 - Locally `PHILLY_ENV` is unset, so the admin endpoint is open. Never set `PHILLY_ADMIN_TOKEN` in a verification shell; the smoke script unsets it.

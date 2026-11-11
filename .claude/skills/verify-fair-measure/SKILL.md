@@ -11,7 +11,7 @@ Run everything from the root of the checkout under test. The helper is
 S=.claude/skills/verify-fair-measure/scripts/fm-verify
 ```
 
-The helpers act on the checkout of the current directory, wherever they live: its code, its `.venv`, its `web/`, and its `data` link or `PHILLY_DATA_DIR`. A checkout that predates this skill can call them by absolute path from one that has it. `$S` with no arguments lists its commands. Each takes a `<slug>` naming the change, such as `fix-search-trim`. The slug keys the evidence folder; the checkout and the slug together key the processes the run owns. Use a new slug per run; a reused slug appends to its earlier folder. Pass the same `FM_*` port variables to every call of one run.
+The helpers act on the checkout of the current directory, wherever they live: its code, its `.venv`, its `web/`, and its `data` link or `PHILLY_DATA_DIR`. A checkout that predates this skill can call them by absolute path from one that has it. `$S` with no arguments lists its commands. Each takes a `<slug>` naming the change, such as `fix-search-trim`. The slug keys the evidence folder; the checkout and the slug together key the processes the run owns. Use a new slug per run: a reused slug reuses its earlier folder, and each capture overwrites the file of the same name there. Pass the same `FM_*` port variables to every call of one run.
 
 ## What counts as proof
 
@@ -45,7 +45,7 @@ The `web/node_modules` link shares more than packages. `vue-tsc --build` writes 
 `$S evidence <slug>` creates and prints `<main checkout>/data/verify/<YYYY-MM-DD>-<slug>/`. The main checkout's `data/` is gitignored and reached by every worktree, so the folder survives worktree removal and is never committed. It is the only place under `data/` a verification writes.
 
 - `meta.txt` records the branch, HEAD and dirty-file count when the folder was made.
-- `commands.log` records every helper call with its status.
+- `commands.log` records each server start and readiness, each `get` and `page` with its HTTP status, each `build-site`, `browse`, `cli`, `remeasure`, `ci` and `doctor` with its exit code, and each process group `stop` kills or leaves alone. `setup` and `evidence` are not logged.
 - `doctor.txt` collects each doctor run.
 - `logs/` holds the api, preview, dev and build logs.
 - `api/` holds `$S get` bodies and headers.
@@ -78,7 +78,7 @@ Read-only. It appends to `doctor.txt` and exits 1 on a hard failure. It reports:
 
 - the checkout, its lake (the `data` link or `PHILLY_DATA_DIR`; missing fails) with the screen's rows, build date and model runs, the run in `siteStats.json`, and the `deploy` and `web/node_modules` links (missing warns and names what needs them);
 - for each port, the listening PID, its command and working directory, and whether this slug started it;
-- for the API, `/health` and `/api/stats`, and whether their rows and build date match the data directory that process serves;
+- for the API, `/health` and `/api/stats`, and whether `/health`'s rows and build day match the data directory that process serves (it prints the `/api/stats` counts without comparing them; `$S remeasure --api` does, and a same-day rebuild that keeps the row count passes this check);
 - for the site, whether `web/dist` has analytics compiled in and calls the API port in use (a hard failure only while a preview serves it), and whether the dev server's proxy reaches the API.
 
 Run it after launch and whenever a result looks wrong.
@@ -112,7 +112,7 @@ Serve-only check:
 just api-smoke 2>&1 | tee "$($S evidence <slug>)/logs/api-smoke.log"
 ```
 
-It rebuilds the worktree's `.venv-serve` from the `serve` and `serve-smoke` groups, installs the worktree's package, and runs `scripts/smoke_api.py`, which calls every endpoint in-process against `deploy/data` with `PHILLY_ENV=prod`. It catches training-only imports on the serve path and files missing from the bundle. It opens no port and takes about 12 s with a warm uv cache. The bundle is the main checkout's `deploy/data`; if your change alters what the API reads, that bundle is stale until `just bundle-data` rewrites it, which needs the owner's go-ahead.
+It rebuilds the worktree's `.venv-serve` from the `serve` and `serve-smoke` groups, installs the worktree's package, and runs `scripts/smoke_api.py`, which calls the business endpoints in-process against `deploy/data` with `PHILLY_ENV=prod` (`/health`, stats, search, property, report and comps for a row home and a condo, the bbox and flagged parcels) and checks that the admin leaderboard answers 404 there. It asserts a few fields per response, not every field, and does not call `/api/docs`. It catches training-only imports on the serve path and files missing from the bundle. It opens no port and takes about 12 s with a warm uv cache. The bundle is the main checkout's `deploy/data`; if your change alters what the API reads, that bundle is stale until `just bundle-data` rewrites it, which needs the owner's go-ahead.
 
 ### Site
 
@@ -173,7 +173,7 @@ runs `scripts/remeasure_screen.py`, which recounts the flags from `marts/assessm
 `data/marts/assessment_screen.manifest.json` lists the `models/<run_id>` inputs (baseline, bayesian, condo) the screen was built from, and each `data/models/run_id=<id>/run.manifest.json` lists what that run trained on. `siteStats.json` `meta.model_run_id` and `meta.interval_run_id` must appear among the screen's inputs; remeasure checks it. For any other number, write the polars query and `tee` it into the evidence folder:
 
 ```bash
-uv run python -c "import polars as pl; s = pl.scan_parquet('data/marts/assessment_screen.parquet'); print(s.group_by('model_family', 'assessment_flag').len().collect())"
+uv run python -c "import polars as pl; s = pl.scan_parquet('${PHILLY_DATA_DIR:-data}/marts/assessment_screen.parquet'); print(s.group_by('model_family', 'assessment_flag').len().collect())"
 ```
 
 ### CI and workflows

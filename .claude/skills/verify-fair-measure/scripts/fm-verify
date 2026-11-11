@@ -44,7 +44,7 @@ SCRATCH="${TMPDIR:-/tmp}/fm-verify/$(printf %s "$ROOT" | shasum | cut -c1-12)-$s
 
 evidence_dir() {
   local existing
-  existing=$(ls -d "$MAIN/data/verify/"*-"$slug" 2>/dev/null | sort | tail -1 || true)
+  existing=$(ls -d "$MAIN/data/verify/"[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-"$slug" 2>/dev/null | sort | tail -1 || true)
   if [[ -n $existing ]]; then
     echo "$existing"
     return
@@ -248,15 +248,18 @@ case $cmd in
   build-site)
     # vite preview answers /api/* with the SPA shell, so the build calls the api directly
     build_env=(VITE_ANALYTICS_ENABLED=false "VITE_API_BASE=http://127.0.0.1:$API_PORT")
-    log "build-site: env ${build_env[*]} npm --prefix web run build"
-    if (cd "$ROOT" && env "${build_env[@]}" npm --prefix web run build) >"$EV/logs/site-build.log" 2>&1; then
-      tail -3 "$EV/logs/site-build.log"
-      (cd "$ROOT/web/dist" && find . -name '*.html' | sort) >"$EV/site/dist-html-files.txt"
-      echo "built web/dist; html list in $EV/site/dist-html-files.txt"
-    else
+    set +e
+    (cd "$ROOT" && env "${build_env[@]}" npm --prefix web run build) >"$EV/logs/site-build.log" 2>&1
+    code=$?
+    set -e
+    log "build-site (exit $code): env ${build_env[*]} npm --prefix web run build"
+    if ((code)); then
       tail -30 "$EV/logs/site-build.log" >&2
       exit 1
     fi
+    tail -3 "$EV/logs/site-build.log"
+    (cd "$ROOT/web/dist" && find . -name '*.html' | sort) >"$EV/site/dist-html-files.txt"
+    echo "built web/dist; html list in $EV/site/dist-html-files.txt"
     ;;
   start-preview)
     [[ -f $ROOT/web/dist/index.html ]] || { echo "web/dist missing: run fm-verify build-site $slug" >&2; exit 1; }
@@ -283,8 +286,12 @@ case $cmd in
     [[ $# -ge 2 ]] || { usage; exit 2; }
     name=$1 path=$2
     shift 2
-    log "browse $name http://127.0.0.1:$PREVIEW_PORT$path $*"
+    set +e
     (cd "$ROOT" && node "$HERE/browse.mjs" "$EV/site" "$name" "http://127.0.0.1:$PREVIEW_PORT$path" "$@")
+    code=$?
+    set -e
+    log "browse $name (exit $code): http://127.0.0.1:$PREVIEW_PORT$path $*"
+    exit "$code"
     ;;
   cli)
     [[ $# -ge 2 ]] || { usage; exit 2; }
@@ -308,11 +315,11 @@ case $cmd in
     exit "$code"
     ;;
   remeasure)
-    log "remeasure $*"
     set +e
     (cd "$ROOT" && uv run --quiet python "$HERE/remeasure_screen.py" --out "$EV/remeasure.json" "$@") 2>&1 | tee "$EV/remeasure.txt"
     code=${PIPESTATUS[0]}
     set -e
+    log "remeasure (exit $code): $*"
     exit "$code"
     ;;
   ci)
@@ -348,7 +355,9 @@ case $cmd in
       (cd "$ROOT" && uv run --quiet python "$HERE/doctor.py" --scratch "$SCRATCH" \
         --api-port "$API_PORT" --preview-port "$PREVIEW_PORT" --dev-port "$DEV_PORT")
     } 2>&1 | tee -a "$EV/doctor.txt"
-    exit "${PIPESTATUS[0]}"
+    code=${PIPESTATUS[0]}
+    log "doctor (exit $code)"
+    exit "$code"
     ;;
   stop)
     shopt -s nullglob
