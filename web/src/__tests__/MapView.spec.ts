@@ -4,16 +4,27 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import MapView from '@/views/MapView.vue'
 import AddressSearch from '@/components/search/AddressSearch.vue'
 
-/** A stand-in for maplibre's Map that keeps the library's loading contract:
- * addSource, addLayer and setFilter throw "Style is not done loading." until
- * the basemap style has arrived (maplibre 6 `Style._checkLoaded`). */
+/** A stand-in for maplibre's Map that keeps the library's loading contract
+ * (maplibre 6): addSource, addLayer and setFilter throw "Style is not done
+ * loading." and getStyle returns nothing until the style JSON is parsed
+ * (`Style._checkLoaded`), while isStyleLoaded() stays false until every
+ * source's tiles and the sprite have loaded too (`Style.loaded`). */
 const fake = vi.hoisted(() => {
   type Handler = (event?: unknown) => void
+  type BasemapLayer = { id: string; type: string; paint: Record<string, unknown> }
   class FakeMap {
     static last: FakeMap
-    styleLoaded = false
+    styleParsed = false
+    resourcesLoaded = false
     zoom = 11.4
     center: [number, number] | null = null
+    /** A few of Positron's own layers with its own colours. */
+    basemap: BasemapLayer[] = [
+      { id: 'background', type: 'background', paint: { 'background-color': 'rgb(242,243,240)' } },
+      { id: 'water', type: 'fill', paint: { 'fill-color': 'rgb(194, 200, 202)' } },
+      { id: 'highway_minor', type: 'line', paint: { 'line-color': 'hsl(0,0%,88%)' } },
+      { id: 'label_city', type: 'symbol', paint: { 'text-color': '#000', 'text-halo-color': '#fff' } },
+    ]
     layers = new Map<string, { filter?: unknown }>()
     sources = new Map<string, { data: unknown; setData: (d: unknown) => void }>()
     handlers = new Map<string, Handler[]>()
@@ -22,11 +33,23 @@ const fake = vi.hoisted(() => {
       FakeMap.last = this
     }
     private checkLoaded() {
-      if (!this.styleLoaded) throw new Error('Style is not done loading.')
+      if (!this.styleParsed) throw new Error('Style is not done loading.')
     }
+    /** The events maplibre 6.11 fires on /map's first load, in the order a
+     * headless Chrome trace recorded. No styledata event sees isStyleLoaded()
+     * true. `load` fires once the tiles are in. */
     loadStyle() {
-      this.styleLoaded = true
+      this.styleParsed = true
       this.fire('styledata')
+      this.fire('style.load')
+      this.fire('styledata')
+      this.fire('styledata')
+      this.resourcesLoaded = true
+      this.fire('load')
+      this.fire('idle')
+    }
+    paint(layerId: string, property: string) {
+      return this.basemap.find((l) => l.id === layerId)?.paint[property]
     }
     fire(event: string, payload?: unknown) {
       for (const h of this.handlers.get(event) ?? []) h(payload)
@@ -42,12 +65,15 @@ const fake = vi.hoisted(() => {
     addControl() {}
     remove() {}
     isStyleLoaded() {
-      return this.styleLoaded
+      return this.styleParsed && this.resourcesLoaded
     }
     getStyle() {
-      return { layers: [] }
+      return this.styleParsed ? { layers: this.basemap } : undefined
     }
-    setPaintProperty() {}
+    setPaintProperty(layerId: string, property: string, value: unknown) {
+      const layer = this.basemap.find((l) => l.id === layerId)
+      if (layer) layer.paint[property] = value
+    }
     getLayer(id: string) {
       return this.layers.get(id)
     }
@@ -208,6 +234,20 @@ describe('MapView', () => {
     map.loadStyle()
     await flushPromises()
     expect(selectedRing(map)).toEqual(['==', ['get', 'id'], '591073500'])
+  })
+
+  it('draws the basemap in the Fair Measure palette once the style loads', async () => {
+    const { map } = await mountAt('/map')
+    map.loadStyle()
+    await flushPromises()
+
+    expect(map.paint('background', 'background-color')).toBe('#eef0f1')
+    expect(map.paint('water', 'fill-color')).toBe('#ccd8e2')
+    expect(map.paint('highway_minor', 'line-color')).toBe('#ffffff')
+    expect(map.paint('label_city', 'text-halo-color')).toBe('#ffffff')
+    // the label grey itself is the style module's choice (PR #18 changes it), so
+    // this asserts only that Positron's black is gone
+    expect(map.paint('label_city', 'text-color')).not.toBe('#000')
   })
 
   it('keeps the newest search pick when an older lookup answers last', async () => {
