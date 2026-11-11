@@ -377,12 +377,21 @@ case $cmd in
       pid=$(listener "$port")
       [[ -z $pid ]] || echo "port $port still served by pid $pid ($(ps -o command= -p "$pid")); not ours, left alone"
     done
-    changed=$(find "$MAIN/data" "$MAIN/deploy" -type f -newer "$EV/meta.txt" -not -path "$MAIN/data/verify/*" 2>/dev/null || true)
-    if [[ -n $changed ]]; then
-      echo "lake or bundle files written since this run began (by anyone):"
-      echo "$changed"
+    roots=("$MAIN/data" "$MAIN/deploy")
+    lake=$(cd "$ROOT" && cd "${PHILLY_DATA_DIR:-data}" 2>/dev/null && pwd -P || true)
+    [[ -z $lake || $lake == "$(cd "$MAIN/data" && pwd -P)" ]] || roots+=("$lake")
+    if [[ ! -f $EV/meta.txt ]]; then
+      echo "cannot check lake writes: $EV/meta.txt is missing"
     else
-      echo "no lake or bundle writes since this run began"
+      changed=$(find -H "${roots[@]}" -type f -newer "$EV/meta.txt" \
+        -not -path "$MAIN/data/verify/*" -not -path "$MAIN/data/reviews/*" \
+        -not -path "${lake:-/nonexistent}/verify/*" -not -path "${lake:-/nonexistent}/reviews/*" 2>/dev/null || true)
+      if [[ -n $changed ]]; then
+        echo "files written since this run began (by anyone) under ${roots[*]}, outside verify/ and reviews/:"
+        echo "$changed"
+      else
+        echo "no writes since this run began under ${roots[*]}, outside verify/ and reviews/"
+      fi
     fi | tee "$EV/lake-writes.txt"
     echo "evidence kept at $EV:"
     (cd "$EV" && find . -type f | sort)
