@@ -5,8 +5,8 @@ gets their assessment analysis, the screen verdict with its 90% interval, the
 value drivers, the neighborhood equity comparison, assessment history, and a
 plain-language appeal on-ramp. Design brief: mobile-first, accessible,
 **8th-grade reading level** (Philadelphia's adult average), honest about
-uncertainty, and free, the product features (leaderboards) live in an
-unlinked staff view, not the public flow.
+uncertainty, and free. Staff worklists (leaderboards) come from the
+token-protected API and the CLI, not the site.
 
 ## Architecture
 
@@ -18,7 +18,7 @@ web/                    Vue 3 + TypeScript + Vite + Tailwind v4 (mobile-first)
                         DriverBars, PeerHistogram, HistorySpark, IntervalExplainer
   src/views/            Home (search), Property (report), Map, AnnualReport,
                         Findings, Methodology, Trust (The Proof), Appeal,
-                        Admin (staff, unlinked), NotFound
+                        NotFound
 
 src/philly_fair_measure/api.py   FastAPI over the marts
   startup: assessment_screen + coordinates loaded once into memory (~500k rows)
@@ -81,7 +81,7 @@ Worker. Vite SSG pre-renders Home, Findings, the annual report and its `/report`
 alias, Methodology, Trust, and Appeal. Each page includes its content and
 route-specific metadata before JavaScript runs. The Worker owns only
 `www.nickhand.dev/fair-measure/*`, maps clean URLs to generated HTML in `dist/`,
-and uses a separate empty `spa.html` for map, admin, and property routes.
+and uses a separate empty `spa.html` for map and property routes.
 Unknown page URLs return 404 with the browser app's not-found view. Asset HTML
 rewrites are disabled in Wrangler because the Worker controls the public prefix
 and fallback explicitly. The FastAPI service remains on Fly at
@@ -151,9 +151,6 @@ deliberately kept:
 
 ## Product notes
 
-- `/leaderboards` (alias `/admin`) is the review-worklist page, planned to move
-  behind a real paywall/admin login when the product tier ships; the current
-  passphrase is a placeholder only.
 - Site-wide links (creator credit → nickhand.dev, GitHub repo, technical model
   docs) live in `web/src/config/site.ts`.
 
@@ -234,7 +231,7 @@ calling the current model ground truth.
 
 - `/api/admin/*` requires the `PHILLY_ADMIN_TOKEN` bearer token
   (`_require_admin` in api.py; `just fly-secrets` sets it in production). The
-  `/admin` view's client-side passphrase remains a convenience gate only, the
+  site has no admin view or passphrase. The
   server-side token is the real access control.
 - CORS uses an allowlist from `PHILLY_CORS_ORIGINS` (api.py); dev uses the
   Vite proxy.

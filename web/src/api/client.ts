@@ -6,7 +6,6 @@
 
 import type {
   CompRow,
-  LeaderRow,
   ParcelCollection,
   PropertyCore,
   Report,
@@ -57,7 +56,4 @@ export const api = {
       `/api/parcels?minx=${bbox[0]}&miny=${bbox[1]}&maxx=${bbox[2]}&maxy=${bbox[3]}`,
       signal,
     ),
-
-  leaderboard: (kind: 'over' | 'under' | 'nonuniform', n = 25, signal?: AbortSignal) =>
-    get<LeaderRow[]>(`/api/admin/leaderboard?kind=${kind}&n=${n}`, signal),
 }

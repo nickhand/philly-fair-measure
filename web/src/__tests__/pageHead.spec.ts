@@ -21,8 +21,8 @@ describe('page metadata', () => {
       .toBe('https://www.nickhand.dev/fair-measure/appeal')
   })
 
-  it('does not assign an indexable canonical URL to admin or missing pages', () => {
-    const head = pageHead({ name: 'admin', path: '/admin', meta: { noindex: true } })
+  it('does not assign an indexable canonical URL to missing pages', () => {
+    const head = pageHead({ name: 'not-found', path: '/missing-page', meta: { noindex: true } })
     expect(head.link).toEqual([])
     expect(head.meta).toContainEqual({ name: 'robots', content: 'noindex, nofollow' })
   })

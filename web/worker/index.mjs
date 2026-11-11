@@ -94,13 +94,12 @@ export default {
       shellRequest.headers.delete('If-Modified-Since')
       const fallback = await env.ASSETS.fetch(shellRequest)
       const path = new URL(request.url).pathname.slice(BASE_PATH.length)
-      const clientRoute = ['/map', '/admin', '/leaderboards'].includes(path) ||
-        /^\/property\/[^/]+$/.test(path)
+      const clientRoute = path === '/map' || /^\/property\/[^/]+$/.test(path)
       response = new Response(fallback.body, {
         status: fallback.ok && clientRoute ? 200 : 404,
         headers: fallback.headers,
       })
-      if (!clientRoute || path === '/admin' || path === '/leaderboards') {
+      if (!clientRoute) {
         response.headers.set('X-Robots-Tag', 'noindex, nofollow')
       }
     }

@@ -158,17 +158,6 @@ export interface Stats {
   screen_built: string | null
 }
 
-export interface LeaderRow {
-  parcel_id: string
-  address: string
-  opa_market_value: number | null
-  model_median: number | null
-  ratio: number | null
-  screen_z: number | null
-  twin_n: number | null
-  twin_ratio: number | null
-}
-
 export interface ParcelFeature {
   type: 'Feature'
   geometry: { type: 'Point'; coordinates: [number, number] }

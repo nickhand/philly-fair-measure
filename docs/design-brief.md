@@ -50,7 +50,7 @@ Professional but civic-minded, operationally:
 
 The app works and follows the right patterns, but visually it's default-Tailwind generic: stock slate grays, one navy, emoji as icons (🏠 ⚖️ 📝 ⓘ ⚠), uniform rounded-2xl cards with no hierarchy between the verdict (the emotional payoff) and supporting panels, no wordmark, no visual identity.
 
-Run it locally to see it: `uv run fair-measure api` + `cd web && npm run dev` → http://localhost:5173 (try address "108 ELFRETHS ALY"; map at /map; /methodology; /admin passphrase `philly-staff`).
+Run it locally to see it: `uv run fair-measure api` + `cd web && npm run dev` → http://localhost:5173 (try address "108 ELFRETHS ALY"; map at /map; /methodology).
 
 Known specific weaknesses to solve:
 
@@ -69,8 +69,7 @@ Known specific weaknesses to solve:
 2. **Home** `/`, hero + address search (ARIA combobox, keep exact behavior), three "what you'll see" cards, citywide counters, honesty blurb.
 3. **Map** `/map`, full-bleed map, floating search, legend, zoom hint, bottom sheet.
 4. **Methodology** `/methodology`, long-form explainer with the interactive confidence-level widget (50/80/90/95% buttons over 80 dots), fairness comparison table, "what we cannot see" honesty section.
-5. **Admin** `/admin`, staff tables; needs only tidying, deliberately utilitarian.
-6. 404, loading, error states.
+5. 404, loading, error states.
 
 ## 7. Hard technical contract (so the work drops in)
 
