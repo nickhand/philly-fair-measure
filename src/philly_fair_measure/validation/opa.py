@@ -152,13 +152,23 @@ def _require_coherent(
         hint = _RETRAIN_HINTS.get(kind, "retrain the model")
         message = (
             f"{run_dir.name} predates the current {name} mart "
-            f"({run_built} < {built}); its learned geography no longer matches "
-            f"the features, so the screen would be full of false flags. "
+            f"({run_built} < {built}); the features it would score no longer "
+            f"match the ones it was trained on, so the screen can fill with false flags. "
             f"Retrain first (`{hint}`), or pass --allow-stale to build anyway."
         )
         if not allow_stale:
             raise StaleRunError(message)
         logger.warning("%s (building anyway: --allow-stale)", message)
+
+
+def _mart_built_times(root: Path, names: tuple[str, ...]) -> tuple[tuple[str, datetime], ...]:
+    """Build time of each named mart that exists; proximity and
+    characteristic quality are optional screen inputs."""
+    return tuple(
+        (name, read_derived_manifest(path).built_at)
+        for name in names
+        if (path := root / "marts" / f"{name}.parquet").exists()
+    )
 
 
 def finalize_screen(df: pl.DataFrame) -> pl.DataFrame:
@@ -415,13 +425,13 @@ def build_assessment_screen(
     except FileNotFoundError:
         retail_run = None
     mart_built = read_derived_manifest(root / "marts" / "sale_features.parquet").built_at
-    # market areas and the price index are read straight from their own marts
-    # below, so a run has to postdate those as well as the sale mart
+    # the screen reads these marts straight from disk below, so a run has to
+    # postdate each of them as well as the sale mart it trained on
     marts = (
         ("sale_features", mart_built),
-        *(
-            (name, read_derived_manifest(paths[name]).built_at)
-            for name in ("market_areas", "price_index")
+        *_mart_built_times(
+            root,
+            ("sale_validity", "market_areas", "price_index", "proximity", "characteristic_quality"),
         ),
     )
     for run_dir in (baseline_run, bayesian_run, *([retail_run] if retail_run else [])):
@@ -733,10 +743,7 @@ def _condo_screen_frame(
     marts = (
         ("condo_sale_features", read_derived_manifest(condo_mart).built_at),
         ("sale_features", residential_mart_built),
-        *(
-            (name, read_derived_manifest(root / "marts" / f"{name}.parquet").built_at)
-            for name in ("market_areas", "price_index")
-        ),
+        *_mart_built_times(root, ("sale_validity", "market_areas", "price_index", "proximity")),
     )
     _require_coherent(condo_run, marts, allow_stale=allow_stale)
 
