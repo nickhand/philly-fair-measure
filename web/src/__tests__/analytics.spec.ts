@@ -1,3 +1,4 @@
+import { gunzipSync } from 'node:zlib'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { App } from 'vue'
 import type { Router } from 'vue-router'
@@ -12,7 +13,7 @@ const posthog = {
 function pageviews(): unknown[] {
   return posthog.capture.mock.calls
     .filter(([event]) => event === '$pageview')
-    .map(([, props]) => props?.path)
+    .map(([, props]) => props?.route)
 }
 
 function mountedApp(): App | undefined {
@@ -30,6 +31,15 @@ async function openSite(path: string): Promise<Router> {
 
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve))
 
+type Sent = { event: string; properties: Props }
+
+/** The events posthog-js sends, decoded from the request bodies it hands to fetch. */
+async function decodeEvents(body: unknown): Promise<Sent[]> {
+  const bytes = Buffer.from(await new Response(body as BodyInit).arrayBuffer())
+  const text = bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes).toString() : bytes.toString()
+  return [JSON.parse(text)].flat()
+}
+
 beforeEach(() => {
   vi.resetModules()
   vi.stubEnv('PROD', true)
@@ -45,6 +55,7 @@ afterEach(() => {
   vi.doUnmock('posthog-js')
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 describe('analytics', () => {
@@ -60,12 +71,12 @@ describe('analytics', () => {
     vi.doMock('posthog-js', () => ({ default: posthog }))
     const { initAnalytics, track, trackPageview } = await import('@/lib/analytics')
     initAnalytics()
-    trackPageview('/map')
+    trackPageview('map')
     track('map_filter_toggled', { group: 'condos', on: true })
     await vi.waitFor(() => expect(posthog.capture).toHaveBeenCalledTimes(2))
     expect(posthog.capture.mock.calls).toEqual([
-      ['$pageview', { path: '/map' }],
-      ['map_filter_toggled', { group: 'condos', on: true }],
+      ['$pageview', { route: 'map' }],
+      ['map_filter_toggled', { group: 'condos', on: true, route: 'map' }],
     ])
     expect(posthog.init).toHaveBeenCalledOnce()
     expect(posthog.init.mock.invocationCallOrder[0]).toBeLessThan(posthog.capture.mock.invocationCallOrder[0]!)
@@ -96,6 +107,39 @@ describe('analytics', () => {
     await router.push('/findings')
     await nextFrame()
     expect(document.activeElement?.textContent).toContain('What we found')
-    await vi.waitFor(() => expect(pageviews()).toEqual([report, '/findings']))
+    await vi.waitFor(() => expect(pageviews()).toEqual(['annual-report', 'findings']))
   })
+
+  it('names the route instead of the URL and stores nothing in the browser', async () => {
+    localStorage.clear()
+    sessionStorage.clear()
+    vi.spyOn(document, 'referrer', 'get').mockReturnValue('http://localhost:3000/property/591073500?from=share')
+    const bodies: string[] = []
+    const events: Sent[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (!String(url).includes('posthog.com')) return { ok: false, status: 404, json: async () => ({}) }
+        const sent = String(url).includes('/e/') ? await decodeEvents(init?.body) : []
+        events.push(...sent)
+        bodies.push(`${url} ${JSON.stringify(sent)}`)
+        return new Response('{}')
+      }),
+    )
+
+    const router = await openSite('/property/052174500?from=share#comps')
+    await router.push('/property/888520502?tab=comps')
+    const { track } = await import('@/lib/analytics')
+    track('comps_shown')
+
+    await vi.waitFor(() => expect(events.map((e) => e.event)).toEqual(['$pageview', '$pageview', 'comps_shown']), {
+      timeout: 8000,
+    })
+    expect(bodies.join('\n')).not.toMatch(/052174500|591073500|888520502|from=share|tab=comps|#comps/)
+    for (const { properties } of events) {
+      expect(properties).toMatchObject({ route: 'property', $current_url: 'property', $pathname: 'property' })
+    }
+    const stored = [...Object.keys(localStorage), ...Object.keys(sessionStorage), document.cookie]
+    expect(stored.filter((key) => key.includes('ph_'))).toEqual([])
+  }, 15_000)
 })
