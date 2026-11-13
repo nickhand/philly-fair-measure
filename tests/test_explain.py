@@ -101,3 +101,37 @@ def test_decode_recorded_translates_published_city_codes():
     # undocumented codes stay untranslated rather than risk invented meanings
     assert decode_recorded("char_construction", "A") is None
     assert decode_recorded("char_interior_condition", "9") is None
+
+
+def _shipped_feature_lists() -> dict[str, list[str]]:
+    from philly_fair_measure.features.renovation_episodes import EPISODE_RAW_FEATURES
+    from philly_fair_measure.models.baseline import feature_lists
+    from philly_fair_measure.models.condo import CONDO_CATEGORICAL, CONDO_NUMERIC
+    from philly_fair_measure.models.renovation_state import TRANSITION_PROBABILITY_FEATURE
+
+    numeric, categorical = feature_lists(time_adjusted=True)
+    return {
+        "baseline": [*numeric, *EPISODE_RAW_FEATURES, TRANSITION_PROBABILITY_FEATURE, *categorical],
+        "condo": [*CONDO_NUMERIC, *CONDO_CATEGORICAL],
+    }
+
+
+def test_every_shipped_model_feature_has_a_plain_label():
+    from philly_fair_measure.models.explain import FEATURE_LABELS
+
+    shipped = _shipped_feature_lists()
+    for run, features in shipped.items():
+        # fin_ features stay in the model but are never shown as drivers
+        unlabelled = [f for f in features if not f.startswith("fin_") and f not in FEATURE_LABELS]
+        assert unlabelled == [], f"{run} features shown as raw code names: {unlabelled}"
+    every_feature = {f for features in shipped.values() for f in features}
+    stale = sorted(set(FEATURE_LABELS) - every_feature)
+    assert stale == [], f"labels for features no model trains on: {stale}"
+
+
+def test_demolition_driver_names_the_property_itself():
+    from philly_fair_measure.models.explain import FEATURE_LABELS
+
+    # evt_n_demolitions_before counts demolitions recorded on this parcel's own account
+    label, _ = FEATURE_LABELS["evt_n_demolitions_before"]
+    assert "nearby" not in label and "this property" in label
