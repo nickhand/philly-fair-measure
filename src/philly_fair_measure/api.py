@@ -37,6 +37,19 @@ logger = logging.getLogger(__name__)
 
 _SEARCH_LIMIT = 10
 _BBOX_LIMIT = 4000
+# A capped viewport keeps the homes the map highlights: flagged, then the
+# watch tier, then data warnings. parcel_id breaks ties so the cut never
+# depends on the mart's row order.
+_BBOX_ORDER = (
+    pl.when(pl.col("assessment_flag").is_in([str(AssessmentFlag.OVER), str(AssessmentFlag.UNDER)]))
+    .then(0)
+    .when(pl.col("attention").is_not_null())
+    .then(1)
+    .when(pl.col("assessment_flag") == str(AssessmentFlag.INSUFFICIENT))
+    .then(2)
+    .otherwise(3),
+    pl.col("parcel_id"),
+)
 # The flagged payload changes only when a deploy loads new data. Five minutes
 # bounds how long a browser keeps showing the old dots after one; the ETag
 # turns each later check into a bodyless 304.
@@ -634,9 +647,15 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
     ) -> dict[str, Any]:
         """GeoJSON points in a map viewport (client gates to high zoom).
         `truncated` is true when the viewport holds more than `limit` homes."""
-        sub = frame.filter(
-            pl.col("loc_lon").is_between(minx, maxx) & pl.col("loc_lat").is_between(miny, maxy)
-        ).head(limit + 1)
+        sub = (
+            frame.lazy()
+            .filter(
+                pl.col("loc_lon").is_between(minx, maxx) & pl.col("loc_lat").is_between(miny, maxy)
+            )
+            .sort(*_BBOX_ORDER)
+            .head(limit + 1)
+            .collect()
+        )
         truncated = sub.height > limit
         sub = sub.head(limit)
         features = [
