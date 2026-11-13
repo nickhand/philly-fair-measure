@@ -426,7 +426,7 @@ Every figure above is regenerated from public data by the open-source
 | Vertical regressivity across periods + conventions (Robustness) | `fair-measure regressivity-cv` |
 | Temporal + spatial CV, look-ahead bound | `fair-measure stability-audit` |
 | Sales-chasing and convention bridge (F6) | `fair-measure ratio-study` |
-| Per-property both-value report | `fair-measure report <address>` |
+| Per-property both-value report | the site's property page, from `GET /api/property/<parcel_id>/report` |
 
 Data sources: OPA property assessments and characteristics, Real Estate
 Transfer records, L&I permits/violations/complaints, PWD parcels, and the city
