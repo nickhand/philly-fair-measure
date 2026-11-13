@@ -18,7 +18,7 @@ const LAND = '#eef0f1'
 const WATER = '#ccd8e2'
 const ROAD = '#ffffff'
 const PARK = '#dce8dc'
-const LABEL = '#8593a4'
+const LABEL = '#637182'
 const LABEL_HALO = '#ffffff'
 
 export function applyFairMeasurePaint(map: MLMap): void {

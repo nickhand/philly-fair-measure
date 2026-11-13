@@ -309,8 +309,8 @@ function onMove(e: PointerEvent) {
       >
         {{ l.text }}
       </text>
-      <text :x="PAD" :y="BASE + 15" text-anchor="start" font-size="11.5" fill="#8593a4">{{ years[0] }}</text>
-      <text :x="width - PAD" :y="BASE + 15" text-anchor="end" font-size="11.5" fill="#8593a4">{{ years[1] }}</text>
+      <text :x="PAD" :y="BASE + 15" text-anchor="start" font-size="11.5" fill="#637182">{{ years[0] }}</text>
+      <text :x="width - PAD" :y="BASE + 15" text-anchor="end" font-size="11.5" fill="#637182">{{ years[1] }}</text>
     </svg>
     <div
       v-if="hover"

@@ -92,10 +92,10 @@ const ariaLabel = computed(
       <line :x1="x(peerMedian)" y1="24" :x2="x(peerMedian)" :y2="BASE" stroke="#0f4d90" stroke-width="2" />
       <line :x1="x(clampedYou)" y1="34" :x2="x(clampedYou)" :y2="BASE" :stroke="youHex" stroke-width="2" stroke-dasharray="3 4" />
       <circle :cx="x(clampedYou)" cy="34" r="3.5" :fill="youHex" />
-      <text v-for="t in ticks" :key="t" :x="x(t)" :y="BASE + 15" text-anchor="middle" font-size="11.5" fill="#8593a4" style="font-variant-numeric: tabular-nums">
+      <text v-for="t in ticks" :key="t" :x="x(t)" :y="BASE + 15" text-anchor="middle" font-size="11.5" fill="#637182" style="font-variant-numeric: tabular-nums">
         {{ Math.round(t * 100) }}%
       </text>
-      <text :x="width / 2" :y="HEIGHT - 4" text-anchor="middle" font-size="11.5" fill="#8593a4">
+      <text :x="width / 2" :y="HEIGHT - 4" text-anchor="middle" font-size="11.5" fill="#637182">
         assessment as % of our estimate
       </text>
       <text
